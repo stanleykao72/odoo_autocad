@@ -4,7 +4,7 @@
 (defun c:O1 ()
   (setq
     python "C:/Python/Python310/python.exe"
-    pyscript "o:/python/connect_odoo2csv.py"
+    pyscript "C:/odoo/odoo_autocad/python/connect_odoo2csv.py"
    
   )
   (startapp python pyscript)
@@ -13,7 +13,7 @@
 (defun c:O2 ()
   (setq
     python "C:/Python/Python310/python.exe"
-    pyscript "o:/python/get_info_from_acad.py"
+    pyscript "C:/odoo/odoo_autocad/python/get_info_from_acad.py"
    
   )
   (startapp python pyscript)
@@ -22,7 +22,7 @@
 (defun c:O3 ()
   (setq
     python "C:/Python/Python310/python.exe"
-    pyscript "o:/python/import2odoo_boq.py"
+    pyscript "C:/odoo/odoo_autocad/python/import2odoo_boq.py"
    
   )
   (startapp python pyscript)
@@ -31,7 +31,7 @@
 (defun c:O4 ()
   (setq
     python "C:/Python/Python310/python.exe"
-    pyscript "o:/python/import2odoo_pr.py"
+    pyscript "C:/odoo/odoo_autocad/python/import2odoo_pr.py"
    
   )
   (startapp python pyscript)
