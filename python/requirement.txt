@@ -1,0 +1,6 @@
+bravado_core
+bravado
+swagger_spec_validator
+pyautocad
+pywin32
+pyyaml

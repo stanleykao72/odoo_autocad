@@ -1,0 +1,8 @@
+server:
+  host: 'odoo-esmith-1124-stage-6571675.dev.odoo.com'
+  db_name: 'odoo-esmith-1124-stage-6571675'
+  url: 'https://odoo-esmith-1124-stage-6571675.dev.odoo.com/api/v1/boq_import_api/swagger.json?token=34dba8ba-cf29-4ac7-a2b7-e64b7ac7bae6&db=odoo-esmith-1124-stage-6571675'
+  token_file: 'c:\odoo\config\token.yaml'
+  StripMtext_file: 'O:\\autolisp\\StripMtext v5-0b.lsp'
+  read_csv_file: 'O:\\autolisp\\read_csv.lsp'
+  contract_product_file: 'O:\\autolisp\\contract_product.lsp'
