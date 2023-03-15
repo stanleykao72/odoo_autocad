@@ -133,6 +133,7 @@ def main():
     acaduti = acad.ActiveDocument.Utility
     prompt(acaduti, "Hello! Autocad from pywin32.\n")
     mp = acaddoc.ModelSpace
+    acadlyt = acad.ActiveDocument.Layouts
     prompt(acaduti, f'{acaddoc.Name}\n')
 
     file_path = acaddoc.GetVariable('dwgprefix')
@@ -164,13 +165,13 @@ def main():
         return
 
     # point0 = APoint (1,1)
-    point0 = vtPnt(0, 0, 0)
+    # point0 = vtPnt(0, 0, 0)
     # point1 = acaduti.GetPoint ( point0, "請選擇基點")
     # point2 = acaduti.GetCorner (APoint(point1), "請選擇對角點")
 
-    point1 = acaduti.GetPoint ( point0, "請選擇基點")
-    point2 = acaduti.GetCorner (vtFloat(point1), "請選擇對角點")
-    prompt(acaduti, f'{point1}, {point2}\n')
+    # point1 = acaduti.GetPoint ( point0, "請選擇基點")
+    # point2 = acaduti.GetCorner (vtFloat(point1), "請選擇對角點")
+    # prompt(acaduti, f'{point1}, {point2}\n')
 
     # try:
     #     ssget1 = acaddoc.SelectionSets.Add("SS1")
@@ -181,77 +182,96 @@ def main():
 
     # ssget1.select(1, APoint(point1), APoint(point2))
 
-    try:
-        ssget = acaddoc.SelectionSets.Add("SS")
-    except:
-        acaddoc.SelectionSets.Item("SS").Delete
-        ssget = acaddoc.SelectionSets("SS")
-        ssget.Clear()
+    # try:
+    #     ssget = acaddoc.SelectionSets.Add("SS")
+    # except:
+    #     acaddoc.SelectionSets.Item("SS").Delete
+    #     ssget = acaddoc.SelectionSets("SS")
+    #     ssget.Clear()
         
-    pnts = point1 + point2
-    print(pnts)
-    pnts=vtFloat(pnts)
-    ssget.SelectByPolygon(2, pnts)
+    # pnts = point1 + point2
+    # print(pnts)
+    # pnts=vtFloat(pnts)
+    # ssget.SelectByPolygon(2, pnts)
 
-    header_dict = {}
-    for table in iter_objects(acaddoc, "table", ssget):            
-        detail_flag = False
-        prompt(acaduti, f'columns: {table.Columns}, rows: {table.Rows}')
-        chk_cell_value = mtext_to_string(table.GetText(0, 0))
-        header_id = mtext_to_string(table.GetText(0, 8))
-        header_dict['header_id'] = header_id
+    host = server_cfg['host']  #'odoo-esmith-1124-stage-6571675.dev.odoo.com'
+    db_name = server_cfg['db_name'] #'odoo-esmith-1124-stage-6571675'
+    user_token = token_cfg['token'] #'6d4bead3-8c1a-46b4-a399-7e57535b85d9'
+    url = server_cfg['url'] #'https://odoo-esmith-1124-stage-6571675.dev.odoo.com/api/v1/boq_import_api/swagger.json?token=34dba8ba-cf29-4ac7-a2b7-e64b7ac7bae6&db=odoo-esmith-1124-stage-6571675'
+    http_client = RequestsClient()
+    http_client.set_basic_auth(host, db_name, user_token)
 
-    if not 'header_id' in header_dict:
-        prompt(acaduti, f'尚未匯入BOQ，請確認\n')
-    else:    
-        prompt(acaduti, f'header_dict:{header_dict}\n')
+    try:
+        odoo = SwaggerClient.from_url(
+            url,
+            http_client=http_client
+        )
+        prompt(acaduti, f"與Odoo連線成功\n")
+    except requests.exceptions.ConnectionError:
+        print('Unable to connect to server.')
+        prompt(acaduti, f"無法與Odoo，通常多試幾次會成功\n")
+        return
+    except (
+        simplejson.errors.JSONDecodeError,      # type: ignore
+        yaml.YAMLError,
+        HTTPError,
+        ):
+        print(
+            'Invalid swagger file. Please check to make sure the '
+            'swagger file can be found at: {}.'.format(url)
+        )
+        return
+    except SwaggerValidationError:
+        print('Invalid swagger format.')
+        return
 
-        host = server_cfg['host']  #'odoo-esmith-1124-stage-6571675.dev.odoo.com'
-        db_name = server_cfg['db_name'] #'odoo-esmith-1124-stage-6571675'
-        user_token = token_cfg['token'] #'6d4bead3-8c1a-46b4-a399-7e57535b85d9'
-        url = server_cfg['url'] #'https://odoo-esmith-1124-stage-6571675.dev.odoo.com/api/v1/boq_import_api/swagger.json?token=34dba8ba-cf29-4ac7-a2b7-e64b7ac7bae6&db=odoo-esmith-1124-stage-6571675'
-        http_client = RequestsClient()
-        http_client.set_basic_auth(host, db_name, user_token)
+    for lyt in acadlyt:
+        print(lyt.Name)
+        prompt(acaduti, f'配置: {lyt.Name}\n')
+        # for block in blocks:
+        header_dict = {}
+        if lyt.Name != 'Model':
+            table_count = 0
+            detail_lst = []
 
-        try:
-            odoo = SwaggerClient.from_url(
-                url,
-                http_client=http_client
-            )
-            prompt(acaduti, f"與Odoo連線成功\n")
-        except requests.exceptions.ConnectionError:
-            print('Unable to connect to server.')
-            prompt(acaduti, f"無法與Odoo，通常多試幾次會成功\n")
-        except (
-            simplejson.errors.JSONDecodeError,      # type: ignore
-            yaml.YAMLError,
-            HTTPError,
-            ):
-            print(
-                'Invalid swagger file. Please check to make sure the '
-                'swagger file can be found at: {}.'.format(url)
-            )
-        except SwaggerValidationError:
-            print('Invalid swagger format.')
+            for entity in lyt.Block:
+                name = entity.EntityName
+                print(f'Name:{name}\n')
 
-        import_return_list = odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
-            method_name="boq2pr",
-            body={
-            "args": [header_dict],
-            "kwargs": {'user_token': user_token},
-            "context": {}
-            }    
-        ).response().incoming_response.json()
+    # header_dict = {}
+    # for table in iter_objects(acaddoc, "table", ssget): 
+                if name == 'AcDbTable':
+                    table = entity
+           
+                    detail_flag = False
+                    prompt(acaduti, f'columns: {table.Columns}, rows: {table.Rows}')
+                    chk_cell_value = mtext_to_string(table.GetText(0, 0))
+                    header_id = mtext_to_string(table.GetText(0, 8))
+                    header_dict['header_id'] = header_id
 
-        if 'error_code' in import_return_list:
-            print(import_return_list)
-            prompt(acaduti, f"錯誤:{import_return_list.get('error_code')} ==> {import_return_list.get('error_message')}\n")
-        else:
-            hd_id = import_return_list.get('header_id')
-            hd_state = import_return_list.get('state')
+        if not 'header_id' in header_dict:
+            prompt(acaduti, f'{lyt.Name}:尚未匯入BOQ，請確認\n')
+        else:    
+            prompt(acaduti, f'{lyt.Name}:header_dict:{header_dict}\n')
 
-            if hd_state == 'done':
-                prompt(acaduti, f"成功匯入請購單\n")
+            import_return_list = odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
+                method_name="boq2pr",
+                body={
+                "args": [header_dict],
+                "kwargs": {'user_token': user_token},
+                "context": {}
+                }    
+            ).response().incoming_response.json()
+
+            if 'error_code' in import_return_list:
+                print(import_return_list)
+                prompt(acaduti, f"錯誤:{import_return_list.get('error_code')} ==> {import_return_list.get('error_message')}\n")
+            else:
+                hd_id = import_return_list.get('header_id')
+                hd_state = import_return_list.get('state')
+
+                if hd_state == 'done':
+                    prompt(acaduti, f"成功匯入請購單\n")
 
 if __name__ == "__main__":
     main()
