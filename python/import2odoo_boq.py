@@ -196,15 +196,6 @@ def main():
 
     blocks = acaddoc.Blocks
     # blocks = acad.best_interface(blocks)
-    header_dict = {}
-    for block in blocks:
-        # print(block.name)
-        if block.name == 'pr_no':
-            prompt(acaduti, f'{block.name}\n')
-            # print(block.ObjectName)
-            item = find_one(acaddoc, "text", block)
-            header_dict['pr_no'] = item.TextString
-            prompt(acaduti, f'請購單號:{item.TextString}\n')
         # if block.name == 'prj_name':
         #     print(block.name)
         #     # print(block.ObjectName)
@@ -246,86 +237,108 @@ def main():
 
     # for entity in ssget:
     for lyt in acadlyt:
-        print(lyt.Name)
+        print(f'\n========================')
+        print(f'layout:{lyt.Name}')
+        print(f'========================')
+        prompt(acaduti, f'\n========================')
+        prompt(acaduti, f'layout:{lyt.Name}')
+        prompt(acaduti, f'========================')
+
         # for block in blocks:
         # header_dict = {}
         if lyt.Name != 'Model':
-            table_count = 0
-            detail_lst = []
+            header_dict = {}
+            for block in blocks:
+                # print(block.name)
+                if block.name == 'pr_no':
+                    prompt(acaduti, f'{block.name}\n')
+                    # print(block.ObjectName)
+                    item = find_one(acaddoc, "text", block)
+                    header_dict['pr_no'] = item.TextString
+                    prompt(acaduti, f'請購單號:{item.TextString}\n')
 
+            header_dict['layout_name'] = lyt.Name
+            # detail_lst = []
+            table_count = 0
             for entity in lyt.Block:
                 name = entity.EntityName
-                print(f'Name:{name}\n')
+                # print(f'EntityName:{name}\n')
                 if name == 'AcDbBlockReference':
                     print(f'name:{entity.Name}\n')
-                    print(f'{entity.EffectiveName}')
+                    # print(f'{entity.EffectiveName}')
                     for attrib in entity.GetAttributes():
-                        block = acaddoc.Blocks.Item(entity.Name)
+                        # block = acaddoc.Blocks.Item(entity.Name)
 
                         # if attrib.TagString == '工種群組':
                         if attrib.TagString == 'job_working_plan_name':
-                            prompt(acaduti, f'工種群組:{attrib.TextString}\n')
-                            header_dict['job_working_plan_name'] = attrib.TextString
+                            job_working_plan_name = mtext_to_string(attrib.TextString)
+                            prompt(acaduti, f'工種群組:{job_working_plan_name}\n')
+                            print(f'工種群組:{job_working_plan_name}')
+                            header_dict['job_working_plan_name'] = job_working_plan_name
+                            print(f'工種群組:header_dict["job_working_plan_name"]:{header_dict["job_working_plan_name"]}')
 
                         # if attrib.TagString == '顏色名稱':
                         if attrib.TagString == 'color_name':
                             prompt(acaduti, f'顏色名稱:{attrib.TextString}\n')
+                            print(f'顏色名稱:{attrib.TextString}')
                             header_dict['color_name'] = attrib.TextString
 
                         # if attrib.TagString == '色號':
                         if attrib.TagString == 'color_no':
                             prompt(acaduti, f'色號:{attrib.TextString}\n')
+                            print(f'色號:{attrib.TextString}')
                             header_dict['color_no'] = attrib.TextString
                                         
                         # if attrib.TagString == '表面處理':
                         if attrib.TagString == 'surface_treatment':
                             prompt(acaduti, f'表面處理:{attrib.TextString}\n')
+                            print(f'表面處理:{attrib.TextString}')
                             header_dict['surface_treatment'] = attrib.TextString
 
                         # if attrib.TagString == '材料名稱':
                         if attrib.TagString == 'product_name':
                             prompt(acaduti, f'材料名稱:{attrib.TextString}\n')
+                            print(f'材料名稱:{attrib.TextString}')
                             header_dict['product_name'] = attrib.TextString
+                            print(f'工種群組:header_dict["product_name"]:{header_dict["product_name"]}')
 
                         # if attrib.TagString == '加工流程':
                         if attrib.TagString == 'operation_flow':
-                            prompt(acaduti, f'加工流程:{attrib.TextString}\n')
-                            header_dict['operation_flow'] = attrib.TextString
+                            operation_flow = mtext_to_string(attrib.TextString)
+                            prompt(acaduti, f'加工流程:{operation_flow}\n')
+                            print(f'加工流程:{operation_flow}')
+                            header_dict['operation_flow'] = operation_flow
 
                         # if attrib.TagString == '材料分類':
                         if attrib.TagString == 'product_catelog':
                             prompt(acaduti, f'材料分類:{attrib.TextString}\n')
+                            print(f'材料分類:{attrib.TextString}')
                             header_dict['product_catelog'] = attrib.TextString
 
                         # if attrib.TagString == '材質':
                         if attrib.TagString == 'spec':
                             prompt(acaduti, f'材質:{attrib.TextString}\n')
+                            print(f'材質:{attrib.TextString}')
                             header_dict['spec'] = attrib.TextString
 
                         # if attrib.TagString == '工程名稱':
                         if attrib.TagString == 'project_name':
-                            prompt(acaduti, f'工程名稱:{attrib.TextString}\n')
-                            header_dict['project_name'] = attrib.TextString
+                            project_name = mtext_to_string(attrib.TextString)
+                            prompt(acaduti, f'工程名稱:{project_name}\n')
+                            print(f'工程名稱:{project_name}')
+                            header_dict['project_name'] = project_name
 
                 if name == 'AcDbTable':
                     table = entity
                     
-                    detail_flag = False
-                    prompt(acaduti, f'columns: {table.Columns}, rows: {table.Rows}')
+                    prompt(acaduti, f'columns: {table.Columns}, rows: {table.Rows}\n')
                     chk_cell_value = mtext_to_string(table.GetText(0, 0))
                     header_id = mtext_to_string(table.GetText(0, 8))
                     header_dict['header_id'] = header_id
                     if chk_cell_value == '加工細節':
-                        # table_count += 1
-                        print(f'detail')
-                        # header_flag = False
-                        detail_flag = True
-                        
-                        # if table_count == 1:
-                        # detail_lst = []
-                        # detail_dict = {}
-
-                    if detail_flag:
+                        table_count += 1
+                        print(f'table_count:{table_count}')
+                        print(f'header_dict:{header_dict}')
                         detail_lst = []
                         detail_dict = {}
                         for row in range(table.Rows):
@@ -334,9 +347,25 @@ def main():
                                 position = mtext_to_string(table.GetText(row, 0))
                                 product_no = mtext_to_string(table.GetText(row, 1))
                                 width = mtext_to_string(table.GetText(row, 2))
+                                if width:
+                                    width = float(width)
+                                else:
+                                    width = False
                                 height = mtext_to_string(table.GetText(row, 3))
+                                if height:
+                                    height = float(height)
+                                else:
+                                    height = False
                                 length = mtext_to_string(table.GetText(row, 4))
+                                if length:
+                                    length = float(length)
+                                else:
+                                    length = False
                                 thickness = mtext_to_string(table.GetText(row, 5))
+                                if thickness:
+                                    thickness = float(thickness)
+                                else:
+                                    thickness = False
                                 qty = mtext_to_string(table.GetText(row, 6))
                                 desc = mtext_to_string(table.GetText(row, 7))
                                 detail_id = mtext_to_string(table.GetText(row, 8))
@@ -344,10 +373,10 @@ def main():
                                     detail_dict = {
                                     'position': position,
                                     'product_no': product_no,
-                                    'width': float(width),
-                                    'height': float(height),
-                                    'length': float(length),
-                                    'thickness': float(thickness),
+                                    'width': width,
+                                    'height': height,
+                                    'length': length,
+                                    'thickness': thickness,
                                     'qty': float(qty),
                                     'desc': desc,
                                     'detail_id': detail_id,
@@ -355,50 +384,50 @@ def main():
                                     detail_lst.append(detail_dict)
                                     # print(detail_lst)
 
-                    if detail_lst:
-                        header_dict['detail'] = detail_lst
+            if detail_lst:
+                header_dict['detail'] = detail_lst
 
-                        #  print(header_dict['detail'])
-    
-                    if not 'detail' in header_dict:
-                        prompt(acaduti, f'未讀取到加工細節，請確認\n')
-                    else:    
-                        prompt(acaduti, f'header_dict:{header_dict}\n')
+            print(f"header_dict:{header_dict['detail']}")
 
-                        import_return_list = odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
-                            method_name="import2boq",
-                            body={
-                            "args": [header_dict],
-                            "kwargs": {'user_token': user_token},
-                            "context": {}
-                            }    
-                        ).response().incoming_response.json()
+            if not 'detail' in header_dict:
+                prompt(acaduti, f'未讀取到加工細節，請確認\n')
+            else:    
+                prompt(acaduti, f'header_dict:{header_dict}\n')
 
-                        if 'error_code' in import_return_list:
-                            print(import_return_list)
-                            prompt(acaduti, f"錯誤:{import_return_list.get('error_code')} ==> {import_return_list.get('error_message')}\n")
-                        else:
-                            hd_id = import_return_list.get('header_id')
-                            dtl_lst = import_return_list.get('detail')
-                            # for table in iter_objects(acaddoc, "table", ssget):
-                            # if name == 'AcDbTable':
-                                # table = entity
+                import_return_list = odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
+                    method_name="import2boq",
+                    body={
+                    "args": [header_dict],
+                    "kwargs": {'user_token': user_token},
+                    "context": {}
+                    }    
+                ).response().incoming_response.json()
 
-                            # table.SetText(0, 8, str(hd_id))
-                            # print(table.Rows)
-                            for row in range(table.Rows):
-                                # print(row)
-                                # 
-                                if row == 0:
-                                    table.SetText(row, 8, str(hd_id))
-                                if row > 1:
-                                    qty = mtext_to_string(table.GetText(row, 6))
-                                    # print('qty:', qty)
-                                    if qty:
-                                        dtl_id = dtl_lst[row-2]
-                                        # print('detail_id:',dtl_id)
-                                        table.SetText(row, 8, str(dtl_id))
-                            prompt(acaduti, f"成功匯入BOQ，BOQ_ID={hd_id}\n")
+                if 'error_code' in import_return_list:
+                    print(import_return_list)
+                    prompt(acaduti, f"錯誤:{import_return_list.get('error_code')} ==> {import_return_list.get('error_message')}\n")
+                else:
+                    hd_id = import_return_list.get('header_id')
+                    dtl_lst = import_return_list.get('detail')
+                    # for table in iter_objects(acaddoc, "table", ssget):
+                    # if name == 'AcDbTable':
+                        # table = entity
+
+                    # table.SetText(0, 8, str(hd_id))
+                    # print(table.Rows)
+                    for row in range(table.Rows):
+                        # print(row)
+                        # 
+                        if row == 0:
+                            table.SetText(row, 8, str(hd_id))
+                        if row > 1:
+                            qty = mtext_to_string(table.GetText(row, 6))
+                            # print('qty:', qty)
+                            if qty:
+                                dtl_id = dtl_lst[row-2]
+                                # print('detail_id:',dtl_id)
+                                table.SetText(row, 8, str(dtl_id))
+                    prompt(acaduti, f"成功匯入BOQ，BOQ_ID={hd_id}\n")
 
 if __name__ == "__main__":
     main()
