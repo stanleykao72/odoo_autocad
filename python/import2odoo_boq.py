@@ -258,8 +258,6 @@ def main():
                     prompt(acaduti, f'請購單號:{item.TextString}\n')
 
             header_dict['layout_name'] = lyt.Name
-            # detail_lst = []
-            table_count = 0
             for entity in lyt.Block:
                 name = entity.EntityName
                 # print(f'EntityName:{name}\n')
@@ -328,8 +326,11 @@ def main():
                             print(f'工程名稱:{project_name}')
                             header_dict['project_name'] = project_name
 
+            table_count = 0
+            for ent in lyt.Block:
+                name = ent.EntityName
                 if name == 'AcDbTable':
-                    table = entity
+                    table = ent
                     
                     prompt(acaduti, f'columns: {table.Columns}, rows: {table.Rows}\n')
                     chk_cell_value = mtext_to_string(table.GetText(0, 0))
@@ -384,50 +385,42 @@ def main():
                                     detail_lst.append(detail_dict)
                                     # print(detail_lst)
 
-            if detail_lst:
-                header_dict['detail'] = detail_lst
+                        if detail_lst:
+                            header_dict['detail'] = detail_lst
 
-            print(f"header_dict:{header_dict['detail']}")
+                        print(f"header_dict:{header_dict['detail']}")
 
-            if not 'detail' in header_dict:
-                prompt(acaduti, f'未讀取到加工細節，請確認\n')
-            else:    
-                prompt(acaduti, f'header_dict:{header_dict}\n')
+                        if not 'detail' in header_dict:
+                            prompt(acaduti, f'未讀取到加工細節，請確認\n')
+                        else:    
+                            prompt(acaduti, f'header_dict:{header_dict}\n')
 
-                import_return_list = odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
-                    method_name="import2boq",
-                    body={
-                    "args": [header_dict],
-                    "kwargs": {'user_token': user_token},
-                    "context": {}
-                    }    
-                ).response().incoming_response.json()
+                            import_return_list = odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
+                                method_name="import2boq",
+                                body={
+                                "args": [header_dict],
+                                "kwargs": {'user_token': user_token},
+                                "context": {}
+                                }    
+                            ).response().incoming_response.json()
 
-                if 'error_code' in import_return_list:
-                    print(import_return_list)
-                    prompt(acaduti, f"錯誤:{import_return_list.get('error_code')} ==> {import_return_list.get('error_message')}\n")
-                else:
-                    hd_id = import_return_list.get('header_id')
-                    dtl_lst = import_return_list.get('detail')
-                    # for table in iter_objects(acaddoc, "table", ssget):
-                    # if name == 'AcDbTable':
-                        # table = entity
-
-                    # table.SetText(0, 8, str(hd_id))
-                    # print(table.Rows)
-                    for row in range(table.Rows):
-                        # print(row)
-                        # 
-                        if row == 0:
-                            table.SetText(row, 8, str(hd_id))
-                        if row > 1:
-                            qty = mtext_to_string(table.GetText(row, 6))
-                            # print('qty:', qty)
-                            if qty:
-                                dtl_id = dtl_lst[row-2]
-                                # print('detail_id:',dtl_id)
-                                table.SetText(row, 8, str(dtl_id))
-                    prompt(acaduti, f"成功匯入BOQ，BOQ_ID={hd_id}\n")
+                            if 'error_code' in import_return_list:
+                                print(import_return_list)
+                                prompt(acaduti, f"錯誤:{import_return_list.get('error_code')} ==> {import_return_list.get('error_message')}\n")
+                            else:
+                                hd_id = import_return_list.get('header_id')
+                                dtl_lst = import_return_list.get('detail')
+                                for row in range(table.Rows):
+                                    if row == 0:
+                                        table.SetText(row, 8, str(hd_id))
+                                    if row > 1:
+                                        qty = mtext_to_string(table.GetText(row, 6))
+                                        # print('qty:', qty)
+                                        if qty:
+                                            dtl_id = dtl_lst[row-2]
+                                            # print('detail_id:',dtl_id)
+                                            table.SetText(row, 8, str(dtl_id))
+                                prompt(acaduti, f"成功匯入BOQ，BOQ_ID={hd_id}\n")
 
 if __name__ == "__main__":
     main()
