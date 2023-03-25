@@ -240,9 +240,9 @@ def main():
         print(f'\n========================')
         print(f'layout:{lyt.Name}')
         print(f'========================')
-        prompt(acaduti, f'\n========================')
-        prompt(acaduti, f'layout:{lyt.Name}')
-        prompt(acaduti, f'========================')
+        prompt(acaduti, f'\n========================\n')
+        prompt(acaduti, f'layout:{lyt.Name}\n')
+        prompt(acaduti, f'========================\n')
 
         # for block in blocks:
         # header_dict = {}

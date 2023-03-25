@@ -236,10 +236,7 @@ def main():
 
             for entity in lyt.Block:
                 name = entity.EntityName
-                print(f'Name:{name}\n')
 
-    # header_dict = {}
-    # for table in iter_objects(acaddoc, "table", ssget): 
                 if name == 'AcDbTable':
                     table = entity
            
@@ -249,29 +246,31 @@ def main():
                     header_id = mtext_to_string(table.GetText(0, 8))
                     header_dict['header_id'] = header_id
 
-        if not 'header_id' in header_dict:
-            prompt(acaduti, f'{lyt.Name}:尚未匯入BOQ，請確認\n')
-        else:    
-            prompt(acaduti, f'{lyt.Name}:header_dict:{header_dict}\n')
+                    if chk_cell_value == '加工細節':
+                        print(f'Name:{name}\n')
+                        if not 'header_id' in header_dict:
+                            prompt(acaduti, f'{lyt.Name}:尚未匯入BOQ，請確認\n')
+                        else:    
+                            prompt(acaduti, f'{lyt.Name}:header_dict:{header_dict}\n')
 
-            import_return_list = odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
-                method_name="boq2pr",
-                body={
-                "args": [header_dict],
-                "kwargs": {'user_token': user_token},
-                "context": {}
-                }    
-            ).response().incoming_response.json()
+                            import_return_list = odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
+                                method_name="boq2pr",
+                                body={
+                                "args": [header_dict],
+                                "kwargs": {'user_token': user_token},
+                                "context": {}
+                                }    
+                            ).response().incoming_response.json()
 
-            if 'error_code' in import_return_list:
-                print(import_return_list)
-                prompt(acaduti, f"錯誤:{import_return_list.get('error_code')} ==> {import_return_list.get('error_message')}\n")
-            else:
-                hd_id = import_return_list.get('header_id')
-                hd_state = import_return_list.get('state')
+                            if 'error_code' in import_return_list:
+                                print(import_return_list)
+                                prompt(acaduti, f"錯誤:{import_return_list.get('error_code')} ==> {import_return_list.get('error_message')}\n")
+                            else:
+                                hd_id = import_return_list.get('header_id')
+                                hd_state = import_return_list.get('state')
 
-                if hd_state == 'done':
-                    prompt(acaduti, f"成功匯入請購單\n")
+                                if hd_state == 'done':
+                                    prompt(acaduti, f"成功匯入請購單\n")
 
 if __name__ == "__main__":
     main()
