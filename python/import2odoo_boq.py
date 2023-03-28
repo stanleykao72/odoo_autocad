@@ -109,8 +109,10 @@ def mtext_to_string(s):
         >>> mtext_to_string(text)
         u'TEST123\\ntest321'
     """
-
-    return unformat_mtext(s).replace(u'\\P', u'\n')
+    str = unformat_mtext(s).replace(u'\\P', u'\n')
+    str = str.replace('{', '')
+    str = str.replace(',', '')
+    return str
 
 
 def string_to_mtext(s):
@@ -329,11 +331,13 @@ def main():
             table_count = 0
             for ent in lyt.Block:
                 name = ent.EntityName
+                print(f'name:{name}')
                 if name == 'AcDbTable':
                     table = ent
                     
                     prompt(acaduti, f'columns: {table.Columns}, rows: {table.Rows}\n')
                     chk_cell_value = mtext_to_string(table.GetText(0, 0))
+                    print(f'chk_cell_value:{chk_cell_value}')
                     header_id = mtext_to_string(table.GetText(0, 8))
                     header_dict['header_id'] = header_id
                     if chk_cell_value == '加工細節':
