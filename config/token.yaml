@@ -1,4 +1,4 @@
 user:
-  token: ''
-  # server_file: 'o:/config/server_prod.yaml'
-  server_file: 'o:/config/server.yaml'
+  token: '6d4bead3-8c1a-46b4-a399-7e57535b85d9'
+  server_file: 'o:/config/server_prod.yaml'
+  # server_file: 'C:/odoo/odoo_autocad/config/server.yaml'

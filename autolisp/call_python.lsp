@@ -1,4 +1,3 @@
-
 (vl-load-com)
 ;; call python connect_odoo2csv.py
 (defun c:O1 ()
@@ -35,4 +34,29 @@
    
   )
   (startapp python pyscript)
+)
+
+(defun delay_time (msec)
+  (command "_.delay" msec)
+)
+
+(defun c:L0()
+  (setq
+    python "C:/Python/Python310/python.exe"
+    pyscript "C:/odoo/odoo_autocad/python/python2com.py"
+  )
+  (startapp python pyscript)
+  
+  (delay_time 2000)
+  
+  (if (vlax-get-or-create-object "Python.ComServer")
+    (progn
+      (setq python_com (vlax-get-or-create-object "Python.ComServer"))
+      (setq server_cfg (vlax-invoke-method python_com 'odoo_connection ))
+    )
+    (progn
+      (princ "L0沒有執行成功，請再執行一次L0.....")
+    )
+  )
+  (princ)
 )
