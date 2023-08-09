@@ -55,8 +55,20 @@
       (setq server_cfg (vlax-invoke-method python_com 'odoo_connection ))
     )
     (progn
-      (princ "L0æ²’æœ‰åŸ·è¡ŒæˆåŠŸï¼Œè«‹å†åŸ·è¡Œä¸€æ¬¡L0.....")
+      (princ "L0¨S¦³°õ¦æ¦¨¥\¡A½Ğ¦A°õ¦æ¤@¦¸L0.....")
     )
   )
+  (princ)
+)
+
+(defun c:LREG()
+  (setq
+    python "C:/Python/Python310/python.exe"
+    pyscript_unreg "D:/odoo_autolisp/python/python2com.py  --unregister"
+    pyscript_reg "D:/odoo_autolisp/python/python2com.py  --register"
+  )
+  (startapp python pyscript_unreg)  
+  (delay_time 2000)
+  (startapp python pyscript_reg)
   (princ)
 )
