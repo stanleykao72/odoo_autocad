@@ -64,8 +64,8 @@
 (defun c:LREG()
   (setq
     python "C:/Python/Python310/python.exe"
-    pyscript_unreg "D:/odoo_autolisp/python/python2com.py  --unregister"
-    pyscript_reg "D:/odoo_autolisp/python/python2com.py  --register"
+    pyscript_unreg "C:/odoo/odoo_autocad/python/python2com.py  --unregister"
+    pyscript_reg "C:/odoo/odoo_autocad/python/python2com.py  --register"
   )
   (startapp python pyscript_unreg)  
   (delay_time 2000)
