@@ -307,20 +307,57 @@ class ComServer:
             return import_return_str
 
 
+def RegisterClass(cls):
+  import os, sys, win32api, win32con
+  import win32com.server.register
+  file = os.path.abspath(sys.modules[cls.__module__].__file__)
+  folder = os.path.dirname(file)
+  module = os.path.splitext(os.path.basename(file))[0]
+  python = win32com.server.register._find_localserver_exe(1)
+  python = win32api.GetShortPathName(python)
+  server = win32com.server.register._find_localserver_module()
+  command = '%s "%s" %s' % (python, server, cls._reg_clsid_)
+  typename = module + "." + cls.__name__
+
+  def write(path, value):
+    win32api.RegSetValue(win32con.HKEY_CURRENT_USER, path, win32con.REG_SZ, value)
+
+  write("SOFTWARE\\Classes\\" + cls._reg_progid_ + '\\CLSID', cls._reg_clsid_)
+  write("SOFTWARE\\Classes\\AppID\\" + cls._reg_clsid_, cls._reg_progid_)
+  write("SOFTWARE\\Classes\\CLSID\\" + cls._reg_clsid_, cls._reg_desc_)
+  write("SOFTWARE\\Classes\\CLSID\\" + cls._reg_clsid_ + '\\LocalServer32', command)
+  write("SOFTWARE\\Classes\\CLSID\\" + cls._reg_clsid_ + '\\ProgID', cls._reg_progid_)
+  write("SOFTWARE\\Classes\\CLSID\\" + cls._reg_clsid_ + '\\PythonCOMPath', folder)
+  write("SOFTWARE\\Classes\\CLSID\\" + cls._reg_clsid_ + '\\PythonCOM', typename)
+  write("SOFTWARE\\Classes\\CLSID\\" + cls._reg_clsid_ + '\\Debugging', "0")
+
+  print("Registered %s" % cls.__name__)
+
+
 if __name__ == '__main__':
-    print("\n\n")
-    print("     *******************************************************************************************")
-    print("     *******************************************************************************************")
-    print()
-    print("     *** 注意：本程式為 AutoCAD 的原生程式 AutoLisp 與 Odoo 的溝通管道，請勿關閉(請縮小即可) ***")
-    print()
-    print("     *******************************************************************************************")
-    print("     *******************************************************************************************")
-    print("\n\n\n")
     if '--register' in sys.argv[1:] or '--unregister' in sys.argv[1:]:
         import win32com.server.register
         win32com.server.register.UseCommandLine(ComServer)
+    elif '--debug' in sys.argv[1:]:
+        global debugging, useDispatcher
+        debugging = 1
+        from win32com.server.dispatcher import DefaultDebugDispatcher
+        useDispatcher = DefaultDebugDispatcher
+        import win32com.server.register
+        win32com.server.register.UseCommandLine(ComServer,debug=debugging)
+    elif '--user' in sys.argv[1:]:
+        RegisterClass(ComServer)
     else:
+        print("\n\n")
+        print("     *******************************************************************************************")
+        print("     *******************************************************************************************")
+        print()
+        print("     *** 注意：本程式為 AutoCAD 的原生程式 AutoLisp 與 Odoo 的溝通管道，請勿關閉(請縮小即可) ***")
+        print()
+        print("     *******************************************************************************************")
+        print("     *******************************************************************************************")
+        print("\n\n\n")
+
         # start the server.
         from win32com.server import localserver
         localserver.serve([ComServer._reg_clsid_])
