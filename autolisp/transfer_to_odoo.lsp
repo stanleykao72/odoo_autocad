@@ -750,6 +750,34 @@
   pr_no
 )
 
+(defun get_block_table (block)
+  (setq blockname (vla-get-effectivename block))
+  (setq blockdef  
+    (vla-item
+      (vla-get-blocks
+        (vla-get-activedocument (vlax-get-acad-object))
+      );vla-get-blocks
+      blockname
+    );vla-item
+  )
+  (setq blockdata nil)
+
+  (vlax-for item  blockdef
+    (princ (strcat "item:" (vla-get-objectname item) "\n"))
+    (if (equal (vla-get-objectname item) "AcDbTable")
+      (progn
+        (setq v_block block)
+        ;; (princ (strcat "text:" pr_no "\n"))
+      )
+      (progn
+        (setq v_block nil)
+      )
+    )
+  )                  
+  v_block
+)
+
+
 (defun GetCurrentLayoutInfo ()
   (vl-load-com)
   (if (setq doc (vla-get-activedocument (vlax-get-acad-object)))
@@ -761,6 +789,8 @@
       (setq blocks (vla-get-block layout))
 
       (vlax-for block blocks
+        ;; (setq v_header_list '())
+        ;; (setq v_detail_list '())
         ;; 1. get AcDbBlockReference
         ;; get block
         (if (= (vla-get-ObjectName block) "AcDbBlockReference")
@@ -785,12 +815,20 @@
       ) ;;end (vla-for block blocks)
       
       ;; 2. get AcDbTable
+      (setq count 0)
+      (princ count)(princ "........\n")
       (vlax-for block blocks
+        (setq v_detail_list '())
         ;; get table
         (if (= (vla-get-ObjectName block) "AcDbTable")
           (progn
+            (setq count (1+ count))
+            (princ count)(princ "..........\n")
+            ;; (setq detail_list '())
+            ;; (setq v_detail_list '())
+            ;; (setq result_list '())
             (setq result_list (get_detail_lst block))
-            ;; (princ (strcat "after call get_detail_lst function result_list:" (vl-princ-to-string result_list) "\n"))
+            (princ (strcat "after call get_detail_lst function result_list:" (vl-princ-to-string result_list) "\n"))
             
             (setq detail_list (nth 0 result_list))
             (setq header_id (nth 1 result_list))
@@ -807,16 +845,24 @@
                 ;; (princ (strcat "after call get_detail_lst function result_list of v_header_list" (vl-princ-to-string v_header_list) "\n"))
               )
             )
-            ;; (princ (strcat "after call get_detail_lst function v_detail_list" (vl-princ-to-string v_detail_list) "\n"))
+            ;; (princ (strcat "after call get_detail_lst function v_detail_list" (vl-princ-to-string v_detail_list) "\n"))              
           );progn          
         ) ;; if block=AcDbTable
       ) ;;end (vla-for block blocks)
-      ;; (princ (strcat "header_lst" (vl-princ-to-string header_lst) "\n"))
-      ;; (princ (strcat "detail_lst" (vl-princ-to-string detail_lst) "\n"))
-      (setq v_header_list (append v_header_list v_detail_list))
-      ;; (princ (strcat "after header_lst" (vl-princ-to-string v_header_list) "\n"))
-      (setq import_json (dmc:json:list_to_json v_header_list))
-      ;; (princ (strcat "import_json:" import_json "\n"))
+      
+      (if (and v_header_list v_detail_list)
+       (progn
+        (princ (strcat "header_list:" (vl-princ-to-string v_header_list) "\n"))
+        (princ (strcat "detail_list:" (vl-princ-to-string v_detail_list) "\n"))
+        (setq v_header_list (append v_header_list v_detail_list))
+        ;; (princ (strcat "after header_lst" (vl-princ-to-string v_header_list) "\n"))
+        (setq import_json (dmc:json:list_to_json v_header_list))
+        ;; (princ (strcat "import_json:" import_json "\n"))
+       )
+      (progn
+        (setq import_json nil)
+      )
+      )
     );progn
     (princ "\nNo active document found.")
   )
@@ -841,6 +887,7 @@
             (setq header_list '())
             (setq v_header_list '())
             (setq detail_list '())
+            (setq v_detail_list '())
             ;; 1. get AcDbBlockReference
             (vlax-for block blocks
               ;; (princ block)(princ (vla-get-ObjectName block))(princ "\n")
@@ -867,6 +914,7 @@
             
             ;; 2. get AcDbTable
             (vlax-for block blocks
+              ;; (setq v_detail_list '())
               ;; get table
               (if (= (vla-get-ObjectName block) "AcDbTable")
                 (progn
@@ -894,10 +942,19 @@
             ) ;;end (vla-for block blocks)
             
             ;; (princ (strcat "header_lst" (vl-princ-to-string header_lst) "\n"))
-            ;; (princ (strcat "detail_lst" (vl-princ-to-string detail_lst) "\n"))
-            (if (and v_header_list v_detail_list)
-              (setq v_header_list (list (append v_header_list v_detail_list)))
-              ;; (princ (strcat "after header_lst" (vl-princ-to-string header_lst) "\n"))
+            ;; (princ (strcat "v_detail_list" (vl-princ-to-string v_detail_list) "\n"))
+            (if v_detail_list
+              (progn
+                (if v_header_list
+                  (progn
+                    (setq v_header_list (list (append v_header_list v_detail_list)))
+                    ;; (princ (strcat "after header_list:" (vl-princ-to-string v_header_list) "\n"))
+                  )
+                )
+              )
+              (progn
+                (setq v_header_list nil)
+              )
             )
                 
           );progn
