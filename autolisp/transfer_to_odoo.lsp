@@ -36,7 +36,7 @@
           (setq return_message (cdr (nth 1 response_list)))
         )
         (progn
-          (setq update_header_detail (update-header_id-detail_id response_json))
+          (setq update_header_detail (update-header_id-detail_id response_list))
           (setq return_message "Successfully Import to BOQ")
         )
       )
@@ -778,7 +778,7 @@
 )
 
 
-(defun GetCurrentLayoutInfo ()
+(defun GetCurrentLayoutInfo ( / v_header_list v_detail_list)
   (vl-load-com)
   (if (setq doc (vla-get-activedocument (vlax-get-acad-object)))
     (progn
@@ -788,6 +788,10 @@
       
       (setq blocks (vla-get-block layout))
 
+      (setq header_list '())
+      (setq v_header_list '())
+      (setq detail_list '())
+      (setq v_detail_list '())
       (vlax-for block blocks
         ;; (setq v_header_list '())
         ;; (setq v_detail_list '())
@@ -818,23 +822,24 @@
       (setq count 0)
       (princ count)(princ "........\n")
       (vlax-for block blocks
-        (setq v_detail_list '())
         ;; get table
         (if (= (vla-get-ObjectName block) "AcDbTable")
           (progn
+            ;; (setq v_detail_list '())
             (setq count (1+ count))
             (princ count)(princ "..........\n")
             ;; (setq detail_list '())
             ;; (setq v_detail_list '())
             ;; (setq result_list '())
             (setq result_list (get_detail_lst block))
-            (princ (strcat "after call get_detail_lst function result_list:" (vl-princ-to-string result_list) "\n"))
+            ;; (princ (strcat "after call get_detail_lst function result_list:" (vl-princ-to-string result_list) "\n"))
             
             (setq detail_list (nth 0 result_list))
             (setq header_id (nth 1 result_list))
             (if detail_list
               (progn
                 (setq v_detail_list detail_list)
+                ;; (princ (strcat "after call get_detail_lst function result_list of v_detail_list" (vl-princ-to-string v_detail_list) "\n"))
               )
             )
             (if v_header_list
@@ -844,16 +849,20 @@
                 (setq v_header_list (cons header_id_dict v_header_list))
                 ;; (princ (strcat "after call get_detail_lst function result_list of v_header_list" (vl-princ-to-string v_header_list) "\n"))
               )
+              (progn
+                (princ "no v_header_list\n")
+              )
             )
             ;; (princ (strcat "after call get_detail_lst function v_detail_list" (vl-princ-to-string v_detail_list) "\n"))              
           );progn          
         ) ;; if block=AcDbTable
       ) ;;end (vla-for block blocks)
       
+      ;; (princ (strcat "v_header_list:" (vl-princ-to-string v_header_list) "\n"))
+      ;; (princ (strcat "v_detail_list:" (vl-princ-to-string v_detail_list) "\n"))
+
       (if (and v_header_list v_detail_list)
        (progn
-        (princ (strcat "header_list:" (vl-princ-to-string v_header_list) "\n"))
-        (princ (strcat "detail_list:" (vl-princ-to-string v_detail_list) "\n"))
         (setq v_header_list (append v_header_list v_detail_list))
         ;; (princ (strcat "after header_lst" (vl-princ-to-string v_header_list) "\n"))
         (setq import_json (dmc:json:list_to_json v_header_list))
@@ -861,6 +870,7 @@
        )
       (progn
         (setq import_json nil)
+        (princ "import_jason is nil \n")
       )
       )
     );progn
@@ -1027,7 +1037,7 @@
   (repeat rows
     (setq row (1+ row))
     ;; (princ (strcat "row:" (itoa row) ":\n"))
-    (setq fieldValue_Field1 (vla-gettext obj row colIdx_Field1))
+    (setq fieldValue_Field1  (LM:UnFormat (vla-gettext obj row colIdx_Field1) nil))
     ;; (princ (strcat "fieldValue_Field1:" fieldValue_Field1 ":\n"))
     (if (= fieldValue_Field1 targetValue)
       (vla-settext obj row colIdx_Field8 newValue)
@@ -1069,12 +1079,12 @@
   return_row
 )
 
-(defun update-header_id-detail_id (response_json)
+(defun update-header_id-detail_id (response_list)
   (vl-load-com)
   (setq doc (vla-get-activedocument (vlax-get-acad-object)))
   (if doc
     (progn
-      (setq response_list (dmc:json:json_to_list response_json nil))
+      ;; (setq response_list (dmc:json:json_to_list response_json nil))
       ;; (princ (strcat "response_list:" (vl-princ-to-string response_list) "\n"))
       ;; (princ (strcat "response_list:" "=======================================" "\n"))
       (setq all_list (nth 1 (nth 0 response_list)))
