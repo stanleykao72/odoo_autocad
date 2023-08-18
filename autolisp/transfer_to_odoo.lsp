@@ -25,7 +25,7 @@
       (setq python_com (vlax-get-or-create-object "Python.ComServer"))
       (setq odoo (vlax-invoke-method python_com 'odoo_connection ))
       (setq import_json (GetAllLayoutsInfo))
-      ;; (princ import_json)(princ "\n")
+      ;; (princ (strcat "import_json:" (vl-princ-to-string import_json) "\n"))
       (setq response_json (vlax-invoke-method python_com 'import2boq import_json))
       ;; (princ (strcat "response_json:" (vl-princ-to-string response_json) "\n"))
       (setq response_list (dmc:json:json_to_list response_json nil))
@@ -55,7 +55,7 @@
       (setq python_com (vlax-get-or-create-object "Python.ComServer"))
       (setq odoo (vlax-invoke-method python_com 'odoo_connection ))
       (setq import_json (TransferToPr))
-      ;; (princ (strcat "response_json:" (vl-princ-to-string response_json) "\n"))
+      ;; (princ (strcat "import_json" (vl-princ-to-string import_json) "\n"))
       (setq response_list (dmc:json:json_to_list import_json nil))
       ;; (princ (strcat "response_list:" (vl-princ-to-string response_list) "\n"))
       
@@ -65,6 +65,7 @@
         )
         (progn
           (setq response_json (vlax-invoke-method python_com 'boq2pr import_json))
+          ;; (princ (strcat "response_json:" (vl-princ-to-string response_json) "\n"))
           (setq return_message "Successfully Transfer to PR")
         )
       )
@@ -647,7 +648,7 @@
   header_lst  
 )
 
-(defun get_detail_lst (block)
+(defun chk_legal_table (block)
   (vl-load-com)
   (setq obj block)
   (setq detail_lst '())
@@ -661,70 +662,118 @@
       
       (if (= header_label "HEADER_ID")
         (progn
-          (setq row -1)
-          (setq rows (vla-get-rows obj))
-          ;; (setq columns (vla-get-columns obj))
-          ;; (princ (strcat "rows:" (itoa rows) ":\n"))
-          ;; (princ (strcat "columns:" (itoa columns) ":\n"))
-          (repeat rows
-            (setq row (1+ row))
-            ;; (princ (strcat "row:" (itoa row) ":\n"))
-            (if (> row 1)
-              (progn
-                (setq qty (vla-gettext obj row 6))
-                ;; (princ (strcat "qty" qty ":\n"))
-                (setq qty (atoi2 qty))
-                (if (and  qty
-                          (= (type qty) 'INT)
-                          (>  qty 0 )
-                    )
-                  (progn
-                    (setq position (LM:UnFormat (vla-gettext obj row 0) nil))
-                    (setq product_no (LM:UnFormat (vla-gettext obj row 1) nil))
-                    ;; (princ (strcat "product_no:" product_no ":\n"))
-                    (setq width (LM:UnFormat (vla-gettext obj row 2) nil))
-                    (setq height (LM:UnFormat (vla-gettext obj row 3) nil))
-                    (setq len (LM:UnFormat (vla-gettext obj row 4) nil))
-                    (setq thickness (LM:UnFormat (vla-gettext obj row 5) nil))
-                    ;; (setq qty (vla-gettext obj row 6))
-                    (setq desc (LM:UnFormat (vla-gettext obj row 7) nil))
-                    (setq detail_id (LM:UnFormat (vla-gettext obj row 8) nil))
-                    ;; (princ (strcat "detail_id:" detail_id ":\n"))
-
-                    (setq detail_lst (list (cons "header_id" header_id) (cons "detail_id" detail_id) 
-                                          (cons "position" position) (cons "product_no" product_no)
-                                          (cons "width" width) (cons "height" height) (cons "len" len) (cons "thickness" thickness)
-                                          (cons "qty" qty) (cons "desc" desc)
-                                    )
-                    )
-                    ;; (princ (strcat "detail_lst" (vl-princ-to-string detail_lst) "\n"))
-                    (setq detail_lst (list detail_lst))
-                    ;; (princ (strcat "detail_lst 2" (vl-princ-to-string detail_lst) "\n"))
-                    ;; (princ (strcat "all_dtl_lst..." (vl-princ-to-string all_dtl_lst) "\n"))
-                    (setq all_dtl_lst (append all_dtl_lst detail_lst))
-                    ;; (princ (strcat "before 1 all_dtl_lst:" (vl-princ-to-string all_dtl_lst) "\n"))
-                  );progn
-                );if
-              );progn
-            );if
-          );repeat
-          (setq all_dtl_lst (cons (quote <ARRAY>) all_dtl_lst))
-          ;; (princ (strcat "before 2 all_dtl_lst:" (vl-princ-to-string all_dtl_lst) "\n"))
-          (setq all_dtl_lst (append all_dtl_lst (list (quote </ARRAY>))))
-          ;; (princ (strcat "before 3 all_dtl_lst:" (vl-princ-to-string all_dtl_lst) "\n"))
-          (setq all_dtl_lst (list (list "detail" all_dtl_lst)))
-          ;; (princ (strcat "before 4 all_dtl_lst:" (vl-princ-to-string all_dtl_lst) "\n"))
-          ;; (setq all_dtl_lst (list all_dtl_lst))
-          ;; (princ (strcat "after all_dtl_lst:" (vl-princ-to-string all_dtl_lst) "\n"))
-          ;; (setq import_json (dmc:json:list_to_json all_dtl_lst))
-          ;; (princ (strcat "import_json:" import_json "\n"))
-
-        ); progn
+          (setq return_str "Y")
+        )
+        (progn
+          (setq return_str "N")
+        )
       );if
-
     );progn
+    (progn
+      (setq return_str "N")
+    )
   );if
+  return_str
+)
+
+(defun get_detail_lst (block table_count to_append_lst)
+  (vl-load-com)
+  (setq obj block)
+  (setq detail_lst '())
+  (setq all_dtl_lst '())
+
+  ;; (if (vla-gettext obj 0 7)
+  ;;   (progn
+  ;;     (setq header_label (LM:UnFormat (vla-gettext obj 0 7) nil))
+  ;;     ;; (princ (strcat "header_label:" header_label ":\n"))
+      
+  ;;     (if (= header_label "HEADER_ID")
+  ;;       (progn
+  (setq header_id (vla-gettext obj 0 8))
+  (setq row -1)
+  (setq rows (vla-get-rows obj))
+  ;; (setq columns (vla-get-columns obj))
+  ;; (princ (strcat "rows:" (itoa rows) ":\n"))
+  ;; (princ (strcat "columns:" (itoa columns) ":\n"))
+  (repeat rows
+    (setq row (1+ row))
+    ;; (princ (strcat "row:" (itoa row) ":\n"))
+    (if (> row 1)
+      (progn
+        (setq qty (vla-gettext obj row 6))
+        ;; (princ (strcat "qty" qty ":\n"))
+        (setq qty (atoi2 qty))
+        (if (and  qty
+                  (= (type qty) 'INT)
+                  (>  qty 0 )
+            )
+          (progn
+            (setq position (LM:UnFormat (vla-gettext obj row 0) nil))
+            (setq product_no (LM:UnFormat (vla-gettext obj row 1) nil))
+            ;; (princ (strcat "product_no:" product_no ":\n"))
+            (setq width (LM:UnFormat (vla-gettext obj row 2) nil))
+            (setq height (LM:UnFormat (vla-gettext obj row 3) nil))
+            (setq len (LM:UnFormat (vla-gettext obj row 4) nil))
+            (setq thickness (LM:UnFormat (vla-gettext obj row 5) nil))
+            ;; (setq qty (vla-gettext obj row 6))
+            (setq desc (LM:UnFormat (vla-gettext obj row 7) nil))
+            (setq detail_id (LM:UnFormat (vla-gettext obj row 8) nil))
+            ;; (princ (strcat "detail_id:" detail_id ":\n"))
+
+            (setq detail_lst (list (cons "header_id" header_id) (cons "detail_id" detail_id) 
+                                  (cons "position" position) (cons "product_no" product_no)
+                                  (cons "width" width) (cons "height" height) (cons "len" len) (cons "thickness" thickness)
+                                  (cons "qty" qty) (cons "desc" desc)
+                            )
+            )
+            ;; (princ (strcat "detail_lst" (vl-princ-to-string detail_lst) "\n"))
+            (setq detail_lst (list detail_lst))
+            ;; (princ (strcat "detail_lst 2" (vl-princ-to-string detail_lst) "\n"))
+            ;; (princ (strcat "all_dtl_lst..." (vl-princ-to-string all_dtl_lst) "\n"))
+            (setq all_dtl_lst (append all_dtl_lst detail_lst))
+            ;; (princ (strcat "before 1 all_dtl_lst:" (vl-princ-to-string all_dtl_lst) "\n"))
+          );progn
+        );if
+      );progn
+    );if
+  );repeat
+
+  (setq all_dtl_lst (append to_append_lst all_dtl_lst))
+  ;; (princ (strcat "all_dtl_lst:" (vl-princ-to-string all_dtl_lst) "\n"))
+  ;; (if (= table_count 1)
+  ;;   (progn
+  ;;     (setq all_dtl_lst (cons (quote <ARRAY>) all_dtl_lst))
+  ;;     ;; (princ (strcat "before 2 all_dtl_lst:" (vl-princ-to-string all_dtl_lst) "\n"))
+  ;;     (setq all_dtl_lst (append all_dtl_lst (list (quote </ARRAY>))))
+  ;;     ;; (princ (strcat "before 3 all_dtl_lst:" (vl-princ-to-string all_dtl_lst) "\n"))
+  ;;     (setq all_dtl_lst (list (list "detail" all_dtl_lst)))
+  ;;     ;; (princ (strcat "before 4 all_dtl_lst:" (vl-princ-to-string all_dtl_lst) "\n"))
+  ;;     ;; (setq all_dtl_lst (list all_dtl_lst))
+  ;;     ;; (princ (strcat "after all_dtl_lst:" (vl-princ-to-string all_dtl_lst) "\n"))
+  ;;     ;; (setq import_json (dmc:json:list_to_json all_dtl_lst))
+  ;;     ;; (princ (strcat "import_json:" import_json "\n"))
+  ;;   )
+  ;;   (progn
+  ;;     (princ (strcat "before 4 to_append_lst:" (vl-princ-to-string to_append_lst) "\n"))    
+  ;;   )
+  ;; )
+
+        ;; ); progn
+  ;;     );if
+
+  ;;   );progn
+  ;; );if
   (list all_dtl_lst header_id)
+)
+
+(defun add_arrary_tag (be_added_list dict_key)
+  (setq be_added_list (cons (quote <ARRAY>) be_added_list))
+  ;; (princ (strcat "before 2 be_added_list:" (vl-princ-to-string be_added_list) "\n"))
+  (setq be_added_list (append be_added_list (list (quote </ARRAY>))))
+  ;; (princ (strcat "before 3 be_added_list:" (vl-princ-to-string be_added_list) "\n"))
+  (setq be_added_list (list (list dict_key be_added_list)))
+  
+  be_added_list
 )
 
 (defun get_block_text (block)
@@ -825,35 +874,39 @@
         ;; get table
         (if (= (vla-get-ObjectName block) "AcDbTable")
           (progn
-            ;; (setq v_detail_list '())
-            (setq count (1+ count))
-            (princ count)(princ "..........\n")
-            ;; (setq detail_list '())
-            ;; (setq v_detail_list '())
-            ;; (setq result_list '())
-            (setq result_list (get_detail_lst block))
-            ;; (princ (strcat "after call get_detail_lst function result_list:" (vl-princ-to-string result_list) "\n"))
-            
-            (setq detail_list (nth 0 result_list))
-            (setq header_id (nth 1 result_list))
-            (if detail_list
+            (if (= (chk_legal_table block) "Y")
               (progn
-                (setq v_detail_list detail_list)
-                ;; (princ (strcat "after call get_detail_lst function result_list of v_detail_list" (vl-princ-to-string v_detail_list) "\n"))
+                ;; (setq v_detail_list '())
+                (setq count (1+ count))
+                (princ count)(princ "..........\n")
+                ;; (setq detail_list '())
+                ;; (setq v_detail_list '())
+                ;; (setq result_list '())
+                (setq result_list (get_detail_lst block count))
+                ;; (princ (strcat "after call get_detail_lst function result_list:" (vl-princ-to-string result_list) "\n"))
+                
+                (setq detail_list (nth 0 result_list))
+                (setq header_id (nth 1 result_list))
+                (if detail_list
+                  (progn
+                    (setq v_detail_list detail_list)
+                    ;; (princ (strcat "after call get_detail_lst function result_list of v_detail_list" (vl-princ-to-string v_detail_list) "\n"))
+                  )
+                )
+                (if v_header_list
+                  (progn
+                    (setq header_id_dict (cons "header_id" header_id))
+                    ;; (princ (strcat "after call get_detail_lst function result_list of header_id_dict" (vl-princ-to-string header_id_dict) "\n"))
+                    (setq v_header_list (cons header_id_dict v_header_list))
+                    ;; (princ (strcat "after call get_detail_lst function result_list of v_header_list" (vl-princ-to-string v_header_list) "\n"))
+                  )
+                  (progn
+                    (princ "no v_header_list\n")
+                  )
+                )
+                ;; (princ (strcat "after call get_detail_lst function v_detail_list" (vl-princ-to-string v_detail_list) "\n"))              
               )
             )
-            (if v_header_list
-              (progn
-                (setq header_id_dict (cons "header_id" header_id))
-                ;; (princ (strcat "after call get_detail_lst function result_list of header_id_dict" (vl-princ-to-string header_id_dict) "\n"))
-                (setq v_header_list (cons header_id_dict v_header_list))
-                ;; (princ (strcat "after call get_detail_lst function result_list of v_header_list" (vl-princ-to-string v_header_list) "\n"))
-              )
-              (progn
-                (princ "no v_header_list\n")
-              )
-            )
-            ;; (princ (strcat "after call get_detail_lst function v_detail_list" (vl-princ-to-string v_detail_list) "\n"))              
           );progn          
         ) ;; if block=AcDbTable
       ) ;;end (vla-for block blocks)
@@ -923,42 +976,65 @@
             ) ;;end (vla-for block blocks)
             
             ;; 2. get AcDbTable
+            (setq table_count 0)
             (vlax-for block blocks
               ;; (setq v_detail_list '())
               ;; get table
               (if (= (vla-get-ObjectName block) "AcDbTable")
                 (progn
-                  (setq result_list (get_detail_lst block))
-                  ;; (princ (strcat "after call get_detail_lst function result_list:" (vl-princ-to-string result_list) "\n"))
-                  
-                  (setq detail_list (nth 0 result_list))
-                  (setq header_id (nth 1 result_list))
-                  (if detail_list
+                  (if (= (chk_legal_table block) "Y")
                     (progn
-                      (setq v_detail_list detail_list)
-                    )
-                  )
-                  (if v_header_list
-                    (progn
-                      (setq header_id_dict (cons "header_id" header_id))
-                      ;; (princ (strcat "after call get_detail_lst function result_list of header_id_dict" (vl-princ-to-string header_id_dict) "\n"))
-                      (setq v_header_list (cons header_id_dict v_header_list))
-                      ;; (princ (strcat "after call get_detail_lst function result_list of v_header_list" (vl-princ-to-string v_header_list) "\n"))
-                    )
-                  )
-                  ;; (princ (strcat "after call get_detail_lst function v_detail_list" (vl-princ-to-string v_detail_list) "\n"))
+                      (setq table_count (1+ table_count))
+                      (if (= table_count 1)
+                        (setq to_append_list '())
+                      )
+                      (setq result_list (get_detail_lst block table_count to_append_list))
+                      ;; (princ (strcat "after call get_detail_lst function result_list:" (vl-princ-to-string result_list) "\n"))
+                      ;; (princ "=================================================\n")
+                      
+                      (setq detail_list (nth 0 result_list))
+                      (setq to_append_list detail_list)
+                      (setq header_id (nth 1 result_list))
+                      (if detail_list
+                        (progn
+                          (setq v_detail_list detail_list)
+                          
+                        )
+                      )
+
+                    );progn
+                  );if
+
+
                 );progn          
               ) ;; if block=AcDbTable
             ) ;;end (vla-for block blocks)
             
+            (if v_header_list
+              (progn
+                (if (= table_count 1)
+                  (progn
+                    (setq header_id_dict (cons "header_id" header_id))
+                    ;; (princ (strcat "after call get_detail_lst function result_list of header_id_dict" (vl-princ-to-string header_id_dict) "\n"))
+                    (setq v_header_list (cons header_id_dict v_header_list))
+                    ;; (princ (strcat "after call get_detail_lst function result_list of v_header_list" (vl-princ-to-string v_header_list) "\n"))
+                    ;; (princ "******************************************************\n")
+                  )
+                )
+              )
+            )
+            ;; (princ (strcat "after call get_detail_lst function v_detail_list" (vl-princ-to-string v_detail_list) "\n"))
+
             ;; (princ (strcat "header_lst" (vl-princ-to-string header_lst) "\n"))
             ;; (princ (strcat "v_detail_list" (vl-princ-to-string v_detail_list) "\n"))
             (if v_detail_list
               (progn
                 (if v_header_list
                   (progn
+                    (setq v_detail_list (add_arrary_tag v_detail_list "detail"))
                     (setq v_header_list (list (append v_header_list v_detail_list)))
                     ;; (princ (strcat "after header_list:" (vl-princ-to-string v_header_list) "\n"))
+                    ;; (princ "******************************************************\n")
                   )
                 )
               )
@@ -1120,10 +1196,10 @@
 
 (defun TransferToPr ()
   (vl-load-com)
-  (setq all_header_lst '())
   (if (setq doc (vla-get-activedocument (vlax-get-acad-object)))
     (progn
       (setq layouts (vla-get-Layouts doc))
+      (setq all_header_lst '())
 
       (vlax-for layout layouts
         (setq layout_name (vla-get-name layout))
@@ -1133,25 +1209,40 @@
 
             (setq blocks (vla-get-block layout))
             ;; 2. get AcDbTable
+            (setq table_count 0)
             (vlax-for block blocks
               ;; get table
               (if (= (vla-get-ObjectName block) "AcDbTable")
                 (progn
-                  (setq result_list (get_detail_lst block))
-                  ;; (princ (strcat "after call get_detail_lst function result_list:" (vl-princ-to-string result_list) "\n"))
-                  (setq detail_list (nth 0 result_list))
-                  (if detail_list
+                  (if (= (chk_legal_table block) "Y")
                     (progn
-                      (setq header_id (nth 1 result_list))
-                      ;; (princ (strcat "header_id:" header_id ":\n"))
-                      (if header_id
+                      (setq table_count (1+ table_count))
+                      (if (= table_count 1)
                         (progn
-                          ;; (princ (strcat "header_id 2:" header_id ":\n"))
-                          (setq all_header_lst (cons header_id all_header_lst))
+                          (setq to_append_list '())
+                          (setq header_id nil)
+                          (setq result_list '())
+                          (setq result_list (get_detail_lst block table_count to_append_list))
+
+                          ;; (princ (strcat "result_list:" (vl-princ-to-string result_list) "\n"))
+                          (setq detail_list (nth 0 result_list))
+                          ;; (princ (strcat "detail_list:" (vl-princ-to-string detail_list) "\n"))
+                          (if detail_list
+                            (progn
+                              (setq header_id (nth 1 result_list))
+                              (princ (strcat "header_id:" header_id ":\n"))
+                              (if (and header_id (atoi2 header_id))
+                                (progn
+                                  ;; (princ (strcat "header_id 2:" header_id ":\n"))
+                                  (setq all_header_lst (cons header_id all_header_lst))
+                                )
+                              )
+                            );progn
+                          );if                        
                         )
-                      )
-                    )
-                  )
+                      );if                      
+                    );progn
+                  );if
                 );progn
               );if
             );vlax-for block
