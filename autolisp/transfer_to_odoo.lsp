@@ -49,6 +49,7 @@
   return_message
 )
 
+
 (defun c:L4()
   (if (vlax-get-or-create-object "Python.ComServer")
     (progn
@@ -1114,7 +1115,8 @@
     (setq row (1+ row))
     ;; (princ (strcat "row:" (itoa row) ":\n"))
     (setq fieldValue_Field1  (LM:UnFormat (vla-gettext obj row colIdx_Field1) nil))
-    ;; (princ (strcat "fieldValue_Field1:" fieldValue_Field1 ":\n"))
+    (princ (strcat "fieldValue_Field1..........:" (vla-gettext obj row colIdx_Field1) ":\n"))
+    (princ (strcat "fieldValue_Field1..........(unformate):" (LM:UnFormat (vla-gettext obj row colIdx_Field1) nil) ":\n"))
     (if (= fieldValue_Field1 targetValue)
       (vla-settext obj row colIdx_Field8 newValue)
       (setq return_row row)
