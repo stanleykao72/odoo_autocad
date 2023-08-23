@@ -112,6 +112,7 @@
 ;;------------------------------------------------------------;;
 
 (defun LM:UnFormat ( str mtx / _replace rx )
+(vl-load-com)
 
     (defun _replace ( new old str )
         (vlax-put-property rx 'pattern old)
@@ -152,7 +153,6 @@
         )
     )
 )
-(vl-load-com)
 
 (defun atoi2(str)
   (if (distof str)(atoi str))
