@@ -34,7 +34,7 @@ class ComServer:
     _reg_desc_ = "Python COM Server"
     _reg_progid_ = "Python.ComServer"
     _public_methods_ = ['Hello', 'yaml_to_json', 'string_to_base64', 'odoo_connection', 'import2boq', 'boq2pr', 'get_project', 'get_product', 'get_setup', 'get_color', 'get_server_config']
-    _public_attrs_ = ['softspace', 'noCalls', 'odoo', 'user_token']
+    _public_attrs_ = ['softspace', 'noCalls', 'odoo', 'db_name', 'user_token', 'requestOptions']
     _readonly_attrs_ = ['noCalls']
     # for Python 3.7+
     _reg_verprogid_ = "Python.ComServer.1"
@@ -45,6 +45,8 @@ class ComServer:
         self.noCalls = 0
         self.odoo = False
         self.user_token = False
+        self.db_name = False
+        self.requestOptions = False
 
     def Hello(self, who):
         self.noCalls = self.noCalls + 1
@@ -128,6 +130,7 @@ class ComServer:
 
         host = server_cfg['host']  #'odoo-esmith-1124-stage-6571675.dev.odoo.com'
         db_name = server_cfg['db_name'] #'odoo-esmith-1124-stage-6571675'
+        self.db_name = db_name
         user_token = token_cfg['token'] #'6d4bead3-8c1a-46b4-a399-7e57535b85d9'
         self.user_token = user_token
         url = server_cfg['url'] #'https://odoo-esmith-1124-stage-6571675.dev.odoo.com/api/v1/boq_import_api/swagger.json?token=34dba8ba-cf29-4ac7-a2b7-e64b7ac7bae6&db=odoo-esmith-1124-stage-6571675'
@@ -137,10 +140,23 @@ class ComServer:
         try:
             odoo = SwaggerClient.from_url(
                 url,
-                http_client=http_client
+                http_client=http_client,
             )
             # prompt(acaduti, f"與Odoo連線成功\n")
             # print(f"與Odoo連線成功\n")
+            basic_string = f'{self.db_name}:{self.user_token}'
+            basic_token = self.string_to_base64(basic_string)
+            print(f'basic_token:{basic_token}\n')
+            headers = {
+            'Authorization': f'Basic {basic_token}'
+            }
+            print(f'headers:{headers}\n')
+
+            self.requestOptions = {
+            # === bravado config ===
+            'headers': headers,
+            }
+
             _logger.info(f"與Odoo連線成功\n")
             self.odoo = odoo
             import_return_str = json.dumps(server_cfg, ensure_ascii=False).encode('utf8').decode()
@@ -170,18 +186,18 @@ class ComServer:
 
     def import2boq(self, header_json):
         # print(f'user_token:{self.user_token}\n')
-        # print(f'header_json:{header_json}')
+        print(f'header_json:{header_json}')
         # print(f'odoo:{self.odoo}\n')
 
         header_dict = json.loads(header_json)
-        # print(f'header_dict:{header_dict}')
         import_return_list = self.odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
             method_name="import2boq_v2",
             body={
             "args": [header_dict],
             "kwargs": {'user_token': self.user_token},
             "context": {}
-            }    
+            },
+            _request_options=self.requestOptions, 
         ).response().incoming_response.json()
 
         if 'error_code' in import_return_list:
@@ -209,7 +225,8 @@ class ComServer:
             "args": [header_dict],
             "kwargs": {'user_token': self.user_token},
             "context": {}
-            }    
+            },
+            _request_options=self.requestOptions, 
         ).response().incoming_response.json()
 
         if 'error_code' in import_return_list:
@@ -227,10 +244,11 @@ class ComServer:
         project_list = self.odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
             method_name="get_project_v2",
             body={
-            "args": [[('name', '=', pr_no)]],
+            "args": [[['name', '=', pr_no]]],
             "kwargs": {'user_token': self.user_token},
             "context": {}
-            }    
+            },
+            _request_options=self.requestOptions, 
         ).response().incoming_response.json()
 
         if 'error_code' in project_list:
@@ -251,7 +269,8 @@ class ComServer:
             "args": [[('categ_id', 'child_of', 27), ('active', '=', True)]],
             "kwargs": {'user_token': self.user_token},
             "context": {}
-            }    
+            },
+            _request_options=self.requestOptions, 
         ).response().incoming_response.json()
 
         if 'error_code' in product_list:
@@ -272,7 +291,8 @@ class ComServer:
             "args": [[]],
             "kwargs": {'user_token': self.user_token},
             "context": {}
-            }    
+            },
+            _request_options=self.requestOptions,    
         ).response().incoming_response.json()
 
         if 'error_code' in setup_list:
@@ -293,7 +313,8 @@ class ComServer:
             "args": [[('job_project_id', '=', project_id)]],
             "kwargs": {'user_token': self.user_token},
             "context": {}
-            }    
+            },
+            _request_options=self.requestOptions,  
         ).response().incoming_response.json()
 
         if 'error_code' in color_list:
