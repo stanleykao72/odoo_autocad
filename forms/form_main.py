@@ -24,8 +24,7 @@ from kivymd.uix.boxlayout import MDBoxLayout
 from kivy.core.text import LabelBase
 
 # 註冊支持中文的黑體字體
-# LabelBase.register(name='SimHei',
-#                    fn_regular='SimHei.ttf')
+LabelBase.register(name='JhengHei', fn_regular='fonts/msjh.ttc', fn_bold='fonts/msjhbd.ttc')
 
 KV = '''
 <SelectableLabel>:
@@ -205,18 +204,9 @@ class FormMain(MDApp):
 
         # 第一行
         row1 = MDBoxLayout(orientation='horizontal', size_hint_y=None, height=dp(40))
-        row1.add_widget(MDLabel(text="Parameter 1:", size_hint_y=None, height=dp(30), size_hint_x=0.3))
+        row1.add_widget(MDLabel(text="材料:", size_hint_y=None, height=dp(30), size_hint_x=0.3))
         
-        # self.selected_item = MDTextField(size_hint_y=None, height=dp(30), size_hint_x=0.7)
-        self.selected_item = TextInput(size_hint_y=None, height=dp(30), size_hint_x=0.7, multiline=False)
-        # self.dropdown_menu = MDDropdownMenu(
-        #     caller=self.selected_item,
-        #     items=self.dropdown_items,
-        #     width_mult=4,
-        # )
-        # self.selected_item.bind(on_focus=self.open_menu)
-        # self.selected_item.bind(on_touch_down=self.open_menu)
-        # self.selected_item.bind(text=self.open_menu)
+        self.selected_item = TextInput(size_hint_y=None, height=dp(30), size_hint_x=0.7, multiline=False, font_name='JhengHei')
         self.selected_item.bind(on_text_validate=self.open_menu)
 
         row1.add_widget(self.selected_item)
@@ -224,7 +214,8 @@ class FormMain(MDApp):
 
         # 第二行
         row2 = MDBoxLayout(orientation='horizontal', size_hint_y=None, height=dp(40))
-        row2.add_widget(MDLabel(text="Parameter 2:", size_hint_y=None, height=dp(30), size_hint_x=0.3))
+        row2.add_widget(MDLabel(text="材質:", size_hint_y=None, height=dp(30), size_hint_x=0.3))
+
         row2.add_widget(TextInput(size_hint_y=None, height=dp(30), size_hint_x=0.7))
         form_layout.add_widget(row2)
 
@@ -236,15 +227,6 @@ class FormMain(MDApp):
 
         # 將表單佈局添加到 content_box 中
         self.root.ids.content_box.add_widget(form_layout)
-
-    # def open_menu(self, instance, value):
-    #     # self.logger.info(f"open_menu called with instance: {instance}, value: {value}")
-    #     search_text = instance.text.lower()
-    #     filtered_items = [item for item in self.dropdown_items if search_text in item["text"].lower()]
-    #     self.dropdown_menu.items = filtered_items
-    #     self.dropdown_menu.caller = instance
-    #     if not self.dropdown_menu.parent:
-    #         self.dropdown_menu.open()
 
     def open_menu(self, instance):
         # self.logger.info(f"open_menu called with instance: {instance}, value: {value}")
