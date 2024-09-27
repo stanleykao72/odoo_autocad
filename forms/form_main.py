@@ -28,6 +28,23 @@ from kivy.core.text import LabelBase
 #                    fn_regular='SimHei.ttf')
 
 KV = '''
+<SelectableLabel>:
+    canvas.before:
+        Color:
+            rgba: (0, 0, 0, 0.1) if self.selected else (0, 0, 0, 0)
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+<RV>:
+    viewclass: 'SelectableLabel'
+    RecycleBoxLayout:
+        default_size: None, dp(56)
+        default_size_hint: 1, None
+        size_hint_y: None
+        height: self.minimum_height
+        orientation: 'vertical'
+
 MDBoxLayout:
     orientation: "vertical"
 
@@ -62,26 +79,44 @@ class SelectableLabel(RecycleDataViewBehavior, Label):
     text = StringProperty('')
 
     def refresh_view_attrs(self, rv, index, data):
+        print(f"refresh_view_attrs called with index: {index}, data: {data}")
         self.index = index
         self.text = data['text']
         return super(SelectableLabel, self).refresh_view_attrs(rv, index, data)
 
     def on_touch_down(self, touch):
+        print(f"on_touch_down called with touch: {touch}")
         if super(SelectableLabel, self).on_touch_down(touch):
+            print("super on_touch_down returned True")
             return True
         if self.collide_point(*touch.pos) and self.selectable:
+            print(f"collide_point: {self.collide_point(*touch.pos)}, selectable: {self.selectable}")
             self.parent.parent.select_with_touch(self.index, touch)
             app = MDApp.get_running_app()
+            print(f"Selected item text: {self.text}")
             app.set_item(self.text)
             app.popup.dismiss()
             return True
+        return False
 
 class RV(RecycleView):
     def __init__(self, **kwargs):
         super(RV, self).__init__(**kwargs)
         self.data = []
 
+    def select_with_touch(self, index, touch):
+        print(f"select_with_touch called with index: {index}, touch: {touch}")
+        # 在這裡添加選擇項目的邏輯
+        for item in self.data:
+            item['selected'] = False
+        self.data[index]['selected'] = True
+        self.refresh_from_data()
+
 class FormMain(MDApp):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.filtered_items = []  # 初始化 filtered_items
+
     def build(self):
         self.theme_cls.primary_palette = "Orange"
         self.theme_cls.theme_style = "Dark"
@@ -173,7 +208,7 @@ class FormMain(MDApp):
         row1.add_widget(MDLabel(text="Parameter 1:", size_hint_y=None, height=dp(30), size_hint_x=0.3))
         
         # self.selected_item = MDTextField(size_hint_y=None, height=dp(30), size_hint_x=0.7)
-        self.selected_item = TextInput(size_hint_y=None, height=dp(30), size_hint_x=0.7)
+        self.selected_item = TextInput(size_hint_y=None, height=dp(30), size_hint_x=0.7, multiline=False)
         # self.dropdown_menu = MDDropdownMenu(
         #     caller=self.selected_item,
         #     items=self.dropdown_items,
@@ -181,8 +216,8 @@ class FormMain(MDApp):
         # )
         # self.selected_item.bind(on_focus=self.open_menu)
         # self.selected_item.bind(on_touch_down=self.open_menu)
-        self.selected_item.bind(text=self.open_menu)
-        # self.selected_item.bind(on_text_validate=self.open_menu)
+        # self.selected_item.bind(text=self.open_menu)
+        self.selected_item.bind(on_text_validate=self.open_menu)
 
         row1.add_widget(self.selected_item)
         form_layout.add_widget(row1)
@@ -211,27 +246,47 @@ class FormMain(MDApp):
     #     if not self.dropdown_menu.parent:
     #         self.dropdown_menu.open()
 
-    def open_menu(self, instance, value):
+    def open_menu(self, instance):
         # self.logger.info(f"open_menu called with instance: {instance}, value: {value}")
         search_text = instance.text.lower()
-        filtered_items = [item for item in self.dropdown_items if search_text in item.lower()]
+        print('search_text:', search_text)
+        self.filtered_items = [item for item in self.dropdown_items if search_text in item.lower()]
 
-        if not filtered_items:
+        if not self.filtered_items:
             if hasattr(self, 'popup') and self.popup:
                 self.popup.dismiss()
             return
 
-        content = BoxLayout(orientation='vertical')
-        rv = RV()
-        rv.data = [{'text': item} for item in filtered_items]
-        rv.viewclass = 'SelectableLabel'
-        content.add_widget(rv)
+        self.show_popup()
 
+    def show_popup(self):
+        content = BoxLayout(orientation='vertical')
+        
+        # 添加搜尋欄位
+        search_input = TextInput(size_hint_y=None, height=dp(40), multiline=False)
+        search_input.bind(text=self.update_filter)
+        content.add_widget(search_input)
+        
+        self.rv = RV()
+        self.rv.data = [{'text': item} for item in self.filtered_items]
+        self.rv.viewclass = 'SelectableLabel'
+        content.add_widget(self.rv)
+
+        print('rv.data:', self.rv.data)  # 確認 rv.data 的內容
+        print('filtered_items:', self.filtered_items)  # 確認 filtered_items 的內容
+        print('content:', content)  # 確認 content 的內容
+
+        # 每次打開 popup 前重置它
         if hasattr(self, 'popup') and self.popup:
-            self.popup.content = content
-        else:
-            self.popup = Popup(title='Select an option', content=content, size_hint=(0.8, 0.8))
-            self.popup.open()
+            self.popup.dismiss()
+        self.popup = Popup(title='Select an option', content=content, size_hint=(0.8, 0.8))
+        self.popup.open()
+
+    def update_filter(self, instance, value):
+        search_text = value.lower()
+        self.filtered_items = [item for item in self.dropdown_items if search_text in item.lower()]
+        self.rv.data = [{'text': item} for item in self.filtered_items]
+        self.rv.refresh_from_data()
 
     def set_item(self, text_item):
         self.selected_item.text = text_item
