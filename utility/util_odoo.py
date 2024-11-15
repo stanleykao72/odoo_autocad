@@ -24,10 +24,14 @@ _logger.addHandler(c_handler)
 
 
 class UtilOdoo:
-    def __init__(self, odoo, requestOptions, token):
-        self.odoo = odoo
-        self.requestOptions = requestOptions
-        self.user_token = token
+    def __init__(self, odoo_connection):
+        # self.odoo = odoo
+        # self.requestOptions = requestOptions
+        # self.user_token = token
+        self.odoo = None
+        self.requestOptions = None
+        self.user_token = None
+        self.connect_odoo(odoo_connection)
 
     def string_to_base64(self, input_string):
         input_bytes = input_string.encode('utf-8')        
@@ -143,11 +147,8 @@ class UtilOdoo:
             _logger.info(f'error_message: {error_message}')
             return error_message
         else:
-            import_return_str = json.dumps(project_list, ensure_ascii=False).encode('utf8').decode()
-            # print(f'import_return_str:{import_return_str}')
-            # _logger.info(f'import_return_str: {import_return_str}')
-
-            return import_return_str.get('project')
+            # return_project_list = project_list.get('project')
+            return project_list
 
     def get_product(self):
 
@@ -206,5 +207,5 @@ class UtilOdoo:
             _logger.info(f'error_message: {error_message}')
             return error_message
         else:
-            return_color_list = color_list.get('setup')
+            return_color_list = color_list.get('color')
             return return_color_list

@@ -157,9 +157,9 @@ def connect_to_odoo(odoo_conn):
 if __name__ == '__main__':
 
     odoo_connection = sqlite_create_table()
-    odoo, requestOptions, token = connect_to_odoo(odoo_connection)
+    # odoo, requestOptions, token = connect_to_odoo(odoo_connection)
 
-    if odoo:
+    if odoo_connection:
         # print(f"odoo: {odoo}")
         # print(f"requestOptions: {requestOptions}")
         # print(f"token: {token}")
@@ -168,5 +168,6 @@ if __name__ == '__main__':
         # prompt(acaduti, f"token: {token}")
 
         # 建立 FormMain
-        form_main = FormMain(odoo=odoo, requestOptions=requestOptions, token=token, odoo_connection=odoo_connection)
+        # form_main = FormMain(odoo=odoo, requestOptions=requestOptions, token=token, odoo_connection=odoo_connection)
+        form_main = FormMain(odoo_connection=odoo_connection)
         form_main.mainloop()
