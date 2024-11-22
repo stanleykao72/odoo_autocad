@@ -1,17 +1,19 @@
 # -*- coding: utf-8 -*-
-import tkinter as tk
+
 
 class UtilPushToBoq:
-    def __init__(self):
-        pass
+    def __init__(self, odoo_util, autocad_util, log_util):
+        self.odoo_util = odoo_util
+        self.autocad_util = autocad_util
+        self.log_util = log_util
 
-    def push_to_boq(self, main_body):
-        self.clear_main_body(main_body)
-        log_messages = tk.Text(main_body)
-        log_messages.pack(fill="both", expand=True)
-        log_messages.insert(tk.END, "推送到 BOQ...\n")
-        main_body.after(1000, lambda: log_messages.insert(tk.END, "成功推送到 BOQ。\n"))
-
-    def clear_main_body(self, main_body):
-        for widget in main_body.winfo_children():
-            widget.destroy()
+    def push_to_boq(self):
+        table_list = self.autocad_util.get_tables_from_layouts()
+        # self.log_util.safe_log_insert(f"table_list: {table_list}\n")
+        return_table_list = []
+        for table in table_list:
+            self.log_util.safe_log_insert(f"table: {table}\n")
+            table_dict = self.autocad_util.get_table_data(table['layout'], table['block'])
+            return_table_list.append(table_dict)
+        self.log_util.safe_log_insert(f"return_table_list: {return_table_list}\n")
+        self.log_util.safe_log_insert("推送到 BOQ...\n")

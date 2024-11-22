@@ -1,37 +1,45 @@
 # -*- coding: utf-8 -*-
 import json
-import logging
 import requests
 import simplejson
 import yaml
 import base64
+# from utility.util_log import UtilLog
+
 from requests.exceptions import HTTPError
 from bravado.requests_client import RequestsClient
 from bravado.client import SwaggerClient
 from swagger_spec_validator.common import SwaggerValidationError
 
-_logger = logging.getLogger(__name__)
-_logger.setLevel(logging.INFO)
+# _logger = logging.getLogger(__name__)
+# _logger.setLevel(logging.INFO)
 
-# log to console
-c_handler = logging.StreamHandler()
+# # log to console
+# c_handler = logging.StreamHandler()
 
-console_format = logging.Formatter("%(asctime)s: %(name)-18s [%(levelname)s] %(message)s")
-c_handler.setFormatter(console_format)
-c_handler.setLevel = logging.DEBUG
+# console_format = logging.Formatter("%(asctime)s: %(name)-18s [%(levelname)s] %(message)s")
+# c_handler.setFormatter(console_format)
+# c_handler.setLevel = logging.DEBUG
 
-_logger.addHandler(c_handler)
+# _logger.addHandler(c_handler)
 
 
 class UtilOdoo:
-    def __init__(self, odoo_connection):
+    def __init__(self, odoo_connection, log_util):
         # self.odoo = odoo
         # self.requestOptions = requestOptions
         # self.user_token = token
         self.odoo = None
         self.requestOptions = None
         self.user_token = None
+        self.log = log_util
         self.connect_odoo(odoo_connection)
+
+    def connected_odoo(self):
+        if self.odoo:
+            return True
+        else:
+            return False
 
     def string_to_base64(self, input_string):
         input_bytes = input_string.encode('utf-8')        
@@ -56,23 +64,23 @@ class UtilOdoo:
             requestOptions = {
                 'headers': headers,
             }
-            _logger.info(f"與 Odoo 連線成功\n")
+            self.log.safe_log_insert(f"與 Odoo 連線成功\n")
             self.odoo = odoo
             self.requestOptions = requestOptions
             self.user_token = token
             return odoo, requestOptions, token
         except requests.exceptions.ConnectionError:
-            _logger.info(f"無法與 Odoo 連線，通常多試幾次會成功\n")
+            self.log.safe_log_insert(f"無法與 Odoo 連線，通常多試幾次會成功\n")
             raise
         except (
             simplejson.errors.JSONDecodeError,
             yaml.YAMLError,
             HTTPError,
             ):
-            _logger.info(f"無效的 Swagger 文件。請檢查確保 Swagger 文件可以在 {url} 找到。\n")
+            self.log.safe_log_insert(f"無效的 Swagger 文件。請檢查確保 Swagger 文件可以在 {url} 找到。\n")
             raise
         except SwaggerValidationError:
-            _logger.info(f'無效的 Swagger 格式。')
+            self.log.safe_log_insert(f'無效的 Swagger 格式。\n')
             raise
 
     def import2boq(self, header_json):
@@ -93,14 +101,14 @@ class UtilOdoo:
 
         if 'error_code' in import_return_list:
             error_message = import_return_list.get('error_message')
-            _logger.info(f'error_message: {error_message}')
+            self.log.safe_log_insert(f'error_message: {error_message}\n')
             import_return_str = json.dumps(import_return_list, ensure_ascii=False).encode('utf8').decode()
-            _logger.info(f'import_return_str: {import_return_str}')
+            self.log.safe_log_insert(f'import_return_str: {import_return_str}\n')
             return import_return_str
         else:
             import_return_str = json.dumps(import_return_list, ensure_ascii=False).encode('utf8').decode()
             # print(f'import_return_str:{import_return_str}')
-            _logger.info(f'import_return_str: {import_return_str}')
+            self.log.safe_log_insert(f'import_return_str: {import_return_str}\n')
             return import_return_str
 
     def boq2pr(self, header_json):
@@ -122,12 +130,12 @@ class UtilOdoo:
 
         if 'error_code' in import_return_list:
             error_message = import_return_list.get('error_message')
-            _logger.info(f'error_message: {error_message}')
+            self.log.safe_log_insert(f'error_message: {error_message}\n')
             return error_message
         else:
             import_return_str = json.dumps(import_return_list, ensure_ascii=False).encode('utf8').decode()
             # print(f'import_return_str:{import_return_str}')
-            _logger.info(f'import_return_str: {import_return_str}')
+            self.log.safe_log_insert(f'import_return_str: {import_return_str}\n')
             return import_return_str
 
     def get_project(self, pr_no):
@@ -144,7 +152,7 @@ class UtilOdoo:
 
         if 'error_code' in project_list:
             error_message = project_list.get('error_message')
-            _logger.info(f'error_message: {error_message}')
+            self.log.safe_log_insert(f'error_message: {error_message}\n')
             return error_message
         else:
             # return_project_list = project_list.get('project')
@@ -164,7 +172,7 @@ class UtilOdoo:
 
         if 'error_code' in product_list:
             error_message = product_list.get('error_message')
-            _logger.info(f'error_message: {error_message}')
+            self.log.safe_log_insert(f'error_message: {error_message}\n')
             return error_message
         else:
             return_product_list = product_list.get('product')
@@ -184,7 +192,7 @@ class UtilOdoo:
 
         if 'error_code' in setup_list:
             error_message = setup_list.get('error_message')
-            _logger.info(f'error_message: {error_message}')
+            self.log.safe_log_insert(f'error_message: {error_message}\n')
             return error_message
         else:
             return_setup_list = setup_list.get('setup')
@@ -204,7 +212,7 @@ class UtilOdoo:
 
         if 'error_code' in color_list:
             error_message = color_list.get('error_message')
-            _logger.info(f'error_message: {error_message}')
+            self.log.safe_log_insert(f'error_message: {error_message}\n')
             return error_message
         else:
             return_color_list = color_list.get('color')

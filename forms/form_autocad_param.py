@@ -1,141 +1,23 @@
 # -*- coding: utf-8 -*-
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, Toplevel
 from utility.util_autocad import UtilAutoCAD
+# from utility.util_log import UtilLog
 from utility.popup_selector import PopupSelector  # 新增導入
 
-# class PopupSelector:
-#     def __init__(self, parent, data_source, target_entry, columns, title="選擇一個選項", additional_target_entries=None):
-#         """
-#         :param parent: 父小部件
-#         :param fetch_data_func: 獲取數據的函數，應返回一個字典列表
-#         :param target_entry: 用於填充選定數據的 Entry 小部件
-#         :param columns: 要顯示的數據鍵列表
-#         :param title: 彈出窗口的標題
-#         :param additional_target_entries: 字典，映射額外欄位到其 Entry 小部件
-#         """
-#         self.parent = parent
-#         self.data_source = data_source
-#         self.target_entry = target_entry
-#         self.columns = columns
-#         self.title = title
-#         self.popup_open = False
-#         self.filtered_items = []
-#         self.items = []
-#         self.additional_target_entries = additional_target_entries or {}
-
-#     def show(self):
-#         if self.popup_open:
-#             return
-#         self.popup_open = True
-#         self.items = self.data_source() or []  # 確保返回空列表而不是 None
-#         self.filtered_items = self.items
-#         if not self.filtered_items:
-#             messagebox.showinfo("提示", "沒有可用的選項")
-#             self.popup_open = False
-#             return
-#         self._create_popup()
-
-#     def _create_popup(self):
-#         self.popup = tk.Toplevel(self.parent)
-#         self.popup.title(self.title)
-#         self.popup.geometry("400x300")
-
-#         # 更新彈出視窗以獲取正確尺寸
-#         self.popup.update_idletasks()
-#         # 將彈出視窗置中
-#         self._center_popup()
-
-#         # 綁定關閉事件
-#         self.popup.protocol("WM_DELETE_WINDOW", self.on_close)
-
-#         self.search_input = tk.Entry(self.popup)
-#         self.search_input.pack(fill="x")
-#         self.search_input.bind("<KeyRelease>", self.update_filter)
-
-#         self.tree = ttk.Treeview(self.popup, columns=self.columns, show="headings")
-#         for col in self.columns:
-#             self.tree.heading(col, text=col.title())
-#         self.tree.pack(fill="both", expand=True)
-
-#         self._update_tree_items()
-#         self.tree.bind("<<TreeviewSelect>>", self.on_select)
-
-#     def _center_popup(self):
-#         # 更新父視窗和彈出視窗以獲取正確尺寸
-#         self.parent.update_idletasks()
-#         self.popup.update_idletasks()
-
-#         # 獲取父視窗的位置和尺寸
-#         parent_x = self.parent.winfo_rootx()
-#         parent_y = self.parent.winfo_rooty()
-#         parent_width = self.parent.winfo_width()
-#         parent_height = self.parent.winfo_height()
-
-#         # 獲取彈出視窗的尺寸
-#         popup_width = self.popup.winfo_width()
-#         popup_height = self.popup.winfo_height()
-
-#         # 計算彈出視窗的位置，使其置於父視窗中央
-#         x = parent_x + (parent_width - popup_width) // 2
-#         y = parent_y + (parent_height - popup_height) // 2
-
-#         # 設定彈出視窗的位置
-#         self.popup.geometry(f"+{x}+{y}")
-
-#     def update_filter(self, event):
-#         search_text = event.widget.get().lower()
-#         self.filtered_items = [
-#             item for item in self.items 
-#             if any(str(value).lower().find(search_text) != -1 
-#                   for value in item.values())
-#         ]
-#         self._update_tree_items()
-
-#     def _update_tree_items(self):
-#         for i in self.tree.get_children():
-#             self.tree.delete(i)
-#         for item in self.filtered_items:
-#             values = [item[col] for col in self.columns]
-#             self.tree.insert("", "end", values=values)
-
-#     def on_select(self, event):
-#         selected_item = self.tree.selection()
-#         if selected_item:
-#             values = self.tree.item(selected_item, "values")
-#             # 將第一列的值插入到 target_entry
-#             self.target_entry.delete(0, tk.END)
-#             self.target_entry.insert(0, values[0])
-#             # 將其他值插入到對應的 Entry 控件
-#             for i, col in enumerate(self.columns):
-#                 if col in self.additional_target_entries:
-#                     entry = self.additional_target_entries[col]
-#                     entry.configure(state='normal')
-#                     entry.delete(0, tk.END)
-#                     entry.insert(0, values[i])
-#                     entry.configure(state='readonly')
-#             self.popup.destroy()
-#             self.popup_open = False
-#             self.target_entry.master.focus_set()
-
-#     def on_close(self):
-#         self.popup.destroy()
-#         self.popup_open = False
 
 class FormAutoCADParam:
-    def __init__(self, main_content, odoo_util, util_autocad):
+    def __init__(self, main_content, odoo_util, autocad_util, log_util, root):
         self.main_content = main_content
         self.odoo_util = odoo_util
-        self.util_autocad = util_autocad  # Store the UtilAutoCAD instance
-        self.project_id = self.util_autocad.project_id
+        self.autocad_util = autocad_util  # Store the UtilAutoCAD instance
+        self.project_id = self.autocad_util.project_id
         self.material_selector = None
         self.spec_selector = None
         self.category_selector = None
 
-        # 建立日誌框架
-        log_frame = tk.Frame(self.main_content)
-        log_frame.pack(fill="both", expand=True)
-        self.util_autocad.initialize_log(log_frame)
+        self.util_log = log_util
+        self.root = root
 
     def get_parameters_from_odoo(self):
         self.clear_main_content()
@@ -295,11 +177,6 @@ class FormAutoCADParam:
     def clear_main_content(self):
         for widget in self.main_content.winfo_children():
             widget.destroy()
-        # 重新初始化日誌視窗
-        self.util_autocad.initialize_log(self.main_content)
-        # 設置焦點到 log_messages，避免觸發 FocusIn 事件
-        if self.util_autocad.log_messages:
-            self.util_autocad.log_messages.focus_set()
 
     def submit(self):
         material = self.material_entry.get()
@@ -310,22 +187,15 @@ class FormAutoCADParam:
         color = self.color_entry.get()
         color_no = self.color_no_entry.get()  # Retrieve color_no
 
-        print("Material:", material)
-        print("Spec:", spec)
-        print("Category:", category)
-        print("Process:", process)
-        print("Surface:", surface)
-        print("Color:", color)
-        print("Color No:", color_no)
-
         if not all([material, spec, category, process, surface, color, color_no]):
-            messagebox.showinfo("提示", "請填寫所有欄位")
+            # self.show_message("提示", "請填寫所有欄位")
+            self.util_log.safe_log_insert("請填寫所有欄位。\n")
             return
 
 
         try:
             # 假設所有屬性都在同一個塊中，替換為實際的塊名稱
-            block = self.util_autocad.get_attribute_block()
+            block = self.autocad_util.get_attribute_block()
 
             if block:
                 # 準備屬性值字典
@@ -341,16 +211,38 @@ class FormAutoCADParam:
 
                 # 更新每個屬性
                 for tag, value in attr_values.items():
-                    self.util_autocad.set_attribute_value(block, tag, value)
+                    self.autocad_util.set_attribute_value(block, tag, value)
 
-                messagebox.showinfo("提示", "參數已更新至 AutoCAD。")
+                # self.show_message("提示", "參數已更新至 AutoCAD。", "info")
+                self.util_log.safe_log_insert("參數已更新至 AutoCAD。\n")
                 self.clear_main_content()  # 清除內容並重置表單
             else:
-                messagebox.showerror("錯誤", "未找到指定的塊來更新屬性。")
+                # self.show_message("錯誤", "未找到指定的塊來更新屬性。")
+                self.util_log.safe_log_insert("未找到指定的塊來更新屬性。\n")
 
         except Exception as e:
-            messagebox.showerror("錯誤", f"更新 AutoCAD 屬性時發生錯誤: {str(e)}")
+            # self.show_message("錯誤", f"更新 AutoCAD 屬性時發生錯誤: {str(e)}")
+            self.util_log.safe_log_insert(f"更新 AutoCAD 屬性時發生錯誤: {str(e)}\n")
 
     def cancel(self):
         self.clear_main_content()
 
+    def show_message(self, title, message, msg_type="error"):
+        # 确保窗口已更新
+        self.root.update_idletasks()
+        
+        # 创建一个隐藏的 Toplevel 作为父窗口
+        top = Toplevel(self.root)
+        top.withdraw()  # 隐藏窗口
+        top.transient(self.root)  # 设置为对话框
+        top.grab_set()  # 捕获所有事件
+
+        # 显示消息
+        if msg_type == "info":
+            messagebox.showinfo(title, message, parent=top)
+        else:
+            messagebox.showerror(title, message, parent=top)
+        
+        # 释放捕获并销毁窗口
+        top.grab_release()
+        top.destroy()

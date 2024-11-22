@@ -9,6 +9,7 @@ from utility.util_odoo import UtilOdoo
 from utility.util_autocad import UtilAutoCAD
 from utility.util_push_to_boq import UtilPushToBoq
 from utility.util_transfer_boq_to_pr import UtilTransferBoqToPr
+from utility.util_log import UtilLog
 from forms.form_autocad_param import FormAutoCADParam
 from bravado.requests_client import RequestsClient
 from bravado.client import SwaggerClient
@@ -31,13 +32,23 @@ class FormMain(tk.Tk):
         super().__init__()
         self.odoo_connection = odoo_connection
         self.title("AutoCAD Odoo Integration")
-        self.geometry("800x600")
 
-        # Initialize Odoo and AutoCAD utilities
-        self.odoo_util = UtilOdoo(self.odoo_connection)
-        self.autocad_util = UtilAutoCAD(self.odoo_util)
+        # 獲取屏幕寬度
+        screen_width = self.winfo_screenwidth()
+        window_width = 800
+        window_height = 600
+
+        # 計算窗口應該放置的位置
+        x_position = screen_width - window_width
+        y_position = 0
+
+        # 設置窗口大小並將其放置在屏幕的最右邊
+        self.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
 
         # Define main layout frames
+        self.top_bar = tk.Frame(self, bg="orange", height=50)
+        self.top_bar.pack(side="top", fill="x")
+
         self.side_menu = tk.Frame(self, width=200, bg="lightgray")
         self.side_menu.pack(side="left", fill="y")
 
@@ -47,65 +58,96 @@ class FormMain(tk.Tk):
         self.log_frame = tk.Frame(self, bg="black")
         self.log_frame.pack(side="bottom", fill="x")
 
-        # Initialize log messages
-        self.autocad_util.initialize_log(self.log_frame)
+        # Initialize log utility
+        self.log_util = UtilLog(self.log_frame)
+
+        # Initialize Odoo and AutoCAD utilities
+        self.odoo_util = UtilOdoo(self.odoo_connection, self.log_util)
+        self.autocad_util = UtilAutoCAD(self.odoo_util, self.log_util)
+        self.push_to_boq_util = UtilPushToBoq(self.odoo_util, self.autocad_util, self.log_util)
+        self.transfer_boq_to_pr_util = UtilTransferBoqToPr(self.odoo_util, self.autocad_util, self.log_util)
 
         # Add buttons to the side menu
         self.add_side_menu_buttons()
 
     def add_side_menu_buttons(self):
         buttons = [
-            ("連接到 Odoo", self.connect_odoo),
-            ("連接到 AutoCAD", self.connect_autocad),
-            ("從 Odoo 獲取參數", self.get_parameters_from_odoo),
-            ("推送到 BOQ", self.push_to_boq),
-            ("轉移 BOQ 到 PR", self.transfer_boq_to_pr),
+            ("連接到 Odoo", self.connect_odoo, 'button_connect_odoo'),
+            ("連接到 AutoCAD", self.connect_autocad, 'button_connect_autocad'),
+            ("從 Odoo 獲取參數", self.get_parameters_from_odoo, 'button_get_parameters'),
+            ("推送到 BOQ", self.push_to_boq, 'button_push_to_boq'),
+            ("轉移 BOQ 到 PR", self.transfer_boq_to_pr, 'button_transfer_boq_to_pr')
         ]
 
-        for (text, command) in buttons:
-            button = tk.Button(self.side_menu, text=text, command=command)
+        for (text, command, button_name) in buttons:
+            button = tk.Button(self.side_menu, text=text, command=command, name=button_name)
             button.pack(fill="x", pady=5)
+            setattr(self, button_name, button)  # 將按鈕賦值為類的屬性
+
+
+        if self.odoo_util.connected_odoo():
+            self.button_connect_odoo.config(bg="green")
+        else:
+            self.button_connect_odoo.config(bg="red")
+
+        if self.autocad_util.connected_autocad():
+            self.button_connect_autocad.config(bg="green")
+        else:
+            self.button_connect_autocad.config(bg="red")
 
     def connect_odoo(self):
         self.clear_main_content()
-        log = self.autocad_util.log_messages
-        log.insert(tk.END, "連接到 Odoo...\n")
+        self.log_util.safe_log_insert("連接到 Odoo...\n")
         try:
             odoo, requestOptions, token = self.odoo_util.connect_odoo(self.odoo_connection)
-            self.after(1000, lambda: log.insert(tk.END, "與 Odoo 連線成功\n"))
+            # self.after(1000, lambda: self.log_util.safe_log_insert("與 Odoo 連線成功\n"))
+            if self.odoo_util.connected_odoo():
+                self.button_connect_odoo.config(bg="green")
         except requests.exceptions.ConnectionError:
-            self.after(1000, lambda: log.insert(tk.END, "無法與 Odoo 連線，通常多試幾次會成功\n"))
+            self.after(1000, lambda: self.log_util.safe_log_insert("無法與 Odoo 連線，通常多試幾次會成功\n"))
         except Exception as e:
-            self.after(1000, lambda: log.insert(tk.END, f"連接 Odoo 時發生錯誤: {str(e)}\n"))
+            self.after(1000, lambda: self.log_util.safe_log_insert(f"連接 Odoo 時發生錯誤: {str(e)}\n"))
 
     def connect_autocad(self):
         self.autocad_util.connect_autocad(self.main_content)
+        if self.autocad_util.connected_autocad():
+            self.button_connect_autocad.config(bg="green")
 
     def get_parameters_from_odoo(self):
         # Ensure AutoCAD is connected and attributes are available
         if not self.autocad_util.project_id:
-            messagebox.showerror("錯誤", "請先連接 AutoCAD 並確保已獲取專案資料。")
+            self.show_error_message("錯誤", "請先連接 AutoCAD 並確保已獲取專案資料。")
             return
 
         # Initialize FormAutoCADParam with the UtilAutoCAD instance
         form_autocad_param = FormAutoCADParam(
             main_content=self.main_content,
             odoo_util=self.odoo_util,
-            util_autocad=self.autocad_util  # Pass the UtilAutoCAD instance
+            autocad_util=self.autocad_util,
+            log_util=self.log_util,
+            root=self
         )
         form_autocad_param.get_parameters_from_odoo()
 
     def push_to_boq(self):
         # Implement push to BOQ logic
-        pass
+        self.push_to_boq_util.push_to_boq()
 
     def transfer_boq_to_pr(self):
         # Implement transfer BOQ to PR logic
-        pass
+        self.transfer_boq_to_pr_util.transfer_boq_to_pr()
 
     def clear_main_content(self):
         for widget in self.main_content.winfo_children():
             widget.destroy()
+
+    def show_error_message(self, title, message):
+        self.update_idletasks()  # 確保窗口已更新
+        messagebox.showerror(title, message, parent=self)
+
+    def show_info_message(self, title, message):
+        self.update_idletasks()  # 確保窗口已更新
+        messagebox.showinfo(title, message, parent=self)
 
 # class FormMain(tk.Tk):
 #     def __init__(self, odoo=None, requestOptions=None, token=None, odoo_connection=None):
