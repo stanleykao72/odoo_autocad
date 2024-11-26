@@ -8,12 +8,14 @@ class UtilPushToBoq:
         self.log_util = log_util
 
     def push_to_boq(self):
-        table_list = self.autocad_util.get_tables_from_layouts()
-        # self.log_util.safe_log_insert(f"table_list: {table_list}\n")
-        return_table_list = []
-        for table in table_list:
-            self.log_util.safe_log_insert(f"table: {table}\n")
-            table_dict = self.autocad_util.get_table_data(table['layout'], table['block'])
-            return_table_list.append(table_dict)
-        self.log_util.safe_log_insert(f"return_table_list: {return_table_list}\n")
+
+        layout_dic = self.autocad_util.get_layouts_values()
+        self.log_util.safe_log_insert(f"layout_dic: {layout_dic}\n")
+
+        boq_list = self.odoo_util.import2boq(layout_dic)
+        self.log_util.safe_log_insert(f"boq_list: {boq_list}\n")
+
+        self.autocad_util.set_layouts_tables_id(boq_list)
+
+        # self.log_util.safe_log_insert(f"return_table_list: {return_table_list}\n")
         self.log_util.safe_log_insert("推送到 BOQ...\n")

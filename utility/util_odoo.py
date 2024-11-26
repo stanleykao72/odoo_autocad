@@ -52,6 +52,11 @@ class UtilOdoo:
         db_name = odoo_connection['db_name']
         url = odoo_connection['url']
         token = odoo_connection['token']
+        self.log.safe_log_insert(f"host: {host}\n")
+        self.log.safe_log_insert(f"db_name: {db_name}\n")
+        self.log.safe_log_insert(f"url: {url}\n")
+        self.log.safe_log_insert(f"token: {token}\n")
+
         http_client = RequestsClient()
         http_client.set_basic_auth(host, db_name, token)
         try:
@@ -83,64 +88,49 @@ class UtilOdoo:
             self.log.safe_log_insert(f'無效的 Swagger 格式。\n')
             raise
 
-    def import2boq(self, header_json):
-        # print(f'user_token:{self.user_token}\n')
-        print(f'header_json:{header_json}')
-        # print(f'odoo:{self.odoo}\n')
+    def import2boq(self, layout_dict):
 
-        header_dict = json.loads(header_json)
-        import_return_list = self.odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
+        boq_dict = self.odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
             method_name="import2boq_v2",
             body={
-            "args": [header_dict],
+            "args": [layout_dict],
             "kwargs": {'user_token': self.user_token},
             "context": {}
             },
             _request_options=self.requestOptions, 
         ).response().incoming_response.json()
 
-        if 'error_code' in import_return_list:
-            error_message = import_return_list.get('error_message')
-            self.log.safe_log_insert(f'error_message: {error_message}\n')
-            import_return_str = json.dumps(import_return_list, ensure_ascii=False).encode('utf8').decode()
-            self.log.safe_log_insert(f'import_return_str: {import_return_str}\n')
-            return import_return_str
-        else:
-            import_return_str = json.dumps(import_return_list, ensure_ascii=False).encode('utf8').decode()
-            # print(f'import_return_str:{import_return_str}')
-            self.log.safe_log_insert(f'import_return_str: {import_return_str}\n')
-            return import_return_str
-
-    def boq2pr(self, header_json):
-        # print(f'user_token:{self.user_token}\n')
-        # print(f'header_json:{header_json}')
-        # print(f'odoo:{self.odoo}\n')
-
-        header_dict = json.loads(header_json)
-        # print(f'header_dict:{header_dict}')
-        import_return_list = self.odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
-            method_name="boq2pr_v2",
-            body={
-            "args": [header_dict],
-            "kwargs": {'user_token': self.user_token},
-            "context": {}
-            },
-            _request_options=self.requestOptions, 
-        ).response().incoming_response.json()
-
-        if 'error_code' in import_return_list:
-            error_message = import_return_list.get('error_message')
+        if 'error_code' in boq_dict:
+            error_message = boq_dict.get('error_message')
             self.log.safe_log_insert(f'error_message: {error_message}\n')
             return error_message
         else:
-            import_return_str = json.dumps(import_return_list, ensure_ascii=False).encode('utf8').decode()
-            # print(f'import_return_str:{import_return_str}')
-            self.log.safe_log_insert(f'import_return_str: {import_return_str}\n')
-            return import_return_str
+            return_boq_list = boq_dict.get('all')
+            return return_boq_list
+
+    def boq2pr(self, layout_dict):
+
+        pr_dict = self.odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
+            method_name="boq2pr_v2",
+            body={
+            "args": [layout_dict],
+            "kwargs": {'user_token': self.user_token},
+            "context": {}
+            },
+            _request_options=self.requestOptions, 
+        ).response().incoming_response.json()
+
+        if 'error_code' in pr_dict:
+            error_message = pr_dict.get('error_message')
+            self.log.safe_log_insert(f'error_message: {error_message}\n')
+            return error_message
+        else:
+            return_pr_list = pr_dict.get('all')
+            return return_pr_list
 
     def get_project(self, pr_no):
 
-        project_list = self.odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
+        project_dict = self.odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
             method_name="get_project_v2",
             body={
             "args": [[['name', '=', pr_no]]],
@@ -150,17 +140,17 @@ class UtilOdoo:
             _request_options=self.requestOptions, 
         ).response().incoming_response.json()
 
-        if 'error_code' in project_list:
-            error_message = project_list.get('error_message')
+        if 'error_code' in project_dict:
+            error_message = project_dict.get('error_message')
             self.log.safe_log_insert(f'error_message: {error_message}\n')
             return error_message
         else:
             # return_project_list = project_list.get('project')
-            return project_list
+            return project_dict
 
     def get_product(self):
 
-        product_list = self.odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
+        product_dict = self.odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
             method_name="get_product_v2",
             body={
             "args": [[('categ_id', 'child_of', 27), ('active', '=', True)]],
@@ -170,17 +160,17 @@ class UtilOdoo:
             _request_options=self.requestOptions, 
         ).response().incoming_response.json()
 
-        if 'error_code' in product_list:
-            error_message = product_list.get('error_message')
+        if 'error_code' in product_dict:
+            error_message = product_dict.get('error_message')
             self.log.safe_log_insert(f'error_message: {error_message}\n')
             return error_message
         else:
-            return_product_list = product_list.get('product')
+            return_product_list = product_dict.get('product')
             return return_product_list
 
     def get_setup(self, setup_name):
 
-        setup_list = self.odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
+        setup_dict = self.odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
             method_name="get_setup_v2",
             body={
             "args": [[('setup_name', '=', setup_name)]],
@@ -190,17 +180,17 @@ class UtilOdoo:
             _request_options=self.requestOptions,    
         ).response().incoming_response.json()
 
-        if 'error_code' in setup_list:
-            error_message = setup_list.get('error_message')
+        if 'error_code' in setup_dict:
+            error_message = setup_dict.get('error_message')
             self.log.safe_log_insert(f'error_message: {error_message}\n')
             return error_message
         else:
-            return_setup_list = setup_list.get('setup')
+            return_setup_list = setup_dict.get('setup')
             return return_setup_list
 
     def get_color(self, project_id):
 
-        color_list = self.odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
+        color_dict = self.odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
             method_name="get_color_v2",
             body={
             "args": [[('job_project_id', '=', project_id)]],
@@ -210,10 +200,10 @@ class UtilOdoo:
             _request_options=self.requestOptions,  
         ).response().incoming_response.json()
 
-        if 'error_code' in color_list:
-            error_message = color_list.get('error_message')
+        if 'error_code' in color_dict:
+            error_message = color_dict.get('error_message')
             self.log.safe_log_insert(f'error_message: {error_message}\n')
             return error_message
         else:
-            return_color_list = color_list.get('color')
+            return_color_list = color_dict.get('color')
             return return_color_list

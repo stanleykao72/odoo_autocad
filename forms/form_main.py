@@ -76,7 +76,9 @@ class FormMain(tk.Tk):
             ("連接到 AutoCAD", self.connect_autocad, 'button_connect_autocad'),
             ("從 Odoo 獲取參數", self.get_parameters_from_odoo, 'button_get_parameters'),
             ("推送到 BOQ", self.push_to_boq, 'button_push_to_boq'),
-            ("轉移 BOQ 到 PR", self.transfer_boq_to_pr, 'button_transfer_boq_to_pr')
+            ("轉移 BOQ 到 PR", self.transfer_boq_to_pr, 'button_transfer_boq_to_pr'),
+            ("清除此配置表格ID", self.clear_table_id, 'button_clear_table_id'),
+            ("清除所有配置表格ID", self.clear_all_tables_id, 'button_clear_all_tables_id'),
         ]
 
         for (text, command, button_name) in buttons:
@@ -136,6 +138,12 @@ class FormMain(tk.Tk):
     def transfer_boq_to_pr(self):
         # Implement transfer BOQ to PR logic
         self.transfer_boq_to_pr_util.transfer_boq_to_pr()
+    
+    def clear_table_id(self):
+        self.autocad_util.clear_table_id()
+
+    def clear_all_tables_id(self):
+        self.autocad_util.clear_all_tables_id()
 
     def clear_main_content(self):
         for widget in self.main_content.winfo_children():

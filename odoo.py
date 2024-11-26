@@ -78,7 +78,7 @@ def sqlite_create_table():
     sqlite_session = Sqlite_session()
 
     # 初始化 server_env
-    server_env = []
+    # server_env = []
 
     # 尋找 server table 中是否有資料
     sever_env = sqlite_session.query(Server).filter_by(active=True).all()
@@ -94,7 +94,23 @@ def sqlite_create_table():
         # _logger.info(f"second server_env: {server_env}")
         env = new_env
     else:
-        env = sever_env
+        config_loader = LoadYamlConfig('c:/odoo/config/token.yaml', 'c:/odoo/config/server.yaml')
+        server_cfg, token_cfg = config_loader.load()
+
+        # 如果有資料，則更新資料
+        for env in sever_env:
+            if env.host != server_cfg['host']:
+                env.host = server_cfg['host']
+            if env.db_name != server_cfg['db_name']:
+                env.db_name = server_cfg['db_name']
+            if env.url != server_cfg['url']:
+                env.url = server_cfg['url']
+            if env.token != token_cfg['token']:
+                env.token = token_cfg['token']
+            sqlite_session.commit()
+
+        new_env = sqlite_session.query(Server).filter_by(active=True).all()
+        env = new_env
 
     if env:
         odoo_env = env[0]

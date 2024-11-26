@@ -195,7 +195,8 @@ class FormAutoCADParam:
 
         try:
             # 假設所有屬性都在同一個塊中，替換為實際的塊名稱
-            block = self.autocad_util.get_attribute_block()
+            active_layout = self.autocad_util.get_active_layout()
+            block = self.autocad_util.get_attribute_block(active_layout)
 
             if block:
                 # 準備屬性值字典
