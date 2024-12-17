@@ -12,6 +12,7 @@ class FormAutoCADParam:
         self.odoo_util = odoo_util
         self.autocad_util = autocad_util  # Store the UtilAutoCAD instance
         self.project_id = self.autocad_util.project_id
+        self.job_working_plan_name = self.autocad_util.job_working_plan_name
         self.material_selector = None
         self.spec_selector = None
         self.category_selector = None
@@ -197,6 +198,7 @@ class FormAutoCADParam:
             # 假設所有屬性都在同一個塊中，替換為實際的塊名稱
             active_layout = self.autocad_util.get_active_layout()
             block = self.autocad_util.get_attribute_block(active_layout)
+            self.autocad_util.process_pr_no(active_layout)
 
             if block:
                 # 準備屬性值字典
