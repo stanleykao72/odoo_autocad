@@ -39,23 +39,28 @@ VersionInfoDescription=Odoo AutoCAD Integration Tool
 VersionInfoCopyright=Copyright (C) 2025 承暉精品股份有限公司
 
 ; === 程式碼簽章配置 ===
+; SignTool 必須放在 [Setup] 區段內
 ; 請根據您的憑證類型選擇其中一種方法，並移除前面的分號
 
 ; 方法1: 使用 PFX 檔案 (需要密碼)
-; SignTool=signtool /f "C:\certs\company.pfx" /p "your_password" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
+; SignTool=signtool sign /f "C:\certs\company.pfx" /p "your_password" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
 
 ; 方法2: 使用環境變數保護密碼
 ; 先設定: set CERT_PASSWORD=your_password
-; SignTool=signtool /f "C:\certs\company.pfx" /p "%CERT_PASSWORD%" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
+; SignTool=signtool sign /f "C:\certs\company.pfx" /p "%CERT_PASSWORD%" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
 
 ; 方法3: 使用憑證存放區中的憑證 (依憑證主體名稱)
-; SignTool=signtool /n "承暉精品股份有限公司" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
+; SignTool=signtool sign /n "承暉精品股份有限公司" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
 
 ; 方法4: 使用憑證指紋 (最安全)
-; SignTool=signtool /sha1 "certificate_thumbprint_here" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
+; SignTool=signtool sign /sha1 "certificate_thumbprint_here" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
 
 ; 方法5: 簡化版本 (使用舊格式時間戳記)
-; SignTool=signtool /f "C:\certs\company.pfx" /p "your_password" /t "http://timestamp.digicert.com" $f
+; SignTool=signtool sign /f "C:\certs\company.pfx" /p "your_password" /t "http://timestamp.digicert.com" $f
+
+; SignTool="C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe" sign /f "C:\certs\codesign.pfx" /p "YourSecurePassword123!" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
+; 設定 signtool="C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe" $p
+SignTool=signtool sign /f "C:\odoo\autocad_source\certs\codesign.pfx" /p "YourSecurePassword123!" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

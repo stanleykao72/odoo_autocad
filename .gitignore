@@ -5,3 +5,5 @@ log
 output
 installer
 !.gitattributes
+build
+certs
