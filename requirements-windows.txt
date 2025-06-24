@@ -1,0 +1,23 @@
+# Windows specific requirements
+# Use this file for Windows environment with AutoCAD integration
+
+# Core dependencies
+sqlalchemy
+requests
+pyyaml
+pillow
+
+# Odoo API integration
+bravado_core
+bravado
+swagger_spec_validator
+
+# UI framework
+customtkinter>=5.2.0
+
+# Windows COM integration (Required for AutoCAD integration)
+pywin32
+
+# Development and optional dependencies
+# kivy[base]
+# kivymd==1.2.0
