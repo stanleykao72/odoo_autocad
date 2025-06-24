@@ -44,12 +44,29 @@ _logger.addHandler(c_handler)
 
 
 def resource_path(relative_path):
+    """獲取資源檔案的正確路徑，相容於 PyInstaller 打包"""
     try:
-        base_path = sys._MEIPASS2
+        # PyInstaller 打包後的臨時目錄
+        base_path = sys._MEIPASS
     except Exception:
+        # 開發環境下的當前目錄
         base_path = os.path.abspath(".")
 
     return os.path.join(base_path, relative_path)
+
+def get_app_data_path():
+    """獲取應用程式資料目錄路徑"""
+    if sys.platform.startswith('win'):
+        # Windows: 使用 %APPDATA% 目錄
+        app_data = os.environ.get('APPDATA', os.path.expanduser('~'))
+        app_dir = os.path.join(app_data, 'OdooAutoCAD')
+    else:
+        # macOS/Linux: 使用用戶家目錄
+        app_dir = os.path.expanduser('~/.odoo_autocad')
+    
+    # 確保目錄存在
+    os.makedirs(app_dir, exist_ok=True)
+    return app_dir
 
 def string_to_base64(input_string):
     # 將字串轉換成 UTF-8 編碼的位元組序列
@@ -61,12 +78,14 @@ def string_to_base64(input_string):
     return base64_string
 
 def sqlite_create_table():
-    # 獲取當前檔案的目錄
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-
-    # 設定資料庫路徑
-    db_path = os.path.join(resource_path(current_dir), 'db', 'database.db')
-    # print('db_path: %s' % db_path)
+    # 使用應用程式資料目錄來儲存資料庫
+    app_data_dir = get_app_data_path()
+    db_path = os.path.join(app_data_dir, 'database.db')
+    
+    _logger.info(f"資料庫路徑: {db_path}")
+    
+    # 確保資料庫目錄存在
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
     # 建立 Sqlite 引擎
     sqlite_engine = create_engine(f'sqlite:///{db_path}')
@@ -83,34 +102,57 @@ def sqlite_create_table():
     # 尋找 server table 中是否有資料
     sever_env = sqlite_session.query(Server).filter_by(active=True).all()
     # _logger.info(f"first sever_env: {sever_env}")
-    # 如果沒有資料，則從LoadYamlConfig取得server_cfg, token_cfg 新增一筆資料
+    # 如果沒有資料，則嘗試從配置檔案載入或使用預設配置
     if not sever_env:
-        config_loader = LoadYamlConfig('c:/odoo/config/token.yaml', 'c:/odoo/config/server.yaml')
-        server_cfg, token_cfg = config_loader.load()
+        try:
+            # 嘗試從原始配置路徑載入
+            config_loader = LoadYamlConfig('c:/odoo/config/token.yaml', 'c:/odoo/config/server.yaml')
+            server_cfg, token_cfg = config_loader.load()
+        except (FileNotFoundError, Exception) as e:
+            _logger.warning(f"無法載入配置檔案: {e}")
+            # 使用預設配置
+            server_cfg = {
+                'host': 'localhost',
+                'db_name': 'your_database',
+                'url': 'http://localhost:8069/api/v1/swagger.json'
+            }
+            token_cfg = {
+                'token': 'your_token_here'
+            }
+            _logger.info("使用預設配置，請在首次使用時更新連接設定")
+        
         server = Server(host=server_cfg['host'], db_name=server_cfg['db_name'], url=server_cfg['url'], token=token_cfg['token'])
         sqlite_session.add(server)
         sqlite_session.commit()
         new_env = sqlite_session.query(Server).filter_by(active=True).all()
-        # _logger.info(f"second server_env: {server_env}")
         env = new_env
     else:
-        config_loader = LoadYamlConfig('c:/odoo/config/token.yaml', 'c:/odoo/config/server.yaml')
-        server_cfg, token_cfg = config_loader.load()
+        try:
+            config_loader = LoadYamlConfig('c:/odoo/config/token.yaml', 'c:/odoo/config/server.yaml')
+            server_cfg, token_cfg = config_loader.load()
+        except (FileNotFoundError, Exception) as e:
+            _logger.warning(f"配置檔案載入失敗，使用資料庫中的現有配置: {e}")
+            # 使用現有的資料庫配置
+            env = sever_env
 
-        # 如果有資料，則更新資料
-        for env in sever_env:
-            if env.host != server_cfg['host']:
-                env.host = server_cfg['host']
-            if env.db_name != server_cfg['db_name']:
-                env.db_name = server_cfg['db_name']
-            if env.url != server_cfg['url']:
-                env.url = server_cfg['url']
-            if env.token != token_cfg['token']:
-                env.token = token_cfg['token']
-            sqlite_session.commit()
+        # 如果成功載入配置檔案，則更新資料庫中的資料
+        if 'config_loader' in locals() and 'server_cfg' in locals() and 'token_cfg' in locals():
+            for env_item in sever_env:
+                if env_item.host != server_cfg['host']:
+                    env_item.host = server_cfg['host']
+                if env_item.db_name != server_cfg['db_name']:
+                    env_item.db_name = server_cfg['db_name']
+                if env_item.url != server_cfg['url']:
+                    env_item.url = server_cfg['url']
+                if env_item.token != token_cfg['token']:
+                    env_item.token = token_cfg['token']
+                sqlite_session.commit()
 
-        new_env = sqlite_session.query(Server).filter_by(active=True).all()
-        env = new_env
+            new_env = sqlite_session.query(Server).filter_by(active=True).all()
+            env = new_env
+        else:
+            # 使用現有的資料庫配置
+            env = sever_env
 
     if env:
         odoo_env = env[0]
