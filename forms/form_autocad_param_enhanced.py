@@ -57,7 +57,7 @@ class EnhancedFormAutoCADParam:
         # 說明文字
         info_label = ctk.CTkLabel(
             main_frame,
-            text="請選擇或輸入所需的參數。可以任意順序填寫，未填寫的欄位將保持空白。",
+            text="請選擇或輸入所需的參數。可以任意順序填寫，未填寫的欄位將保持空白。\n💡 提示：在下拉選單中輸入關鍵字即可快速篩選選項！",
             font=get_app_font('body'),
             text_color=theme.get_color('text_secondary')
         )
@@ -202,10 +202,15 @@ class EnhancedFormAutoCADParam:
         combobox.configure(state="normal")
         combobox.set(placeholder)  # 設置提示文字
         
+        # 綁定鍵盤事件進行即時搜尋
+        combobox._entry.bind('<KeyRelease>', lambda event, key=field_key: self.on_keyword_search(event, key))
+        
         self.comboboxes[field_key] = {
             'widget': combobox,
             'data_key': data_key,
-            'placeholder': placeholder
+            'placeholder': placeholder,
+            'all_values': [],  # 儲存所有選項，用於搜尋
+            'filtered_values': []  # 儲存篩選後的選項
         }
         
         # 只讀欄位（如單位、色號等）
@@ -244,11 +249,12 @@ class EnhancedFormAutoCADParam:
             center_frame,
             text="✅ 確定並更新到 AutoCAD",
             command=self.submit,
-            font=get_app_font('button'),
-            height=40,
-            width=200,
-            fg_color=theme.get_color('success'),
-            hover_color=theme.get_color('success_hover')
+            font=("Microsoft JhengHei UI", 16, "bold"),
+            height=50,
+            width=220,
+            fg_color="#2E7D32",  # 深綠色，更好的對比度
+            hover_color="#1B5E20",  # 更深的綠色
+            text_color="white"
         )
         submit_btn.pack(side="left", padx=10)
         
@@ -257,11 +263,12 @@ class EnhancedFormAutoCADParam:
             center_frame,
             text="🔄 重置表單",
             command=self.reset_form,
-            font=get_app_font('button'),
-            height=40,
-            width=120,
-            fg_color=theme.get_color('warning'),
-            hover_color=theme.get_color('warning_hover')
+            font=("Microsoft JhengHei UI", 14, "bold"),
+            height=50,
+            width=140,
+            fg_color="#F57C00",  # 橘色，更好的對比度
+            hover_color="#E65100",  # 更深的橘色
+            text_color="white"
         )
         reset_btn.pack(side="left", padx=10)
         
@@ -270,11 +277,12 @@ class EnhancedFormAutoCADParam:
             center_frame,
             text="❌ 取消",
             command=self.cancel,
-            font=get_app_font('button'),
-            height=40,
-            width=100,
-            fg_color=theme.get_color('error'),
-            hover_color=theme.get_color('error_hover')
+            font=("Microsoft JhengHei UI", 14, "bold"),
+            height=50,
+            width=120,
+            fg_color="#D32F2F",  # 深紅色，更好的對比度
+            hover_color="#B71C1C",  # 更深的紅色
+            text_color="white"
         )
         cancel_btn.pack(side="left", padx=10)
     
@@ -328,6 +336,10 @@ class EnhancedFormAutoCADParam:
                 else:
                     values = [item.get('value', '') for item in data if item.get('value')]
                 
+                # 儲存完整的選項列表以供搜尋使用
+                combobox_info['all_values'] = values
+                combobox_info['filtered_values'] = values.copy()
+                
                 # 更新Combobox選項
                 combobox.configure(values=values)
                 
@@ -344,6 +356,72 @@ class EnhancedFormAutoCADParam:
                         combobox.set("載入中...")
                     elif loading_status == "error":
                         combobox.set("載入失敗")
+    
+    def on_keyword_search(self, event, field_key: str):
+        """處理關鍵字搜尋事件"""
+        if field_key not in self.comboboxes:
+            return
+            
+        combobox_info = self.comboboxes[field_key]
+        combobox = combobox_info['widget']
+        keyword = combobox.get().strip().lower()
+        
+        # 如果是提示文字，不進行搜尋
+        if keyword == combobox_info['placeholder'].lower():
+            return
+            
+        # 如果關鍵字為空，顯示所有選項
+        if not keyword:
+            filtered_values = combobox_info['all_values']
+        else:
+            # 根據關鍵字篩選選項 - 多種匹配方式
+            all_values = combobox_info['all_values']
+            filtered_values = []
+            
+            # 1. 完全匹配（優先級最高）
+            exact_matches = [value for value in all_values if value.lower() == keyword]
+            
+            # 2. 開頭匹配
+            starts_with = [value for value in all_values 
+                          if value.lower().startswith(keyword) and value.lower() != keyword]
+            
+            # 3. 包含匹配
+            contains = [value for value in all_values 
+                       if keyword in value.lower() and not value.lower().startswith(keyword)]
+            
+            # 按優先級組合結果
+            filtered_values = exact_matches + starts_with + contains
+        
+        # 更新篩選後的選項
+        combobox_info['filtered_values'] = filtered_values
+        combobox.configure(values=filtered_values)
+        
+        # 顯示搜尋結果統計
+        if keyword and self.util_log:
+            total_count = len(combobox_info['all_values'])
+            filtered_count = len(filtered_values)
+            field_name = {
+                'material': '材料',
+                'spec': '材質', 
+                'category': '材料分類',
+                'process': '加工流程',
+                'surface': '表面處理',
+                'color': '顏色'
+            }.get(field_key, field_key)
+            
+            if filtered_count == 0:
+                self.util_log.safe_log_insert(f"🔍 {field_name}搜尋 '{keyword}': 未找到匹配項目\n")
+            elif filtered_count == total_count:
+                pass  # 顯示全部時不記錄
+            else:
+                self.util_log.safe_log_insert(f"🔍 {field_name}搜尋 '{keyword}': 找到 {filtered_count} 項匹配結果\n")
+        
+        # 如果找到匹配項目，自動展開下拉選單
+        if filtered_values and len(filtered_values) <= 10 and keyword:  # 只在搜尋時且結果不太多時自動展開
+            try:
+                combobox._open_dropdown_menu()
+            except:
+                pass  # 如果展開失敗就忽略
     
     def on_selection_change(self, field_key: str, value: str):
         """處理選擇變更事件"""
@@ -389,6 +467,10 @@ class EnhancedFormAutoCADParam:
         for combobox_info in self.comboboxes.values():
             # 重新設置提示文字
             combobox_info['widget'].set(combobox_info['placeholder'])
+            # 重置搜尋狀態，顯示所有選項
+            if combobox_info['all_values']:
+                combobox_info['filtered_values'] = combobox_info['all_values'].copy()
+                combobox_info['widget'].configure(values=combobox_info['all_values'])
             
         for entry in self.readonly_entries.values():
             entry.configure(state="normal")
