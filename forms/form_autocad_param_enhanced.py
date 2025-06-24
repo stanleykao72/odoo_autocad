@@ -193,14 +193,14 @@ class EnhancedFormAutoCADParam:
         # 主要輸入欄位 - 使用可編輯的Combobox
         combobox = ctk.CTkComboBox(
             field_frame,
-            placeholder_text=placeholder,
             font=get_app_font('body'),
             command=lambda value, key=field_key: self.on_selection_change(key, value)
         )
         combobox.pack(side="left", fill="x", expand=True, padx=(0, 10))
         
-        # 設置為可編輯
+        # 設置為可編輯，並設置初始提示文字
         combobox.configure(state="normal")
+        combobox.set(placeholder)  # 設置提示文字
         
         self.comboboxes[field_key] = {
             'widget': combobox,
@@ -331,13 +331,19 @@ class EnhancedFormAutoCADParam:
                 # 更新Combobox選項
                 combobox.configure(values=values)
                 
+                # 清除提示文字並重新設置（如果有資料的話）
+                if values:
+                    current_value = combobox.get()
+                    if current_value == combobox_info['placeholder']:
+                        combobox.set("")  # 清除提示文字
+                
                 # 如果還沒有資料，顯示載入狀態
                 if not values:
                     loading_status = self._loading_status.get(data_key, "")
                     if loading_status == "loading":
-                        combobox.configure(placeholder_text="載入中...")
+                        combobox.set("載入中...")
                     elif loading_status == "error":
-                        combobox.configure(placeholder_text="載入失敗")
+                        combobox.set("載入失敗")
     
     def on_selection_change(self, field_key: str, value: str):
         """處理選擇變更事件"""
@@ -381,7 +387,8 @@ class EnhancedFormAutoCADParam:
     def reset_form(self):
         """重置表單"""
         for combobox_info in self.comboboxes.values():
-            combobox_info['widget'].set("")
+            # 重新設置提示文字
+            combobox_info['widget'].set(combobox_info['placeholder'])
             
         for entry in self.readonly_entries.values():
             entry.configure(state="normal")
@@ -407,7 +414,12 @@ class EnhancedFormAutoCADParam:
         for field_key, attr_key in field_mapping.items():
             if field_key in self.comboboxes:
                 value = self.comboboxes[field_key]['widget'].get().strip()
-                values[attr_key] = value
+                placeholder = self.comboboxes[field_key]['placeholder']
+                # 忽略提示文字
+                if value and value != placeholder:
+                    values[attr_key] = value
+                else:
+                    values[attr_key] = ""
         
         # 獲取只讀欄位值
         readonly_mapping = {
