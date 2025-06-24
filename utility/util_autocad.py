@@ -587,7 +587,18 @@ class UtilAutoCAD:
                         cell_value = table.GetCellValue(i, j)
                         cell_value = self.LM_UnFormat(cell_value, True)
                         dectail_dict[col_name_list[j]] = cell_value
-                    detail_list.append(dectail_dict)
+                    
+                    # 檢查關鍵欄位是否為空 - 如果 qty 和 product_no 都為空則跳過此行
+                    qty = dectail_dict.get('qty', '').strip() if dectail_dict.get('qty') else ''
+                    product_no = dectail_dict.get('product_no', '').strip() if dectail_dict.get('product_no') else ''
+                    
+                    # 只有當 qty 或 product_no 至少有一個不為空時才加入列表
+                    if qty or product_no:
+                        detail_list.append(dectail_dict)
+                        self.log.safe_log_insert(f"加入表格行資料: product_no={product_no}, qty={qty}\n")
+                    else:
+                        self.log.safe_log_insert(f"跳過空白行: 第 {i+1} 行 (qty 和 product_no 皆為空)\n")
+                        
         return header_id, detail_list
 
     def get_layouts_header_id_to_pr(self):
