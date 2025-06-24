@@ -2,16 +2,10 @@
 
 ## 使用方法
 
-### Batch 腳本 (推薦)
-```cmd
-REM 以管理員身分執行 Command Prompt，然後執行：
-scripts\create_internal_ca.bat "承暉精品股份有限公司" "YourSecurePassword123!" ".\certs"
-```
-
-### PowerShell 腳本 (如果有編碼問題請使用 Batch 版本)
+### PowerShell 腳本 (推薦)
 ```powershell
 # 以管理員身分執行 PowerShell，然後執行：
-.\scripts\create_internal_ca.ps1 -CompanyName "承暉精品股份有限公司" -CertPassword "YourSecurePassword123!" -OutputPath ".\certs"
+.\scripts\create_ca_compatible.ps1 -CompanyName "承暉精品股份有限公司" -CertPassword "YourSecurePassword123!" -OutputPath ".\certs"
 ```
 
 ## 參數說明
@@ -29,12 +23,13 @@ scripts\create_internal_ca.bat "承暉精品股份有限公司" "YourSecurePassw
 - `codesign.pfx` - 程式碼簽章憑證 (含私鑰，用於簽章)
 - `deploy-ca.bat` - 部署腳本，用於在其他電腦安裝根 CA
 - `inno-setup-config.txt` - Inno Setup 簽章配置範例
+- `README.txt` - 詳細使用說明
 
 ## 使用步驟
 
 ### 1. 建立憑證
-```cmd
-scripts\create_internal_ca.bat "承暉精品股份有限公司" "YourSecurePassword123!" ".\certs"
+```powershell
+.\scripts\create_ca_compatible.ps1 -CompanyName "承暉精品股份有限公司" -CertPassword "YourSecurePassword123!" -OutputPath ".\certs"
 ```
 
 ### 2. 部署根 CA 到其他電腦
@@ -47,13 +42,18 @@ deploy-ca.bat
 將 `inno-setup-config.txt` 中的內容加入您的 `.iss` 檔案：
 ```ini
 [Setup]
-SignTool=signtool /f "C:\path\to\codesign.pfx" /p "YourSecurePassword123!" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
+SignTool=signtool /f "C:\certs\codesign.pfx" /p "YourSecurePassword123!" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
 ```
 
 ### 4. 測試簽章
 ```cmd
 signtool sign /f "certs\codesign.pfx" /p "YourSecurePassword123!" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 "your-file.exe"
 ```
+
+## 腳本版本說明
+
+目前提供一個兼容性最佳的版本：
+- `create_ca_compatible.ps1` - 兼容舊版 PowerShell 和 Windows 系統
 
 ## 注意事項
 
@@ -62,6 +62,7 @@ signtool sign /f "certs\codesign.pfx" /p "YourSecurePassword123!" /fd sha256 /tr
 - 在企業內部所有電腦安裝根 CA 憑證
 - 定期備份憑證檔案
 - 憑證到期前及時更新
+- 根 CA 有效期 10 年，程式碼簽章憑證有效期 3 年
 
 ## 故障排除
 
@@ -73,9 +74,9 @@ signtool sign /f "certs\codesign.pfx" /p "YourSecurePassword123!" /fd sha256 /tr
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-### 3. 中文字符顯示問題
-- 使用 Batch 版本 (create_internal_ca.bat)
-- 確保 Command Prompt 使用 UTF-8 編碼
+### 3. 參數不支援錯誤（舊版 PowerShell）
+- 使用兼容版本 (create_ca_compatible.ps1)
+- 確保以管理員身分執行 PowerShell
 
 ### 4. 憑證不受信任
 - 確保在所有需要的電腦上執行 `deploy-ca.bat`
