@@ -5,7 +5,7 @@
 #define MyAppVersion "3.0"
 #define MyAppPublisher "承暉精品股份有限公司"
 #define MyAppURL "https://odoo-esmith.odoo.com/"
-#define MyAppExeName "odoo.exe"
+#define MyAppExeName "odoo-autocad-integration.exe"
 #define MyAppAssocName MyAppName + " File"
 #define MyAppAssocExt ".myp"
 #define MyAppAssocKey StringChange(MyAppAssocName, " ", "") + MyAppAssocExt
