@@ -85,30 +85,30 @@ try {
 
     # 5. 建立部署腳本
     Write-Host "📜 建立部署腳本..." -ForegroundColor Cyan
-    $deployScript = @"
+    
+    $deployScriptContent = @'
 @echo off
 REM 企業根 CA 憑證部署腳本
 echo 正在安裝企業根 CA 憑證...
 
 REM 安裝根 CA 憑證到受信任的根憑證授權單位
-certlm.msc
 powershell -Command "Import-Certificate -FilePath 'root-ca.cer' -CertStoreLocation Cert:\LocalMachine\Root"
 
 if %ERRORLEVEL% EQU 0 (
-    echo ✅ 根 CA 憑證安裝成功
+    echo 根 CA 憑證安裝成功
 ) else (
-    echo ❌ 根 CA 憑證安裝失敗
+    echo 根 CA 憑證安裝失敗
 )
 
 pause
-"@
+'@
 
     $deployScriptPath = Join-Path $OutputPath "deploy-ca.bat"
-    $deployScript | Out-File -FilePath $deployScriptPath -Encoding ASCII
+    $deployScriptContent | Out-File -FilePath $deployScriptPath -Encoding ASCII
     Write-Host "   部署腳本: $deployScriptPath" -ForegroundColor White
 
     # 6. 建立 Inno Setup 配置範例
-    $innoSetupConfig = @"
+    $innoSetupContent = @"
 ; 使用企業內部憑證的 Inno Setup 配置
 [Setup]
 ; ... 其他設定 ...
@@ -121,40 +121,36 @@ SignTool=signtool /f "$pfxPath" /p "$CertPassword" /fd sha256 /tr "http://timest
 "@
 
     $innoConfigPath = Join-Path $OutputPath "inno-setup-config.txt"
-    $innoSetupConfig | Out-File -FilePath $innoConfigPath -Encoding UTF8
+    $innoSetupContent | Out-File -FilePath $innoConfigPath -Encoding UTF8
     Write-Host "   Inno Setup 配置: $innoConfigPath" -ForegroundColor White
 
     # 7. 建立說明文件
-    $readme = @"
+    $readmeContent = @"
 # 企業內部 CA 憑證
 
 ## 檔案說明
 
 ### 憑證檔案
-- `root-ca.cer`: 根 CA 憑證 (需要部署到所有電腦)
-- `codesign.cer`: 程式碼簽章憑證 (公鑰)
-- `codesign.pfx`: 程式碼簽章憑證 (含私鑰，用於簽章)
+- root-ca.cer: 根 CA 憑證 (需要部署到所有電腦)
+- codesign.cer: 程式碼簽章憑證 (公鑰)
+- codesign.pfx: 程式碼簽章憑證 (含私鑰，用於簽章)
 
 ### 部署檔案
-- `deploy-ca.bat`: 根 CA 憑證部署腳本
-- `inno-setup-config.txt`: Inno Setup 簽章配置範例
+- deploy-ca.bat: 根 CA 憑證部署腳本
+- inno-setup-config.txt: Inno Setup 簽章配置範例
 
 ## 使用步驟
 
 ### 1. 部署根 CA 憑證
 在每台需要信任此憑證的電腦上執行：
-```
 deploy-ca.bat
-```
 
 ### 2. 配置 Inno Setup
-將 `inno-setup-config.txt` 中的內容加入您的 .iss 檔案
+將 inno-setup-config.txt 中的內容加入您的 .iss 檔案
 
 ### 3. 簽章檔案
 使用以下命令測試簽章：
-```
 signtool sign /f "codesign.pfx" /p "$CertPassword" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 "your-file.exe"
-```
 
 ## 憑證資訊
 - 公司名稱: $CompanyName
@@ -170,7 +166,7 @@ signtool sign /f "codesign.pfx" /p "$CertPassword" /fd sha256 /tr "http://timest
 "@
 
     $readmePath = Join-Path $OutputPath "README.md"
-    $readme | Out-File -FilePath $readmePath -Encoding UTF8
+    $readmeContent | Out-File -FilePath $readmePath -Encoding UTF8
     Write-Host "   說明文件: $readmePath" -ForegroundColor White
 
     # 顯示摘要
