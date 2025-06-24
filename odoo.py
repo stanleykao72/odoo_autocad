@@ -25,8 +25,8 @@ from models.server import Server
 
 # # form
 # from autocad.forms.form_main_kivy import FormMain
-# form
-from forms.form_main import FormMain
+# form - 使用現代化版本
+from forms.form_main_modern import ModernFormMain as FormMain
 
 import logging
 
