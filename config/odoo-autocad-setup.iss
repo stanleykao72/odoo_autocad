@@ -23,6 +23,13 @@ AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
 DefaultDirName=c:\odoo\{#MyAppName}
 DisableDirPage=yes
+; Add digital signature information to reduce false positives
+SignTool=byparam $p
+; Add version info to help with reputation
+VersionInfoVersion={#MyAppVersion}
+VersionInfoTextVersion={#MyAppVersion}
+VersionInfoDescription=Odoo AutoCAD Integration Tool
+VersionInfoCopyright=Copyright (C) 2025 承暉精品股份有限公司
 ; "ArchitecturesAllowed=x64compatible" specifies that Setup cannot run
 ; on anything but x64 and Windows 11 on Arm.
 ArchitecturesAllowed=x64compatible
