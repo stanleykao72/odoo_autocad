@@ -179,21 +179,21 @@ class EnhancedFormAutoCADParam:
         field_frame = ctk.CTkFrame(parent, fg_color="transparent")
         field_frame.pack(fill="x", padx=20, pady=5)
         
-        # 標籤
+        # 標籤 - 加粗並加大字體
         label_widget = ctk.CTkLabel(
             field_frame,
             text=label,
-            font=get_app_font('body'),
+            font=("Microsoft JhengHei UI", 18, "bold"),  # 進一步加大並加粗
             text_color=theme.get_color('text_primary'),
             width=100,
             anchor="w"
         )
         label_widget.pack(side="left", padx=(0, 10))
         
-        # 主要輸入欄位 - 使用可編輯的Combobox
+        # 主要輸入欄位 - 使用可編輯的Combobox，加大字體
         combobox = ctk.CTkComboBox(
             field_frame,
-            font=get_app_font('body'),
+            font=("Microsoft JhengHei UI", 16),  # 進一步加大字體
             command=lambda value, key=field_key: self.on_selection_change(key, value)
         )
         combobox.pack(side="left", fill="x", expand=True, padx=(0, 10))
@@ -218,7 +218,7 @@ class EnhancedFormAutoCADParam:
             readonly_label_widget = ctk.CTkLabel(
                 field_frame,
                 text=readonly_label + ":",
-                font=get_app_font('body'),
+                font=("Microsoft JhengHei UI", 16, "bold"),  # 進一步加大並加粗
                 text_color=theme.get_color('text_secondary'),
                 width=60,
                 anchor="w"
@@ -227,7 +227,7 @@ class EnhancedFormAutoCADParam:
             
             readonly_entry = ctk.CTkEntry(
                 field_frame,
-                font=get_app_font('body'),
+                font=("Microsoft JhengHei UI", 16),  # 進一步加大字體
                 width=80,
                 state="disabled"
             )
