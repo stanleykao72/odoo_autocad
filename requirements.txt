@@ -3,6 +3,7 @@ sqlalchemy
 requests
 pyyaml
 pillow
+simplejson
 
 # Odoo API integration
 bravado_core
