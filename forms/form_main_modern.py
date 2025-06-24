@@ -43,11 +43,11 @@ class ModernFormMain(ctk.CTk):
         # 設置視窗樣式
         self.setup_window_style()
         
-        # 初始化元件
-        self.init_utilities()
-        
-        # 創建UI
+        # 創建UI (這會創建日誌工具)
         self.create_ui()
+        
+        # 初始化元件 (現在log_util已經可用)
+        self.init_utilities()
         
         # 更新連接狀態
         self.update_connection_status()
@@ -88,14 +88,13 @@ class ModernFormMain(ctk.CTk):
     
     def init_utilities(self):
         """初始化工具類別"""
-        # 創建日誌框架(將在創建UI時使用)
-        self.log_util = None
+        # 注意：log_util 已經在 create_ui() -> setup_log_util() 中創建
         
-        # 初始化工具類別
-        self.odoo_util = UtilOdoo(self.odoo_connection, None)  # log_util稍後設定
-        self.autocad_util = UtilAutoCAD(self.odoo_util, None)
-        self.push_to_boq_util = UtilPushToBoq(self.odoo_util, self.autocad_util, None)
-        self.transfer_boq_to_pr_util = UtilTransferBoqToPr(self.odoo_util, self.autocad_util, None)
+        # 初始化工具類別，現在可以使用 log_util
+        self.odoo_util = UtilOdoo(self.odoo_connection, self.log_util)
+        self.autocad_util = UtilAutoCAD(self.odoo_util, self.log_util)
+        self.push_to_boq_util = UtilPushToBoq(self.odoo_util, self.autocad_util, self.log_util)
+        self.transfer_boq_to_pr_util = UtilTransferBoqToPr(self.odoo_util, self.autocad_util, self.log_util)
     
     def create_ui(self):
         """創建使用者介面"""
@@ -402,11 +401,8 @@ class ModernFormMain(ctk.CTk):
         """設置日誌工具"""
         self.log_util = UtilLog(self.bottom_frame)
         
-        # 更新工具類別的日誌引用
-        self.odoo_util.log_util = self.log_util
-        self.autocad_util.log_util = self.log_util
-        self.push_to_boq_util.log_util = self.log_util
-        self.transfer_boq_to_pr_util.log_util = self.log_util
+        # 注意：工具類別已經在 init_utilities() 中使用正確的 log_util 初始化
+        # 不需要在這裡更新引用
     
     def update_connection_status(self):
         """更新連接狀態顯示"""
