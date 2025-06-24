@@ -1,5 +1,5 @@
-# Simple CA Certificate Creation Script
-# Avoid encoding issues by using English messages and simple syntax
+# Compatible CA Certificate Creation Script
+# Works with older PowerShell versions and Windows systems
 
 param(
     [string]$CompanyName = "Your Company Name",
@@ -7,8 +7,8 @@ param(
     [string]$OutputPath = ".\certs"
 )
 
-Write-Host "Enterprise Internal CA Creation Tool" -ForegroundColor Green
-Write-Host "====================================" -ForegroundColor Green
+Write-Host "Enterprise Internal CA Creation Tool (Compatible Version)" -ForegroundColor Green
+Write-Host "=========================================================" -ForegroundColor Green
 
 # Check if running as administrator
 if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
@@ -24,9 +24,8 @@ Write-Host "Created output directory: $OutputPath" -ForegroundColor Green
 try {
     Write-Host "Creating Root CA certificate..." -ForegroundColor Cyan
     
-    # Create Root CA
+    # Create Root CA with basic parameters
     $rootCA = New-SelfSignedCertificate `
-        -Type Custom `
         -Subject "CN=$CompanyName Root CA, O=$CompanyName, C=TW" `
         -KeyAlgorithm RSA `
         -KeyLength 4096 `
@@ -45,14 +44,12 @@ try {
     $rootCAStore.Close()
     Write-Host "Root CA installed to Trusted Root store" -ForegroundColor Green
 
-    # Create Code Signing Certificate
+    # Create Code Signing Certificate with basic parameters
     Write-Host "Creating Code Signing certificate..." -ForegroundColor Cyan
     $codeSignCert = New-SelfSignedCertificate `
-        -Type CodeSigningCert `
         -Subject "CN=$CompanyName Code Signing, O=$CompanyName, C=TW" `
         -KeyAlgorithm RSA `
         -KeyLength 2048 `
-        -Provider "Microsoft Enhanced RSA and AES Cryptographic Provider" `
         -KeyExportPolicy Exportable `
         -KeyUsage DigitalSignature `
         -NotAfter (Get-Date).AddYears(3) `
@@ -80,7 +77,7 @@ try {
 
     # Create deployment script
     $deployScriptPath = Join-Path $OutputPath "deploy-ca.bat"
-    @"
+    $deployContent = @"
 @echo off
 echo Installing Enterprise Root CA certificate...
 powershell -Command "Import-Certificate -FilePath 'root-ca.cer' -CertStoreLocation Cert:\LocalMachine\Root"
@@ -90,13 +87,14 @@ if %ERRORLEVEL% EQU 0 (
     echo Root CA certificate installation failed
 )
 pause
-"@ | Out-File -FilePath $deployScriptPath -Encoding ASCII
+"@
+    $deployContent | Out-File -FilePath $deployScriptPath -Encoding ASCII
     Write-Host "Deployment script created: $deployScriptPath" -ForegroundColor White
 
     # Create Inno Setup config
     $innoConfigPath = Join-Path $OutputPath "inno-setup-config.txt"
     $pfxFullPath = (Resolve-Path $pfxPath).Path
-    @"
+    $innoContent = @"
 ; Enterprise Internal Certificate Inno Setup Configuration
 [Setup]
 ; ... other settings ...
@@ -106,12 +104,13 @@ SignTool=signtool /f "$pfxFullPath" /p "$CertPassword" /fd sha256 /tr "http://ti
 
 ; Alternative: Using certificate store (when certificate is installed)
 ; SignTool=signtool /n "$CompanyName Code Signing" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 `$f
-"@ | Out-File -FilePath $innoConfigPath -Encoding UTF8
+"@
+    $innoContent | Out-File -FilePath $innoConfigPath -Encoding UTF8
     Write-Host "Inno Setup config created: $innoConfigPath" -ForegroundColor White
 
     # Create README
     $readmePath = Join-Path $OutputPath "README.txt"
-    @"
+    $readmeContent = @"
 Enterprise Internal CA Certificates
 ====================================
 
@@ -144,7 +143,8 @@ Security Notes:
 - Backup certificates regularly
 - Monitor certificate usage
 - Renew before expiration
-"@ | Out-File -FilePath $readmePath -Encoding UTF8
+"@
+    $readmeContent | Out-File -FilePath $readmePath -Encoding UTF8
     Write-Host "README created: $readmePath" -ForegroundColor White
 
     # Display summary
@@ -163,6 +163,8 @@ Security Notes:
 
 } catch {
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "Full error details:" -ForegroundColor Red
+    Write-Host $_.Exception.ToString() -ForegroundColor Red
     exit 1
 }
 
