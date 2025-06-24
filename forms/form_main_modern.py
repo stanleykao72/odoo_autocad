@@ -12,6 +12,7 @@ from utility.util_push_to_boq import UtilPushToBoq
 from utility.util_transfer_boq_to_pr import UtilTransferBoqToPr
 from utility.util_log import UtilLog
 from forms.form_autocad_param import FormAutoCADParam
+from forms.form_autocad_param_enhanced import EnhancedFormAutoCADParam
 from ui.ui_theme import UITheme, theme
 from ui.ui_fonts import get_app_font
 from bravado.requests_client import RequestsClient
@@ -467,19 +468,20 @@ class ModernFormMain(ctk.CTk):
                 self.log_util.safe_log_insert("✅ 與 AutoCAD 連線成功\n")
     
     def get_parameters_from_odoo(self):
-        """從Odoo獲取參數"""
+        """從Odoo獲取參數 - 使用改進的界面"""
         if not self.autocad_util.project_id:
             self.show_error_message("錯誤", "請先連接 AutoCAD 並確保已獲取專案資料。")
             return
         
-        form_autocad_param = FormAutoCADParam(
+        # 使用改進的參數選擇表單
+        enhanced_form = EnhancedFormAutoCADParam(
             main_content=self.main_content,
             odoo_util=self.odoo_util,
             autocad_util=self.autocad_util,
             log_util=self.log_util,
             root=self
         )
-        form_autocad_param.get_parameters_from_odoo()
+        enhanced_form.get_parameters_from_odoo()
     
     def push_to_boq(self):
         """推送到BOQ"""
