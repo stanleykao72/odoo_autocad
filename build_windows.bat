@@ -25,6 +25,7 @@ pyinstaller ^
     --add-data "config;config" ^
     --add-data "fonts;fonts" ^
     --add-data "icon;icon" ^
+    --add-data "db;db" ^
     --hidden-import "customtkinter" ^
     --hidden-import "win32com.client" ^
     --hidden-import "win32com.gen_py" ^
@@ -32,6 +33,9 @@ pyinstaller ^
     --hidden-import "win32api" ^
     --hidden-import "tkinter" ^
     --hidden-import "tkinter.ttk" ^
+    --hidden-import "sqlalchemy" ^
+    --hidden-import "sqlalchemy.ext.declarative" ^
+    --hidden-import "sqlalchemy.orm" ^
     --exclude-module "pytest" ^
     --exclude-module "unittest" ^
     --exclude-module "doctest" ^
