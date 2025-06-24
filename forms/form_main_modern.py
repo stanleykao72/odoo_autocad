@@ -175,8 +175,8 @@ class ModernFormMain(ctk.CTk):
         sidebar_title = ctk.CTkLabel(
             self.sidebar,
             text="功能選單",
-            font=get_app_font('heading'),
-            text_color=theme.get_color('text_primary')
+            font=("Microsoft JhengHei UI", 18, "bold"),
+            text_color="#FFFFFF"  # 純白色，確保對比度
         )
         sidebar_title.pack(pady=(20, 10))
         
@@ -203,8 +203,8 @@ class ModernFormMain(ctk.CTk):
         conn_label = ctk.CTkLabel(
             self.sidebar,
             text="📡 連接管理",
-            font=get_app_font('body'),
-            text_color=theme.get_color('text_secondary')
+            font=("Microsoft JhengHei UI", 14, "bold"),
+            text_color="#E0E0E0"  # 淺灰色，確保良好對比度
         )
         conn_label.pack(pady=(0, 10))
         
@@ -213,9 +213,12 @@ class ModernFormMain(ctk.CTk):
             self.sidebar,
             text="🏢 連接到 Odoo",
             command=self.connect_odoo,
-            height=theme.get_size('button_height'),
-            font=get_app_font('button'),
-            corner_radius=theme.get_size('border_radius')
+            height=40,
+            font=("Microsoft JhengHei UI", 14, "bold"),
+            corner_radius=8,
+            fg_color="#1976D2",  # 藍色，更好的對比度
+            hover_color="#0D47A1",  # 更深的藍色
+            text_color="white"
         )
         self.btn_connect_odoo.pack(fill="x", padx=20, pady=5)
         
@@ -224,9 +227,12 @@ class ModernFormMain(ctk.CTk):
             self.sidebar,
             text="📐 連接到 AutoCAD",
             command=self.connect_autocad,
-            height=theme.get_size('button_height'),
-            font=get_app_font('button'),
-            corner_radius=theme.get_size('border_radius')
+            height=40,
+            font=("Microsoft JhengHei UI", 14, "bold"),
+            corner_radius=8,
+            fg_color="#7B1FA2",  # 紫色，更好的對比度
+            hover_color="#4A148C",  # 更深的紫色
+            text_color="white"
         )
         self.btn_connect_autocad.pack(fill="x", padx=20, pady=5)
     
@@ -236,8 +242,8 @@ class ModernFormMain(ctk.CTk):
         main_label = ctk.CTkLabel(
             self.sidebar,
             text="⚙️ 主要功能",
-            font=get_app_font('body'),
-            text_color=theme.get_color('text_secondary')
+            font=("Microsoft JhengHei UI", 14, "bold"),
+            text_color="#E0E0E0"  # 淺灰色，確保良好對比度
         )
         main_label.pack(pady=(0, 10))
         
@@ -246,9 +252,12 @@ class ModernFormMain(ctk.CTk):
             self.sidebar,
             text="📋 從 Odoo 獲取參數",
             command=self.get_parameters_from_odoo,
-            height=theme.get_size('button_height'),
-            font=get_app_font('button'),
-            corner_radius=theme.get_size('border_radius')
+            height=40,
+            font=("Microsoft JhengHei UI", 14, "bold"),
+            corner_radius=8,
+            fg_color="#388E3C",  # 綠色，更好的對比度
+            hover_color="#1B5E20",  # 更深的綠色
+            text_color="white"
         )
         self.btn_get_params.pack(fill="x", padx=20, pady=5)
         
@@ -257,9 +266,12 @@ class ModernFormMain(ctk.CTk):
             self.sidebar,
             text="📊 推送到 BOQ",
             command=self.push_to_boq,
-            height=theme.get_size('button_height'),
-            font=get_app_font('button'),
-            corner_radius=theme.get_size('border_radius')
+            height=40,
+            font=("Microsoft JhengHei UI", 14, "bold"),
+            corner_radius=8,
+            fg_color="#F57C00",  # 橘色，更好的對比度
+            hover_color="#E65100",  # 更深的橘色
+            text_color="white"
         )
         self.btn_push_boq.pack(fill="x", padx=20, pady=5)
         
@@ -268,9 +280,12 @@ class ModernFormMain(ctk.CTk):
             self.sidebar,
             text="🔄 轉移 BOQ 到 PR",
             command=self.transfer_boq_to_pr,
-            height=theme.get_size('button_height'),
-            font=get_app_font('button'),
-            corner_radius=theme.get_size('border_radius')
+            height=40,
+            font=("Microsoft JhengHei UI", 14, "bold"),
+            corner_radius=8,
+            fg_color="#5D4037",  # 棕色，更好的對比度
+            hover_color="#3E2723",  # 更深的棕色
+            text_color="white"
         )
         self.btn_transfer_pr.pack(fill="x", padx=20, pady=5)
     
@@ -280,8 +295,8 @@ class ModernFormMain(ctk.CTk):
         tools_label = ctk.CTkLabel(
             self.sidebar,
             text="🔧 工具",
-            font=get_app_font('body'),
-            text_color=theme.get_color('text_secondary')
+            font=("Microsoft JhengHei UI", 14, "bold"),
+            text_color="#E0E0E0"  # 淺灰色，確保良好對比度
         )
         tools_label.pack(pady=(0, 10))
         
@@ -290,11 +305,12 @@ class ModernFormMain(ctk.CTk):
             self.sidebar,
             text="🗑️ 清除此配置表格ID",
             command=self.clear_table_id,
-            height=theme.get_size('button_height'),
-            font=get_app_font('button'),
-            corner_radius=theme.get_size('border_radius'),
-            fg_color=theme.get_color('warning'),
-            hover_color=theme.get_color('warning_hover')
+            height=40,
+            font=("Microsoft JhengHei UI", 13, "bold"),
+            corner_radius=8,
+            fg_color="#FF8F00",  # 警告橘色，更好的對比度
+            hover_color="#E65100",  # 更深的橘色
+            text_color="white"
         )
         self.btn_clear_table.pack(fill="x", padx=20, pady=5)
         
@@ -303,11 +319,12 @@ class ModernFormMain(ctk.CTk):
             self.sidebar,
             text="🗑️ 清除所有配置表格ID",
             command=self.clear_all_tables_id,
-            height=theme.get_size('button_height'),
-            font=get_app_font('button'),
-            corner_radius=theme.get_size('border_radius'),
-            fg_color=theme.get_color('error'),
-            hover_color=theme.get_color('error_hover')
+            height=40,
+            font=("Microsoft JhengHei UI", 13, "bold"),
+            corner_radius=8,
+            fg_color="#D32F2F",  # 危險紅色，更好的對比度
+            hover_color="#B71C1C",  # 更深的紅色
+            text_color="white"
         )
         self.btn_clear_all_tables.pack(fill="x", padx=20, pady=5)
     
@@ -411,28 +428,28 @@ class ModernFormMain(ctk.CTk):
         if hasattr(self, 'odoo_util') and self.odoo_util.connected_odoo():
             self.odoo_status_label.configure(text="🏢 Odoo: ✅ 已連接")
             self.btn_connect_odoo.configure(
-                fg_color=theme.get_color('success'),
-                hover_color=theme.get_color('success_hover')
+                fg_color="#2E7D32",  # 深綠色表示已連接
+                hover_color="#1B5E20"
             )
         else:
             self.odoo_status_label.configure(text="🏢 Odoo: ❌ 未連接")
             self.btn_connect_odoo.configure(
-                fg_color=theme.get_color('primary'),
-                hover_color=theme.get_color('primary_dark')
+                fg_color="#1976D2",  # 原藍色表示未連接
+                hover_color="#0D47A1"
             )
         
         # 更新AutoCAD狀態
         if hasattr(self, 'autocad_util') and self.autocad_util.connected_autocad():
             self.autocad_status_label.configure(text="📐 AutoCAD: ✅ 已連接")
             self.btn_connect_autocad.configure(
-                fg_color=theme.get_color('success'),
-                hover_color=theme.get_color('success_hover')
+                fg_color="#2E7D32",  # 深綠色表示已連接
+                hover_color="#1B5E20"
             )
         else:
             self.autocad_status_label.configure(text="📐 AutoCAD: ❌ 未連接")
             self.btn_connect_autocad.configure(
-                fg_color=theme.get_color('primary'),
-                hover_color=theme.get_color('primary_dark')
+                fg_color="#7B1FA2",  # 原紫色表示未連接
+                hover_color="#4A148C"
             )
     
     # === 事件處理方法 ===
