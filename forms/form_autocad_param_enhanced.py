@@ -196,7 +196,8 @@ class EnhancedFormAutoCADParam:
             font=("Microsoft JhengHei UI", 16),  # 進一步加大字體
             command=lambda value, key=field_key: self.on_selection_change(key, value)
         )
-        combobox.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        # 設定50%寬度分配
+        combobox.pack(side="left", fill="x", expand=True, padx=(0, 5))
         
         # 設置為可編輯，並設置初始提示文字
         combobox.configure(state="normal")
@@ -215,8 +216,12 @@ class EnhancedFormAutoCADParam:
         
         # 只讀欄位（如單位、色號等）
         if readonly_key and readonly_label:
+            # 創建右側容器，佔50%寬度
+            readonly_frame = ctk.CTkFrame(field_frame, fg_color="transparent")
+            readonly_frame.pack(side="left", fill="x", expand=True, padx=(5, 0))
+            
             readonly_label_widget = ctk.CTkLabel(
-                field_frame,
+                readonly_frame,
                 text=readonly_label + ":",
                 font=("Microsoft JhengHei UI", 16, "bold"),  # 進一步加大並加粗
                 text_color=theme.get_color('text_secondary'),
@@ -226,12 +231,11 @@ class EnhancedFormAutoCADParam:
             readonly_label_widget.pack(side="left", padx=(10, 5))
             
             readonly_entry = ctk.CTkEntry(
-                field_frame,
+                readonly_frame,
                 font=("Microsoft JhengHei UI", 16),  # 進一步加大字體
-                width=80,
                 state="disabled"
             )
-            readonly_entry.pack(side="left", padx=(0, 10))
+            readonly_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
             
             self.readonly_entries[readonly_key] = readonly_entry
     
