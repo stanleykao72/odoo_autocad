@@ -51,6 +51,9 @@ pyinstaller --onefile \
 ```bash
 # 使用 SignTool (需要程式碼簽章憑證)
 signtool sign /f certificate.pfx /p password /t http://timestamp.digicert.com output/odoo.exe
+
+signtool sign /f "codesign.pfx" /p "YourSecurePassword123!" /t http://timestamp.digicert.com /fd sha256 ../installer/odoo-autocad-integration-3.0-setup.exe
+
 ```
 
 ### 3. 發佈時的最佳實務
