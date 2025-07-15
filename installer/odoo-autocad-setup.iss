@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "Odoo and AutoCAD Integration"
-#define MyAppVersion "3.0"
+#define MyAppVersion "5.0"
 #define MyAppPublisher "承暉精品股份有限公司"
 #define MyAppURL "https://odoo-esmith.odoo.com/"
 #define MyAppExeName "odoo-autocad-integration.exe"
@@ -48,7 +48,7 @@ DisableProgramGroupPage=yes
 ; Uncomment the following line to run in non administrative install mode (install for current user only.)
 ;PrivilegesRequired=lowest
 OutputDir=C:\odoo\autocad_source\installer
-OutputBaseFilename=odoo-autocad-integration-3.0-setup
+OutputBaseFilename=odoo-autocad-integration-5.0-setup
 SetupIconFile=C:\odoo\autocad_source\icon\odoo_autocad.ico
 Compression=lzma
 SolidCompression=yes
