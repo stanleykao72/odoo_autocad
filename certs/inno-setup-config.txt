@@ -1,0 +1,3 @@
+﻿[Setup]
+; Code signing configuration
+SignTool=signtool sign /f ".\certs\codesign.pfx" /p "YourSecurePassword123!" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f

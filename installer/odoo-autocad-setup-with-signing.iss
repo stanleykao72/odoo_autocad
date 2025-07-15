@@ -2,7 +2,7 @@
 ; 包含程式碼簽章配置的 Inno Setup 腳本
 
 #define MyAppName "Odoo and AutoCAD Integration"
-#define MyAppVersion "3.0"
+#define MyAppVersion "5.0"
 #define MyAppPublisher "承暉精品股份有限公司"
 #define MyAppURL "https://odoo-esmith.odoo.com/"
 #define MyAppExeName "odoo-autocad-integration.exe"
@@ -26,7 +26,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 ChangesAssociations=yes
 DisableProgramGroupPage=yes
 OutputDir=C:\odoo\autocad_source\installer
-OutputBaseFilename=odoo-autocad-integration-3.1-setup
+OutputBaseFilename=odoo-autocad-integration-5.0-setup
 SetupIconFile=C:\odoo\autocad_source\icon\odoo_autocad.ico
 Compression=lzma
 SolidCompression=yes
@@ -60,7 +60,7 @@ VersionInfoCopyright=Copyright (C) 2025 承暉精品股份有限公司
 
 ; SignTool="C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe" sign /f "C:\certs\codesign.pfx" /p "YourSecurePassword123!" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
 ; 設定 signtool="C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe" $p
-SignTool=signtool sign /f "C:\odoo\autocad_source\certs\codesign.pfx" /p "YourSecurePassword123!" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
+; SignTool=signtool sign /f "C:\odoo\autocad_source\certs\codesign.pfx" /p "YourSecurePassword123!" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

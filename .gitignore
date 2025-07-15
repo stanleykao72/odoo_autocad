@@ -1,9 +1,80 @@
-__pycache__
-.vscode
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
 .log
-log
-output
-installer
+log/
+logs/
+
+# Build outputs
+output/
+build/
+
+# Installer directory - exclude executables but keep configuration files
+installer/*.exe
+installer/*.zip
+installer/*.msi
+# Keep ISS configuration files
+!installer/*.iss
+
+# Certificates directory - exclude sensitive files but keep documentation
+certs/*.pfx
+certs/*.p12
+certs/*.key
+certs/*.pem
+certs/codesign.*
+certs/*.zip
+# Keep documentation and configuration
+!certs/README.txt
+!certs/*.txt
+!certs/*.bat
+
+# Database files (keep structure, exclude data)
+db/*.db
+db/*.sqlite
+db/*.sqlite3
+
+# Configuration files with sensitive data
+config/*_prod*.yaml
+config/*token*.yaml
+config/server_*prod*.yaml
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# OS specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Git attributes
 !.gitattributes
-build
-certs

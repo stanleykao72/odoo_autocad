@@ -70,18 +70,33 @@ pip install coverage[toml] pytest-html pytest-xdist
 
 ### Building Application
 ```bash
-# Build executable using optimized Python script
-python build_exe.py
+# 一鍵完整建置流程 (推薦方式) - 從原始碼到安裝包
+build_and_package.bat           # Windows批次檔版本
+build_and_package.ps1          # PowerShell版本
 
-# Alternative: Build using Windows batch script
-build_windows.bat
+# 手動建置選項
+python -m PyInstaller --onefile --windowed --name "odoo-autocad-integration" --icon "icon/odoo_autocad.ico" --add-data "config;config" --add-data "fonts;fonts" --add-data "icon;icon" --add-data "db;db" --hidden-import "customtkinter" --hidden-import "win32com.client" --hidden-import "win32com.gen_py" --hidden-import "pywintypes" --hidden-import "win32api" --hidden-import "tkinter" --hidden-import "tkinter.ttk" --hidden-import "sqlalchemy" --hidden-import "sqlalchemy.ext.declarative" --hidden-import "sqlalchemy.orm" --exclude-module "pytest" --exclude-module "unittest" --exclude-module "doctest" --exclude-module "pdb" --exclude-module "matplotlib" --exclude-module "numpy" --exclude-module "pandas" --clean --noconfirm --distpath "output" odoo.py
 
-# Build installer with Inno Setup (requires Inno Setup installed)
-iscc config/odoo-autocad-setup.iss
-
-# Build installer with code signing (if certificates configured)
-iscc config/odoo-autocad-setup-with-signing.iss
+# 手動安裝包建置 (需先建置EXE)
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/odoo-autocad-setup.iss               # 基本安裝包
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/odoo-autocad-setup-with-signing.iss  # 含簽章的安裝包
 ```
+
+**注意**: 舊的 `build/build_windows.bat`, `build/build_windows.ps1`, `build/build_exe.py` 檔案已移除，統一使用根目錄的一鍵建置腳本。
+
+#### 實際建置流程說明
+更新後的建置系統包含：
+1. **環境檢查**: Python, PyInstaller, Inno Setup
+2. **EXE建置**: 直接使用 PyInstaller 指令，不依賴額外的建置腳本
+3. **文檔複製**: 自動複製 README.md, ANTIVIRUS_SOLUTION.md 等文檔到輸出目錄
+4. **程式碼簽章**: 可選，需要有效的憑證和密碼
+5. **安裝包建置**: 使用 Inno Setup 生成最終安裝程式
+
+#### 建置輸出
+- **EXE檔案**: `output/odoo-autocad-integration.exe`
+- **安裝包**: `installer/odoo-autocad-integration-5.0-setup.exe`
+- **建置資訊**: `output/build_info.json` (包含檔案大小和SHA256雜湊值)
+- **文檔檔案**: `output/*.md`
 
 ### Running and Testing
 ```bash
