@@ -14,7 +14,23 @@ swagger_spec_validator
 customtkinter>=5.2.0
 
 # Windows COM integration (Windows only)
-# pywin32  # Uncomment for Windows environment
+pywin32
+
+# MCP (Model Context Protocol) integration
+mcp
+fastapi
+uvicorn[standard]
+websockets
+pydantic
+
+# Testing framework for TDD
+pytest
+pytest-cov
+pytest-mock
+pytest-watch
+pytest-html
+pytest-xdist
+coverage[toml]
 
 # Development and optional dependencies
 # kivy[base]

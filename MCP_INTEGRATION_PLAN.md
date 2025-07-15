@@ -144,29 +144,196 @@ async def push_to_odoo_ai(context: Context, data: str):
     # 重用 util_push_to_boq.py 和 util_odoo.py
 ```
 
-## 3. UI 整合方案
+## 3. 啟動控制與通訊架構
 
-### 3.1 主介面修改
+### 3.1 手動啟動控制設計
 
-在現有的左側 sidebar 中新增 AI 助手按鈕：
+採用**手動啟動控制**方案，在GUI中提供AI助手控制面板：
 
 ```python
 # forms/form_main.py 或 form_main_modern.py
-def create_sidebar_buttons(self):
-    # ... 現有按鈕 ...
-    
-    # 新增 AI 助手按鈕
-    ai_button = ctk.CTkButton(
-        self.sidebar_frame,
-        text="🤖 AI 助手",
-        command=self.open_ai_chat,
-        font=("Microsoft JhengHei UI", 14, "bold"),
-        height=40
-    )
-    ai_button.pack(pady=5, padx=10, fill="x")
+class FormMain:
+    def create_ai_control_panel(self):
+        """建立AI助手控制面板"""
+        # 在左側sidebar新增AI控制區域
+        ai_frame = ctk.CTkFrame(self.sidebar_frame)
+        ai_frame.pack(fill="x", padx=10, pady=10)
+        
+        # AI助手狀態顯示
+        self.mcp_status_label = ctk.CTkLabel(
+            ai_frame,
+            text="🔴 AI助手離線",
+            font=("Microsoft JhengHei UI", 12)
+        )
+        self.mcp_status_label.pack(pady=5)
+        
+        # 控制按鈕組
+        self.mcp_toggle_button = ctk.CTkButton(
+            ai_frame,
+            text="🚀 啟動AI助手",
+            command=self.toggle_mcp_server,
+            height=40,
+            font=("Microsoft JhengHei UI", 12, "bold")
+        )
+        self.mcp_toggle_button.pack(fill="x", padx=5, pady=5)
+        
+        self.ai_chat_button = ctk.CTkButton(
+            ai_frame,
+            text="💬 AI對話",
+            command=self.open_ai_chat,
+            state="disabled",
+            height=35
+        )
+        self.ai_chat_button.pack(fill="x", padx=5, pady=2)
+        
+        # 連接資訊顯示
+        self.tcp_info_label = ctk.CTkLabel(ai_frame, text="TCP: 未啟動", font=("Microsoft JhengHei UI", 10))
+        self.tcp_info_label.pack(anchor="w", padx=10)
+        
+        self.pipe_info_label = ctk.CTkLabel(ai_frame, text="Pipe: 未啟動", font=("Microsoft JhengHei UI", 10))
+        self.pipe_info_label.pack(anchor="w", padx=10)
 ```
 
-### 3.2 AI 對話框設計
+### 3.2 雙重通訊架構：TCP Socket + Named Pipe
+
+實現同時支援TCP Socket和Named Pipe兩種通訊方式：
+
+```python
+# ai_assistant/mcp_server_manager.py
+class MCPServerManager:
+    """統一管理TCP和Named Pipe MCP服務"""
+    
+    def __init__(self, autocad_util, odoo_util, log_util, 
+                 tcp_port=8000, pipe_name=r'\\.\pipe\odoo_autocad_mcp'):
+        self.tcp_port = tcp_port
+        self.pipe_name = pipe_name
+        self.is_tcp_running = False
+        self.is_pipe_running = False
+    
+    def start_all_servers(self):
+        """同時啟動TCP和Pipe服務"""
+        self.start_tcp_server()
+        self.start_pipe_server()
+    
+    def start_tcp_server(self):
+        """啟動TCP Socket服務"""
+        self.tcp_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.tcp_server.bind(('localhost', self.tcp_port))
+        self.tcp_server.listen(5)
+        
+        self.tcp_thread = threading.Thread(target=self._tcp_server_loop, daemon=True)
+        self.tcp_thread.start()
+        self.is_tcp_running = True
+    
+    def start_pipe_server(self):
+        """啟動Named Pipe服務"""
+        self.pipe_thread = threading.Thread(target=self._pipe_server_loop, daemon=True)
+        self.pipe_thread.start()
+        self.is_pipe_running = True
+```
+
+### 3.3 整合式啟動支援
+
+主程式支援命令列參數，可作為純MCP服務或GUI+MCP混合模式運行：
+
+```python
+# odoo.py 修改
+def main():
+    parser = argparse.ArgumentParser(description='Odoo AutoCAD Integration')
+    
+    # MCP Server 模式
+    parser.add_argument('--mcp-server', action='store_true',
+                       help='Start as MCP server only (no GUI)')
+    parser.add_argument('--mcp-port', type=int, default=8000,
+                       help='MCP TCP server port')
+    parser.add_argument('--mcp-pipe', type=str, 
+                       default=r'\\.\pipe\odoo_autocad_mcp',
+                       help='MCP Named Pipe name')
+    parser.add_argument('--enable-mcp', action='store_true',
+                       help='Enable MCP server in GUI mode')
+    
+    args = parser.parse_args()
+    
+    if args.mcp_server:
+        # 純MCP server模式 (無GUI)
+        start_mcp_server_only(args)
+    else:
+        # GUI模式 (可選擇性啟用MCP)
+        start_gui_application(enable_mcp=args.enable_mcp, mcp_args=args)
+```
+
+### 3.4 Gemini CLI配置 (EXE部署)
+
+為EXE檔案配置Gemini CLI，支援兩種通訊方式：
+
+#### **TCP Socket配置**
+```json
+{
+  "mcpServers": {
+    "autocad-odoo-tcp": {
+      "command": "C:/odoo/Odoo and AutoCAD Integration/odoo-autocad-integration.exe",
+      "args": ["--mcp-server", "--mcp-port", "8000"],
+      "env": {
+        "AUTOCAD_PATH": "C:/Program Files/Autodesk/AutoCAD 2024",
+        "PYTHONIOENCODING": "utf-8"
+      },
+      "transport": {
+        "type": "tcp",
+        "host": "localhost",
+        "port": 8000
+      }
+    }
+  }
+}
+```
+
+#### **Named Pipe配置**
+```json
+{
+  "mcpServers": {
+    "autocad-odoo-pipe": {
+      "command": "C:/odoo/Odoo and AutoCAD Integration/odoo-autocad-integration.exe",
+      "args": ["--mcp-server", "--mcp-pipe", "\\\\.\\pipe\\odoo_autocad_mcp"],
+      "env": {
+        "AUTOCAD_PATH": "C:/Program Files/Autodesk/AutoCAD 2024"
+      },
+      "transport": {
+        "type": "pipe",
+        "name": "\\\\.\\pipe\\odoo_autocad_mcp"
+      }
+    }
+  }
+}
+```
+
+#### **混合配置 (推薦)**
+```json
+{
+  "mcpServers": {
+    "autocad-odoo": {
+      "command": "C:/odoo/Odoo and AutoCAD Integration/odoo-autocad-integration.exe",
+      "args": ["--mcp-server"],
+      "env": {
+        "AUTOCAD_PATH": "C:/Program Files/Autodesk/AutoCAD 2024",
+        "MCP_TRANSPORT": "both"
+      },
+      "transport": [
+        {
+          "type": "tcp",
+          "host": "localhost", 
+          "port": 8000
+        },
+        {
+          "type": "pipe",
+          "name": "\\\\.\\pipe\\odoo_autocad_mcp"
+        }
+      ]
+    }
+  }
+}
+```
+
+### 3.5 AI 對話框設計
 
 ```python
 # forms/form_ai_chat.py
@@ -198,13 +365,54 @@ class FormAIChat:
         # ... 建立快速指令按鈕 ...
 ```
 
-## 4. 詳細實施步驟與時程表
+## 4. 更新實施策略與優先級
 
-### 📋 **總體時程：6-8週完整整合**
+### 4.1 實施方案確認
+
+基於用戶需求確認，採用以下組合方案：
+
+✅ **方案二：手動啟動控制** - 在GUI中提供AI助手控制面板  
+✅ **解決方案二：整合式啟動** - 主程式支援`--mcp-server`參數  
+✅ **解決方案三：Socket通訊** - 同時支援TCP Socket + Named Pipe  
+✅ **正確安裝路徑**：`C:/odoo/Odoo and AutoCAD Integration/`  
+
+### 4.2 核心架構圖
+
+```mermaid
+graph TD
+    A[主程式 GUI] --> B[AI控制面板]
+    B --> C[MCP Server Manager]
+    C --> D[TCP Socket Server :8000]
+    C --> E[Named Pipe Server]
+    
+    F[Gemini CLI] --> G[配置檔案]
+    G --> H[TCP連接 localhost:8000]
+    G --> I[Pipe連接 \\.\pipe\odoo_autocad_mcp]
+    
+    H --> D
+    I --> E
+    
+    C --> J[Easy-MCP 讀圖引擎]
+    C --> K[puran-water 繪圖引擎]
+    
+    J --> L[AutoCAD COM]
+    K --> M[AutoLISP執行器]
+    L --> N[AutoCAD應用程式]
+    M --> N
+    
+    style B fill:#e1f5fe
+    style C fill:#f3e5f5
+    style D fill:#e8f5e8
+    style E fill:#e8f5e8
+```
+
+## 5. 詳細實施步驟與時程表
+
+### 📋 **更新總體時程：5-6週完整整合**
 
 ---
 
-### **第一階段：環境準備與基礎架構（第1-2週）**
+### **第一階段：MCP架構建立（第1-2週）**
 
 #### 🎯 **目標**：建立混合MCP架構基礎
 
@@ -391,38 +599,75 @@ class FormAIChat:
 
 ---
 
-## 5. Todo List 檢核表
+## 6. 更新版 Todo List 檢核表
 
-### **🚀 即刻可開始的任務**
-- [ ] Clone Easy-MCP-AutoCad 專案到本機
-- [ ] Clone puran-water/autocad-mcp 專案到本機  
-- [ ] 建立開發分支 `feature/ai-assistant`
-- [ ] 建立基礎目錄結構 `ai_assistant/`
+### **🚀 階段一：MCP架構建立（即刻開始）**
+- [ ] **專案研究分析**
+  - [ ] Clone Easy-MCP-AutoCad 專案到本機深入研究
+  - [ ] Clone puran-water/autocad-mcp 專案到本機分析
+  - [ ] 研究現有util_autocad.py與MCP的整合可能性
+  
+- [ ] **開發環境準備**
+  - [ ] 建立開發分支 `feature/mcp-integration`
+  - [ ] 建立基礎目錄結構 `ai_assistant/`
+  - [ ] 設置MCP開發虛擬環境和依賴套件
 
-### **📋 第一週必須完成**
-- [ ] 虛擬環境設置與套件安裝
-- [ ] 基礎 MCP 伺服器框架建立
-- [ ] Easy-MCP 核心檔案適配
-- [ ] 基本連線測試通過
+- [ ] **基礎架構建立**
+  - [ ] 實作MCPServerManager - 統一管理TCP和Pipe服務
+  - [ ] 修改odoo.py主程式支援`--mcp-server`參數
+  - [ ] 建立雙重通訊架構 (TCP Socket + Named Pipe)
 
-### **🎯 里程碑檢查點**
-- [ ] **第2週末**：MCP 伺服器可啟動並接受指令
-- [ ] **第4週末**：圖面掃描與 BOQ 提取功能運作
-- [ ] **第5週末**：基礎繪圖工具可通過 AI 指令操作
-- [ ] **第6週末**：完整 AI 對話介面可用
-- [ ] **第8週末**：完整系統可正式使用
+### **📋 階段二：GUI控制面板開發（第1-2週）**
+- [ ] **AI控制面板UI**
+  - [ ] 在forms/form_main.py新增AI助手控制區域
+  - [ ] 實作啟動/停止/重啟AI助手按鈕
+  - [ ] 添加TCP/Pipe服務狀態即時顯示
+  
+- [ ] **狀態監控整合**
+  - [ ] 整合現有StatusIndicator組件顯示MCP狀態
+  - [ ] 實作連接資訊顯示 (端口號、管道名稱等)
+  - [ ] 建立錯誤處理和友善提示機制
 
-### **⚠️ 風險監控點**
-- [ ] **套件相依性衝突**：第1週即需解決
-- [ ] **AutoCAD COM 相容性**：第2週測試驗證
-- [ ] **記憶體使用量**：第5週開始監控
-- [ ] **使用者體驗**：第6週開始測試回饋
+### **🎯 階段三：MCP請求處理器（第2-3週）**
+- [ ] **現有功能整合**
+  - [ ] 重用util_autocad.py的scan_all_entities功能
+  - [ ] 整合util_odoo.py的BOQ和產品查詢功能
+  - [ ] 實作JSON格式的MCP請求/回應協議
+  
+- [ ] **雙引擎架構實現**
+  - [ ] 整合Easy-MCP-AutoCad的讀圖核心
+  - [ ] 移植puran-water的豐富繪圖工具
+  - [ ] 建立統一的工具註冊和路由機制
 
-### **📊 成功指標**
-- [ ] AI 指令回應時間 < 3秒
-- [ ] 圖面掃描準確率 > 95%
-- [ ] BOQ 資料提取成功率 > 98%
-- [ ] 系統穩定運行 > 8小時無當機
+### **🔧 階段四：Gemini CLI配置與部署（第3-4週）**
+- [ ] **EXE部署配置**
+  - [ ] 更新PyInstaller建置腳本支援MCP功能
+  - [ ] 建立Gemini CLI配置範本 (TCP, Pipe, 混合模式)
+  - [ ] 驗證C:/odoo/Odoo and AutoCAD Integration/路徑配置
+  
+- [ ] **端對端測試**
+  - [ ] 測試GUI模式下的MCP服務啟動
+  - [ ] 驗證純MCP server模式運行
+  - [ ] 確認Gemini CLI連接和指令執行
+
+### **⚠️ 關鍵風險監控點**
+- [ ] **第1週**: 套件相依性衝突解決 (MCP版本相容性)
+- [ ] **第2週**: AutoCAD COM與Socket/Pipe的並行執行驗證
+- [ ] **第3週**: 雙引擎架構的記憶體使用量監控
+- [ ] **第4週**: EXE檔案的MCP功能完整性測試
+
+### **📊 更新版成功指標**
+- [ ] MCP服務啟動時間 < 5秒
+- [ ] AI指令回應時間 < 3秒
+- [ ] TCP和Pipe雙重連接穩定性 > 99%
+- [ ] GUI和MCP混合模式穩定運行 > 4小時
+- [ ] Gemini CLI指令執行成功率 > 95%
+
+### **🎁 預期交付成果**
+- [ ] **完整的AI助手控制面板** - 使用者可在GUI中方便管理MCP服務
+- [ ] **雙重通訊支援** - TCP Socket + Named Pipe提供連接冗餘
+- [ ] **無縫Gemini CLI整合** - AI可直接操作AutoCAD和Odoo功能
+- [ ] **完整的使用者文件** - 配置指南和操作說明
 
 ## 5. 技術挑戰與解決方案
 
