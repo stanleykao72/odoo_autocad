@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "autocad-odoo": {
+      "command": "C:/odoo/Odoo and AutoCAD Integration/odoo-autocad-integration.exe",
+      "args": ["--mcp-server"],
+      "env": {
+        "AUTOCAD_PATH": "C:/Program Files/Autodesk/AutoCAD 2024",
+        "PYTHONIOENCODING": "utf-8",
+        "MCP_TRANSPORT": "both"
+      },
+      "transport": {
+        "type": "tcp",
+        "host": "localhost",
+        "port": 8000
+      }
+    }
+  }
+}

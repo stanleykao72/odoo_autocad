@@ -15,16 +15,16 @@ class TestAIControlPanelMethods:
     """Test AI Control Panel method existence and basic functionality"""
     
     def test_create_ai_control_panel_method_exists(self):
-        """Test that create_ai_control_panel method exists"""
+        """Test that create_ai_control_banner method exists (updated to banner design)"""
         from forms.form_main_modern import ModernFormMain
         
         # Check if the method exists
-        assert hasattr(ModernFormMain, 'create_ai_control_panel'), \
-            "create_ai_control_panel method should exist"
+        assert hasattr(ModernFormMain, 'create_ai_control_banner'), \
+            "create_ai_control_banner method should exist"
         
         # Check if it's callable
-        assert callable(getattr(ModernFormMain, 'create_ai_control_panel')), \
-            "create_ai_control_panel should be callable"
+        assert callable(getattr(ModernFormMain, 'create_ai_control_banner')), \
+            "create_ai_control_banner should be callable"
     
     def test_initialize_mcp_server_manager_method_exists(self):
         """Test that initialize_mcp_server_manager method exists"""
@@ -62,17 +62,6 @@ class TestAIControlPanelMethods:
         assert callable(getattr(ModernFormMain, 'update_mcp_status_display')), \
             "update_mcp_status_display should be callable"
     
-    def test_open_ai_chat_method_exists(self):
-        """Test that open_ai_chat method exists"""
-        from forms.form_main_modern import ModernFormMain
-        
-        # Check if the method exists  
-        assert hasattr(ModernFormMain, 'open_ai_chat'), \
-            "open_ai_chat method should exist"
-        
-        # Check if it's callable
-        assert callable(getattr(ModernFormMain, 'open_ai_chat')), \
-            "open_ai_chat should be callable"
 
 
 class TestAIControlPanelLogic:
@@ -171,9 +160,8 @@ class TestAIControlPanelLogic:
         # Mock UI components
         form.mcp_status_label = Mock()
         form.mcp_toggle_button = Mock()
-        form.ai_chat_button = Mock()
         form.tcp_info_label = Mock()
-        form.pipe_info_label = Mock()
+        form.pipe_info_label = None
         
         # Bind the real method to our mock
         form.update_mcp_status_display = ModernFormMain.update_mcp_status_display.__get__(form)
@@ -181,12 +169,10 @@ class TestAIControlPanelLogic:
         # Call the method
         form.update_mcp_status_display()
         
-        # Verify UI updates for running state
-        form.mcp_status_label.configure.assert_called_with(text="🟢 AI助手運行中")
-        form.mcp_toggle_button.configure.assert_called_with(text="⏹️ 停止AI助手")
-        form.ai_chat_button.configure.assert_called_with(state="normal")
-        form.tcp_info_label.configure.assert_called_with(text="TCP: localhost:8000")
-        form.pipe_info_label.configure.assert_called_with(text="Pipe: 運行中")
+        # Verify UI updates for running state (icon-only design)
+        form.mcp_status_label.configure.assert_called_with(text="🟢")
+        form.mcp_toggle_button.configure.assert_called_with(text="⏹️")
+        form.tcp_info_label.configure.assert_called_with(text="AI: :8000")
     
     def test_update_mcp_status_display_shows_stopped_state(self):
         """Test that update_mcp_status_display correctly shows stopped state"""
@@ -200,9 +186,8 @@ class TestAIControlPanelLogic:
         # Mock UI components
         form.mcp_status_label = Mock()
         form.mcp_toggle_button = Mock()
-        form.ai_chat_button = Mock()
         form.tcp_info_label = Mock()
-        form.pipe_info_label = Mock()
+        form.pipe_info_label = None
         
         # Bind the real method to our mock
         form.update_mcp_status_display = ModernFormMain.update_mcp_status_display.__get__(form)
@@ -210,55 +195,8 @@ class TestAIControlPanelLogic:
         # Call the method
         form.update_mcp_status_display()
         
-        # Verify UI updates for stopped state
-        form.mcp_status_label.configure.assert_called_with(text="🔴 AI助手離線")
-        form.mcp_toggle_button.configure.assert_called_with(text="🚀 啟動AI助手")
-        form.ai_chat_button.configure.assert_called_with(state="disabled")
-        form.tcp_info_label.configure.assert_called_with(text="TCP: 未啟動")
-        form.pipe_info_label.configure.assert_called_with(text="Pipe: 未啟動")
+        # Verify UI updates for stopped state (icon-only design)
+        form.mcp_status_label.configure.assert_called_with(text="🔴")
+        form.mcp_toggle_button.configure.assert_called_with(text="🚀")
+        form.tcp_info_label.configure.assert_called_with(text="")
     
-    def test_open_ai_chat_warns_when_server_not_running(self):
-        """Test that open_ai_chat shows warning when MCP server is not running"""
-        from forms.form_main_modern import ModernFormMain
-        
-        # Create a mock form instance
-        form = Mock(spec=ModernFormMain)
-        form.mcp_server_manager = Mock()
-        form.mcp_server_manager.is_running.return_value = False
-        form.log_util = Mock()
-        
-        # Bind the real method to our mock
-        form.open_ai_chat = ModernFormMain.open_ai_chat.__get__(form)
-        
-        # Mock messagebox
-        with patch('forms.form_main_modern.messagebox') as mock_messagebox:
-            # Call the method
-            form.open_ai_chat()
-            
-            # Verify warning was shown
-            mock_messagebox.showwarning.assert_called_once()
-            call_args = mock_messagebox.showwarning.call_args
-            assert "AI助手未啟動" in call_args[0][0]
-    
-    def test_open_ai_chat_shows_development_message_when_running(self):
-        """Test that open_ai_chat shows development message when server is running"""
-        from forms.form_main_modern import ModernFormMain
-        
-        # Create a mock form instance
-        form = Mock(spec=ModernFormMain)
-        form.mcp_server_manager = Mock()
-        form.mcp_server_manager.is_running.return_value = True
-        form.log_util = Mock()
-        
-        # Bind the real method to our mock
-        form.open_ai_chat = ModernFormMain.open_ai_chat.__get__(form)
-        
-        # Mock messagebox
-        with patch('forms.form_main_modern.messagebox') as mock_messagebox:
-            # Call the method
-            form.open_ai_chat()
-            
-            # Verify development message was shown
-            mock_messagebox.showinfo.assert_called_once()
-            call_args = mock_messagebox.showinfo.call_args
-            assert "功能開發中" in call_args[0][0]

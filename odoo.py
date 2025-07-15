@@ -7,6 +7,9 @@ import simplejson
 import yaml
 import json
 import base64
+import argparse
+import signal
+import time
 from requests.exceptions import HTTPError
 from pathlib import Path
 from sqlalchemy import create_engine
@@ -212,20 +215,120 @@ def connect_to_odoo(odoo_conn):
         return
 
 
-if __name__ == '__main__':
+def start_mcp_server_only(args):
+    """啟動純MCP伺服器模式 (無GUI)"""
+    try:
+        from ai_assistant.mcp_server_manager import MCPServerManager
+        from utility.util_log import UtilLog
+        from utility.util_autocad import UtilAutoCAD
+        from utility.util_odoo import UtilOdoo
+        
+        _logger.info("啟動MCP伺服器模式...")
+        
+        # 建立資料庫連接
+        odoo_connection = sqlite_create_table()
+        if not odoo_connection:
+            _logger.error("無法建立Odoo連接配置")
+            return 1
+        
+        # 建立工具實例 (不需要GUI組件)
+        log_util = UtilLog(None)  # None因為沒有GUI
+        odoo_util = UtilOdoo(odoo_connection, log_util)
+        autocad_util = UtilAutoCAD(odoo_util, log_util)
+        
+        # 建立MCP伺服器管理器
+        server_manager = MCPServerManager(
+            autocad_util=autocad_util,
+            odoo_util=odoo_util,
+            log_util=log_util,
+            tcp_port=args.mcp_port,
+            pipe_name=args.mcp_pipe
+        )
+        
+        # 設置信號處理程序以正常關閉
+        def signal_handler(signum, frame):
+            _logger.info("收到停止信號，正在關閉MCP伺服器...")
+            server_manager.stop_all_servers()
+            sys.exit(0)
+        
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+        
+        # 啟動伺服器
+        server_manager.start_all_servers()
+        _logger.info(f"MCP伺服器已啟動 - TCP:{args.mcp_port}, Pipe:{args.mcp_pipe}")
+        
+        # 保持運行
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            _logger.info("收到鍵盤中斷，正在關閉...")
+        finally:
+            server_manager.stop_all_servers()
+        
+        return 0
+        
+    except Exception as e:
+        _logger.error(f"MCP伺服器啟動失敗: {e}")
+        return 1
 
+
+def start_gui_application(enable_mcp=False, mcp_args=None):
+    """啟動GUI應用程式 (可選擇性啟用MCP)"""
     odoo_connection = sqlite_create_table()
-    # odoo, requestOptions, token = connect_to_odoo(odoo_connection)
-
+    
     if odoo_connection:
-        # print(f"odoo: {odoo}")
-        # print(f"requestOptions: {requestOptions}")
-        # print(f"token: {token}")
-        # prompt(acaduti, f"odoo: {odoo}")
-        # prompt(acaduti, f"requestOptions: {requestOptions}")
-        # prompt(acaduti, f"token: {token}")
-
-        # 建立 FormMain
-        # form_main = FormMain(odoo=odoo, requestOptions=requestOptions, token=token, odoo_connection=odoo_connection)
         form_main = FormMain(odoo_connection=odoo_connection)
+        
+        # 如果啟用MCP，自動啟動MCP伺服器
+        if enable_mcp and hasattr(form_main, 'initialize_mcp_server_manager'):
+            try:
+                form_main.initialize_mcp_server_manager()
+                if form_main.mcp_server_manager:
+                    form_main.mcp_server_manager.start_all_servers()
+                    _logger.info("GUI模式下自動啟動MCP伺服器")
+            except Exception as e:
+                _logger.warning(f"GUI模式下自動啟動MCP伺服器失敗: {e}")
+        
         form_main.mainloop()
+
+
+def main():
+    """主程式入口點"""
+    parser = argparse.ArgumentParser(
+        description='Odoo AutoCAD Integration with MCP Support',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+範例用法:
+  python odoo.py                           # 啟動GUI模式
+  python odoo.py --enable-mcp              # 啟動GUI並自動啟動MCP伺服器
+  python odoo.py --mcp-server               # 純MCP伺服器模式 (無GUI)
+  python odoo.py --mcp-server --mcp-port 8001  # 自訂端口的MCP伺服器
+        """
+    )
+    
+    # MCP 伺服器相關參數
+    parser.add_argument('--mcp-server', action='store_true',
+                       help='啟動純MCP伺服器模式 (無GUI)')
+    parser.add_argument('--mcp-port', type=int, default=8000,
+                       help='MCP TCP伺服器端口 (預設: 8000)')
+    parser.add_argument('--mcp-pipe', type=str, 
+                       default=r'\\.\pipe\odoo_autocad_mcp',
+                       help='MCP Named Pipe名稱')
+    parser.add_argument('--enable-mcp', action='store_true',
+                       help='在GUI模式下啟用MCP伺服器')
+    
+    args = parser.parse_args()
+    
+    if args.mcp_server:
+        # 純MCP伺服器模式
+        return start_mcp_server_only(args)
+    else:
+        # GUI模式
+        start_gui_application(enable_mcp=args.enable_mcp, mcp_args=args)
+        return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

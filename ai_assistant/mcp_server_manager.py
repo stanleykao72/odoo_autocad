@@ -10,7 +10,9 @@ This is the minimal implementation to pass initial tests (Green phase of TDD).
 import socket
 import threading
 import time
+import json
 from typing import Optional
+from .mcp_request_handler import MCPRequestHandler
 
 # Constants for server configuration
 DEFAULT_TCP_PORT = 8000
@@ -69,6 +71,13 @@ class MCPServerManager:
         self._tcp_thread = None
         self._pipe_thread = None
         self._shutdown_event = threading.Event()
+        
+        # MCP Request Handler
+        self.request_handler = MCPRequestHandler(
+            autocad_util=autocad_util,
+            odoo_util=odoo_util,
+            log_util=log_util
+        )
     
     def start_tcp_server(self) -> None:
         """
@@ -92,7 +101,7 @@ class MCPServerManager:
             self._tcp_thread.start()
             
             self.is_tcp_running = True
-            self.log_util.log("INFO", f"TCP MCP Server started on localhost:{self.tcp_port}")
+            self.log_util.safe_log_insert(f"TCP MCP Server started on localhost:{self.tcp_port}\n")
             
         except Exception as e:
             self._log_error("Failed to start TCP server", e)
@@ -115,7 +124,7 @@ class MCPServerManager:
             self._pipe_thread.start()
             
             self.is_pipe_running = True
-            self.log_util.log("INFO", f"Named Pipe MCP Server started: {self.pipe_name}")
+            self.log_util.safe_log_insert(f"Named Pipe MCP Server started: {self.pipe_name}\n")
             
         except Exception as e:
             self._log_error("Failed to start Pipe server", e)
@@ -167,7 +176,7 @@ class MCPServerManager:
         self.is_tcp_running = False
         self.is_pipe_running = False
         
-        self.log_util.log("INFO", "All MCP servers stopped")
+        self.log_util.safe_log_insert("All MCP servers stopped\n")
     
     def is_running(self) -> bool:
         """
@@ -204,7 +213,7 @@ class MCPServerManager:
             context: Description of where the error occurred
             error: The exception that was caught
         """
-        self.log_util.log("ERROR", f"{context}: {error}")
+        self.log_util.safe_log_insert(f"{context}: {error}\n")
     
     def _tcp_server_loop(self) -> None:
         """
@@ -219,7 +228,7 @@ class MCPServerManager:
                 self.tcp_server.settimeout(SOCKET_TIMEOUT)
                 client_socket, addr = self.tcp_server.accept()
                 
-                self.log_util.log("INFO", f"TCP client connected: {addr}")
+                self.log_util.safe_log_insert(f"TCP client connected: {addr}\n")
                 
                 # Handle client in separate thread (to be implemented)
                 client_thread = threading.Thread(
@@ -257,15 +266,13 @@ class MCPServerManager:
     
     def _handle_tcp_client(self, client_socket, addr) -> None:
         """
-        Handle TCP client connection (minimal implementation)
+        Handle TCP client connection with full MCP protocol support
         
         Args:
             client_socket: Client socket connection
             addr: Client address tuple
         """
         try:
-            # Minimal client handling for Green phase
-            # Real MCP protocol handling will be implemented in future iterations
             while not self._shutdown_event.is_set():
                 try:
                     client_socket.settimeout(SOCKET_TIMEOUT)
@@ -273,9 +280,35 @@ class MCPServerManager:
                     if not data:
                         break
                     
-                    # Echo back for basic connectivity test
-                    response = b'{"jsonrpc": "2.0", "result": {"status": "connected"}, "id": 1}'
-                    client_socket.send(response)
+                    # 解析MCP請求
+                    try:
+                        request_text = data.decode('utf-8')
+                        self.log_util.safe_log_insert(f"收到MCP請求: {request_text}\n")
+                        
+                        # 處理JSON-RPC請求
+                        request = json.loads(request_text)
+                        response = self.request_handler.process_request(request)
+                        
+                        # 發送回應
+                        response_text = json.dumps(response, ensure_ascii=False)
+                        response_bytes = response_text.encode('utf-8')
+                        client_socket.send(response_bytes)
+                        
+                        self.log_util.safe_log_insert(f"MCP回應已發送\n")
+                        
+                    except json.JSONDecodeError as e:
+                        # 處理JSON解析錯誤
+                        error_response = {
+                            "jsonrpc": "2.0",
+                            "id": None,
+                            "error": {
+                                "code": -32700,
+                                "message": "Parse error"
+                            }
+                        }
+                        error_text = json.dumps(error_response).encode('utf-8')
+                        client_socket.send(error_text)
+                        self.log_util.safe_log_insert(f"JSON解析錯誤: {e}\n")
                     
                 except socket.timeout:
                     continue
@@ -285,6 +318,6 @@ class MCPServerManager:
         finally:
             try:
                 client_socket.close()
-                self.log_util.log("INFO", f"TCP client disconnected: {addr}")
+                self.log_util.safe_log_insert(f"TCP client disconnected: {addr}\n")
             except:
                 pass

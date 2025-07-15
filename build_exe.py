@@ -45,6 +45,7 @@ def build_executable():
         '--add-data', 'config;config',
         '--add-data', 'fonts;fonts',
         '--add-data', 'icon;icon',
+        '--add-data', 'ai_assistant;ai_assistant',
         
         # 隱藏的導入模組
         '--hidden-import', 'customtkinter',
@@ -57,6 +58,15 @@ def build_executable():
         '--hidden-import', 'PIL',
         '--hidden-import', 'PIL.Image',
         '--hidden-import', 'PIL.ImageTk',
+        
+        # MCP 相關模組
+        '--hidden-import', 'ai_assistant.mcp_server_manager',
+        '--hidden-import', 'ai_assistant.mcp_request_handler',
+        '--hidden-import', 'socket',
+        '--hidden-import', 'threading',
+        '--hidden-import', 'json',
+        '--hidden-import', 'argparse',
+        '--hidden-import', 'signal',
         
         # 排除不需要的模組以減少檔案大小
         '--exclude-module', 'pytest',

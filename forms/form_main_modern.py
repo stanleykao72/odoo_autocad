@@ -145,6 +145,7 @@ class ModernFormMain(ctk.CTk):
         # 連接狀態指示器區域
         self.status_frame = ctk.CTkFrame(self.top_bar, fg_color="transparent")
         self.status_frame.grid(row=0, column=1, padx=20, pady=10, sticky="e")
+        self.status_frame.grid_columnconfigure(3, weight=1)  # 讓AI控制區域向右對齊
         
         # Odoo連接狀態
         self.odoo_status_label = ctk.CTkLabel(
@@ -163,6 +164,46 @@ class ModernFormMain(ctk.CTk):
             text_color="white"
         )
         self.autocad_status_label.grid(row=0, column=1, padx=10)
+        
+        # AI助手控制區域
+        self.create_ai_control_banner()
+    
+    def create_ai_control_banner(self):
+        """在頂部banner中創建AI助手控制區域"""
+        # AI助手狀態圖示 (可點擊的狀態指示器)
+        self.mcp_status_label = ctk.CTkLabel(
+            self.status_frame,
+            text="🔴",  # 只顯示狀態圖示
+            font=("Microsoft JhengHei UI", 16),  # 稍大的圖示
+            text_color="white"
+        )
+        self.mcp_status_label.grid(row=0, column=2, padx=5)
+        
+        # AI助手控制按鈕 (純圖示)
+        self.mcp_toggle_button = ctk.CTkButton(
+            self.status_frame,
+            text="🚀",  # 只顯示圖示
+            command=self.toggle_mcp_server,
+            height=32,   # 圓形按鈕
+            width=32,    # 圓形按鈕
+            font=("Microsoft JhengHei UI", 14),
+            corner_radius=16,  # 圓形
+            fg_color="#4CAF50",  # 綠色啟動按鈕
+            hover_color="#388E3C",
+            text_color="white"
+        )
+        self.mcp_toggle_button.grid(row=0, column=3, padx=5)
+        
+        # 保留TCP信息標籤，但使其在banner中更簡潔
+        self.tcp_info_label = ctk.CTkLabel(
+            self.status_frame,
+            text="",  # 初始為空，只在有連接時顯示
+            font=("Microsoft JhengHei UI", 9),
+            text_color="#E0E0E0"
+        )
+        self.tcp_info_label.grid(row=1, column=2, columnspan=2, pady=(2, 0), sticky="e")
+        
+        self.pipe_info_label = None  # 在banner中不顯示pipe信息以節省空間
     
     def create_sidebar(self):
         """創建左側邊欄"""
@@ -200,13 +241,6 @@ class ModernFormMain(ctk.CTk):
         
         # 工具功能區
         self.create_tools_section()
-        
-        # 分隔線
-        separator3 = ctk.CTkFrame(self.sidebar, height=2, fg_color=theme.get_color('border'))
-        separator3.pack(fill="x", padx=20, pady=10)
-        
-        # AI助手控制面板
-        self.create_ai_control_panel()
     
     def create_connection_section(self):
         """創建連接功能區"""
@@ -338,80 +372,6 @@ class ModernFormMain(ctk.CTk):
             text_color="white"
         )
         self.btn_clear_all_tables.pack(fill="x", padx=20, pady=5)
-    
-    def create_ai_control_panel(self):
-        """創建AI助手控制面板"""
-        # AI助手標題
-        ai_label = ctk.CTkLabel(
-            self.sidebar,
-            text="🤖 AI助手",
-            font=("Microsoft JhengHei UI", 14, "bold"),
-            text_color="#E0E0E0"  # 淺灰色，確保良好對比度
-        )
-        ai_label.pack(pady=(0, 10))
-        
-        # AI控制區域框架
-        self.ai_frame = ctk.CTkFrame(
-            self.sidebar,
-            fg_color=theme.get_color('card'),
-            corner_radius=8
-        )
-        self.ai_frame.pack(fill="x", padx=20, pady=5)
-        
-        # AI助手狀態顯示
-        self.mcp_status_label = ctk.CTkLabel(
-            self.ai_frame,
-            text="🔴 AI助手離線",
-            font=("Microsoft JhengHei UI", 12),
-            text_color="#E0E0E0"
-        )
-        self.mcp_status_label.pack(pady=(10, 5))
-        
-        # MCP服務啟動/停止按鈕
-        self.mcp_toggle_button = ctk.CTkButton(
-            self.ai_frame,
-            text="🚀 啟動AI助手",
-            command=self.toggle_mcp_server,
-            height=40,
-            font=("Microsoft JhengHei UI", 12, "bold"),
-            corner_radius=8,
-            fg_color="#4CAF50",  # 綠色啟動按鈕
-            hover_color="#388E3C",
-            text_color="white"
-        )
-        self.mcp_toggle_button.pack(fill="x", padx=10, pady=5)
-        
-        # AI對話按鈕
-        self.ai_chat_button = ctk.CTkButton(
-            self.ai_frame,
-            text="💬 AI對話",
-            command=self.open_ai_chat,
-            height=35,
-            font=("Microsoft JhengHei UI", 11),
-            corner_radius=8,
-            fg_color="#2196F3",  # 藍色對話按鈕
-            hover_color="#1976D2",
-            text_color="white",
-            state="disabled"  # 初始狀態為禁用
-        )
-        self.ai_chat_button.pack(fill="x", padx=10, pady=5)
-        
-        # 連接資訊顯示
-        self.tcp_info_label = ctk.CTkLabel(
-            self.ai_frame,
-            text="TCP: 未啟動",
-            font=("Microsoft JhengHei UI", 10),
-            text_color="#B0B0B0"  # 更淡的灰色
-        )
-        self.tcp_info_label.pack(anchor="w", padx=15, pady=(0, 2))
-        
-        self.pipe_info_label = ctk.CTkLabel(
-            self.ai_frame,
-            text="Pipe: 未啟動",
-            font=("Microsoft JhengHei UI", 10),
-            text_color="#B0B0B0"  # 更淡的灰色
-        )
-        self.pipe_info_label.pack(anchor="w", padx=15, pady=(0, 10))
     
     def create_main_content(self):
         """創建主要內容區域"""
@@ -660,72 +620,43 @@ class ModernFormMain(ctk.CTk):
         try:
             if self.mcp_server_manager is None:
                 # 服務管理器未初始化
-                self.mcp_status_label.configure(text="🔴 AI助手離線")
-                self.mcp_toggle_button.configure(text="🚀 啟動AI助手")
-                self.ai_chat_button.configure(state="disabled")
-                self.tcp_info_label.configure(text="TCP: 未啟動")
-                self.pipe_info_label.configure(text="Pipe: 未啟動")
+                self.mcp_status_label.configure(text="🔴")  # 紅色圓圈
+                self.mcp_toggle_button.configure(text="🚀")  # 啟動圖示
+                self.tcp_info_label.configure(text="")
+                if self.pipe_info_label:  # 檢查是否存在
+                    self.pipe_info_label.configure(text="Pipe: 未啟動")
                 return
             
             if self.mcp_server_manager.is_running():
                 # 服務運行中
-                self.mcp_status_label.configure(text="🟢 AI助手運行中")
-                self.mcp_toggle_button.configure(text="⏹️ 停止AI助手")
-                self.ai_chat_button.configure(state="normal")
+                self.mcp_status_label.configure(text="🟢")  # 綠色圓圈
+                self.mcp_toggle_button.configure(text="⏹️")  # 停止圖示
                 
-                # 顯示連接資訊
+                # 顯示連接資訊 - 在banner中更簡潔
                 tcp_port = self.mcp_server_manager.get_tcp_port()
                 pipe_name = self.mcp_server_manager.get_pipe_name()
                 
-                if tcp_port:
-                    self.tcp_info_label.configure(text=f"TCP: localhost:{tcp_port}")
+                if tcp_port and pipe_name:
+                    self.tcp_info_label.configure(text=f"AI: :8000")  # 更簡潔
+                elif tcp_port:
+                    self.tcp_info_label.configure(text=f"AI: :8000")
                 else:
-                    self.tcp_info_label.configure(text="TCP: 未啟動")
-                
-                if pipe_name:
-                    self.pipe_info_label.configure(text="Pipe: 運行中")
-                else:
-                    self.pipe_info_label.configure(text="Pipe: 未啟動")
+                    self.tcp_info_label.configure(text="AI: ...")
             else:
                 # 服務停止
-                self.mcp_status_label.configure(text="🔴 AI助手離線")
-                self.mcp_toggle_button.configure(text="🚀 啟動AI助手")
-                self.ai_chat_button.configure(state="disabled")
-                self.tcp_info_label.configure(text="TCP: 未啟動")
-                self.pipe_info_label.configure(text="Pipe: 未啟動")
+                self.mcp_status_label.configure(text="🔴")  # 紅色圓圈
+                self.mcp_toggle_button.configure(text="🚀")  # 啟動圖示
+                self.tcp_info_label.configure(text="")
+                if self.pipe_info_label:  # 檢查是否存在
+                    self.pipe_info_label.configure(text="Pipe: 未啟動")
                 
         except Exception as e:
             # 發生錯誤時顯示錯誤狀態
-            self.mcp_status_label.configure(text="⚠️ AI助手錯誤")
-            self.ai_chat_button.configure(state="disabled")
-            self.tcp_info_label.configure(text="TCP: 錯誤")
-            self.pipe_info_label.configure(text="Pipe: 錯誤")
+            self.mcp_status_label.configure(text="⚠️")  # 錯誤圖示
+            self.tcp_info_label.configure(text="錯誤")
+            if self.pipe_info_label:  # 檢查是否存在
+                self.pipe_info_label.configure(text="Pipe: 錯誤")
             self.log_util.safe_log_insert(f"更新AI助手狀態顯示失敗: {e}\n")
-    
-    def open_ai_chat(self):
-        """開啟AI對話窗口"""
-        try:
-            # 檢查MCP服務是否正在運行
-            if self.mcp_server_manager is None or not self.mcp_server_manager.is_running():
-                messagebox.showwarning(
-                    "AI助手未啟動",
-                    "請先啟動AI助手服務才能開始對話。",
-                    parent=self
-                )
-                return
-            
-            # 這裡將來會實現AI對話窗口
-            # TODO: 實現FormAIChat類
-            messagebox.showinfo(
-                "功能開發中",
-                "AI對話功能正在開發中，敬請期待！",
-                parent=self
-            )
-            self.log_util.safe_log_insert("AI對話功能被調用（開發中）\n")
-            
-        except Exception as e:
-            self.log_util.safe_log_insert(f"開啟AI對話失敗: {e}\n")
-            messagebox.showerror("錯誤", f"無法開啟AI對話：{e}")
     
     def on_closing(self):
         """視窗關閉事件"""

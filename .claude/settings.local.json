@@ -3,7 +3,14 @@
     "allow": [
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(git checkout:*)",
+      "Bash(mkdir:*)",
+      "Bash(python -m pytest tests/unit/test_mcp_server_manager.py::TestMCPServerManagerInitialization::test_mcp_server_manager_can_be_created -v)",
+      "Bash(python -m pytest tests/unit/test_mcp_server_manager.py -v)",
+      "Bash(git add:*)",
+      "Bash(python:*)"
     ],
     "deny": []
   }

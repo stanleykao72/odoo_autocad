@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "autocad-odoo-pipe": {
+      "command": "C:/odoo/Odoo and AutoCAD Integration/odoo-autocad-integration.exe",
+      "args": ["--mcp-server", "--mcp-pipe", "\\\\.\\pipe\\odoo_autocad_mcp"],
+      "env": {
+        "AUTOCAD_PATH": "C:/Program Files/Autodesk/AutoCAD 2024",
+        "PYTHONIOENCODING": "utf-8"
+      },
+      "transport": {
+        "type": "pipe",
+        "name": "\\\\.\\pipe\\odoo_autocad_mcp"
+      }
+    }
+  }
+}
