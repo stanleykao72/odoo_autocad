@@ -33,11 +33,22 @@ python test_mcp_connection.py
 
 詳細文檔請參考 [`doc/`](./doc/) 目錄：
 
+### 核心文檔
 - **[MCP整合計劃](./doc/MCP_INTEGRATION_PLAN.md)** - 完整MCP實作文檔
 - **[部署指南](./doc/DEPLOYMENT_GUIDE.md)** - 建置和部署說明
-- **[Gemini CLI設定](./doc/GEMINI_CLI_SETUP.md)** - AI助手配置指南
 - **[發布說明](./doc/RELEASE_NOTES_v5.0.md)** - v5.0版本特色
+
+### 設定與配置
+- **[Gemini CLI設定](./doc/GEMINI_CLI_SETUP.md)** - AI助手配置指南
 - **[開發指南](./doc/README-DEVELOPMENT.md)** - 開發環境設定
+
+### 安全與部署
+- **[防毒軟體解決方案](./doc/ANTIVIRUS_SOLUTION.md)** - 防毒軟體相容性指南
+- **[程式碼簽章指南](./doc/CODE_SIGNING_GUIDE.md)** - 數位簽章設定
+- **[內部CA指南](./doc/INTERNAL_CA_GUIDE.md)** - 企業憑證管理
+
+### UI與介面
+- **[UI改善計劃](./doc/UI_IMPROVEMENT_PLAN.md)** - 介面現代化計劃
 
 ## 🛠️ 開發
 
