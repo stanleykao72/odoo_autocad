@@ -54,29 +54,64 @@ This is a Windows desktop application that bridges Odoo ERP and AutoCAD for engi
 conda activate odoo_autocad
 pip install -r requirements.txt
 
-# Build Windows installer (requires Inno Setup)
+# For Windows development, install Windows-specific dependencies
+pip install -r requirements-windows.txt
+```
+
+### Building Application
+```bash
+# Build executable using optimized Python script
+python build_exe.py
+
+# Alternative: Build using Windows batch script
+build_windows.bat
+
+# Build installer with Inno Setup (requires Inno Setup installed)
 iscc config/odoo-autocad-setup.iss
+
+# Build installer with code signing (if certificates configured)
+iscc config/odoo-autocad-setup-with-signing.iss
 ```
 
-### UI Development (現代化進行中)
+### Running and Testing
 ```bash
-# 測試新的現代化UI (需要tkinter支援)
-python test_modern_ui.py
-
-# 如果遇到tkinter問題，確保conda環境正確設置:
-# conda install tk
-```
-
-### Database Management
-```bash
-# Initialize database (handled automatically by odoo.py)
+# Run main application
 python odoo.py
+
+# Test modern UI implementations
+python tests/test_modern_ui.py
+python tests/test_enhanced_ui.py
+python tests/test_ui_cross_platform.py
+
+# Debug launch with enhanced logging
+python debug_launch.py
 ```
 
-### Testing AutoCAD Integration
+### AutoCAD Integration
 ```bash
 # Register COM server for AutoCAD integration
 python utility/util_com_server.py
+
+# Verify AutoCAD connection (requires AutoCAD running)
+# Test through main application UI connection status
+```
+
+### Database Operations
+```bash
+# Initialize database (handled automatically by odoo.py)
+# Database file location: db/database.db
+# Manual SQLite access: sqlite3 db/database.db
+```
+
+### Testing
+```bash
+# UI testing (manual testing approach)
+python tests/test_modern_ui.py        # Modern CustomTkinter interface
+python tests/test_enhanced_ui.py      # Enhanced widget functionality  
+python tests/test_ui_cross_platform.py # Cross-platform compatibility
+
+# Run all UI tests
+cd tests && python test_modern_ui.py && python test_enhanced_ui.py && python test_ui_cross_platform.py
 ```
 
 ## Configuration Management
@@ -120,6 +155,29 @@ The application uses a main window with side navigation pattern:
 
 The application includes Chinese language support throughout the UI and uses appropriate fonts (Microsoft JhengHei) for proper character rendering on Windows systems.
 
+## Deployment and Security
+
+### Code Signing
+- **Certificates**: Store certificates in `certs/` directory
+- **Configuration**: Use `config/odoo-autocad-setup-with-signing.iss` for signed installers
+- **Antivirus**: Follow `ANTIVIRUS_SOLUTION.md` and `CODE_SIGNING_GUIDE.md` for deployment best practices
+- **Build info**: Generated builds include SHA256 hashes and metadata in `output/build_info.json`
+
+### File Structure for Deployment
+```
+output/
+├── odoo-autocad-integration.exe     # Main executable
+├── build_info.json                  # Build metadata and hashes
+├── README_ANTIVIRUS.txt             # Antivirus whitelist instructions
+└── *.md                            # Documentation files
+```
+
+### PyInstaller Configuration
+- **Spec file**: `odoo-autocad-integration.spec` contains build configuration
+- **Hidden imports**: Required for COM, CustomTkinter, and SQLAlchemy
+- **Excluded modules**: Testing and heavy libraries excluded to reduce size
+- **UPX compression**: Optional if UPX is available on build system
+
 ## UI Modernization Progress (進行中)
 
 ### 已完成階段一 (CustomTkinter基礎)
@@ -136,11 +194,11 @@ The application includes Chinese language support throughout the UI and uses app
 
 ### 重新開始指導
 1. 確保conda環境: `conda activate odoo_autocad && conda install tk`
-2. 測試UI: `python test_modern_ui.py`
+2. 測試UI: `python tests/test_modern_ui.py`
 3. 查看詳細計劃: `UI_IMPROVEMENT_PLAN.md`
 
 ### 新增的UI檔案
 - `ui/` - UI主題和字體管理模組
 - `forms/form_main_modern.py` - 現代化主表單
-- `test_modern_ui.py` - UI測試檔案
+- `tests/` - UI測試檔案目錄
 - `UI_IMPROVEMENT_PLAN.md` - 完整改善計劃

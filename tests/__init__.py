@@ -1,0 +1,1 @@
+# Tests package for Odoo-AutoCAD Integration
