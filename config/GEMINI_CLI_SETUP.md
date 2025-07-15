@@ -1,4 +1,8 @@
-# Gemini CLI 配置指南
+# Gemini CLI 配置指南 v5.0
+
+> **版本**: 5.0  
+> **發布日期**: 2024年7月15日  
+> **MCP工具數量**: 7個（4個AutoCAD + 3個Odoo）
 
 本指南說明如何配置 Gemini CLI 以連接到 AutoCAD-Odoo MCP 伺服器。
 

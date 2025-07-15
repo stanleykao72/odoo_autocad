@@ -1,4 +1,7 @@
 {
+  "_comment": "AutoCAD-Odoo MCP Integration v5.0 - Hybrid Configuration", 
+  "_version": "5.0",
+  "_updated": "2024-07-15",
   "mcpServers": {
     "autocad-odoo": {
       "command": "C:/odoo/Odoo and AutoCAD Integration/odoo-autocad-integration.exe",

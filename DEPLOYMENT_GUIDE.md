@@ -1,4 +1,8 @@
-# AutoCAD-Odoo MCP 整合部署指南
+# AutoCAD-Odoo MCP 整合部署指南 v5.0
+
+> **版本**: 5.0  
+> **發布日期**: 2024年7月15日  
+> **適用範圍**: MCP整合完整版本
 
 本指南說明如何部署和配置 AutoCAD-Odoo MCP 整合系統。
 

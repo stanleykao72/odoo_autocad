@@ -1,10 +1,16 @@
 # CLAUDE.md
 
+> **版本**: 5.0 (MCP整合完整版)  
+> **最後更新**: 2024年7月15日  
+> **新功能**: AI助手整合，7個MCP工具，完整TDD覆蓋
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
 This is a Windows desktop application that bridges Odoo ERP and AutoCAD for engineering/construction workflows. The application enables automated extraction of drawing parameters from AutoCAD, manages BOQ (Bill of Quantities), and handles Purchase Requisition processing through Odoo's REST API.
+
+**v5.0 新增功能**: 完整的MCP (Model Context Protocol) 整合，提供AI助手功能，支援自然語言操作AutoCAD和Odoo系統。
 
 ## Architecture
 
