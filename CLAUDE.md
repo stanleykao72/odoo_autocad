@@ -303,7 +303,7 @@ The application includes Chinese language support throughout the UI and uses app
 ### Code Signing
 - **Certificates**: Store certificates in `certs/` directory
 - **Configuration**: Use `config/odoo-autocad-setup-with-signing.iss` for signed installers
-- **Antivirus**: Follow `ANTIVIRUS_SOLUTION.md` and `CODE_SIGNING_GUIDE.md` for deployment best practices
+- **Antivirus**: Follow `doc/ANTIVIRUS_SOLUTION.md` and `doc/CODE_SIGNING_GUIDE.md` for deployment best practices
 - **Build info**: Generated builds include SHA256 hashes and metadata in `output/build_info.json`
 
 ### File Structure for Deployment
@@ -339,13 +339,13 @@ output/
 1. 確保conda環境: `conda activate odoo_autocad && conda install tk`
 2. 安裝測試依賴: `pip install pytest pytest-cov pytest-mock`
 3. 測試UI: `python -m pytest tests/ui/`
-4. 查看詳細計劃: `UI_IMPROVEMENT_PLAN.md`
+4. 查看詳細計劃: `doc/UI_IMPROVEMENT_PLAN.md`
 
 ### 新增的UI檔案
 - `ui/` - UI主題和字體管理模組
 - `forms/form_main_modern.py` - 現代化主表單
 - `tests/` - UI測試檔案目錄
-- `UI_IMPROVEMENT_PLAN.md` - 完整改善計劃
+- `doc/UI_IMPROVEMENT_PLAN.md` - 完整改善計劃
 
 ---
 
@@ -379,3 +379,30 @@ python -m pytest tests/performance/ -v
 ```
 
 記住：**好的測試是最好的文檔，TDD讓重構變得安全且快速。**
+
+---
+
+## 📚 文檔結構
+
+專案文檔統一存放在 `doc/` 目錄下：
+
+```
+doc/
+├── MCP_INTEGRATION_PLAN.md      # MCP整合完整計劃與進度
+├── DEPLOYMENT_GUIDE.md          # 部署和建置指南  
+├── GEMINI_CLI_SETUP.md          # Gemini CLI配置說明
+├── RELEASE_NOTES_v5.0.md        # v5.0版本發布說明
+├── README-DEVELOPMENT.md        # 開發環境設定指南
+├── UI_IMPROVEMENT_PLAN.md       # UI現代化計劃
+├── ANTIVIRUS_SOLUTION.md        # 防毒軟體解決方案
+├── CODE_SIGNING_GUIDE.md        # 代碼簽名指南
+└── INTERNAL_CA_GUIDE.md         # 內部CA憑證指南
+```
+
+### 快速導航
+
+- **🚀 開始使用**: 參考根目錄 `README.md`
+- **🤖 AI助手設定**: `doc/GEMINI_CLI_SETUP.md`
+- **🏗️ 建置部署**: `doc/DEPLOYMENT_GUIDE.md`
+- **📋 完整計劃**: `doc/MCP_INTEGRATION_PLAN.md`
+- **🔧 開發指引**: 本檔案 `CLAUDE.md`
