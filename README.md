@@ -50,6 +50,15 @@ python test_mcp_connection.py
 ### UI與介面
 - **[UI改善計劃](./doc/UI_IMPROVEMENT_PLAN.md)** - 介面現代化計劃
 
+### 進階整合
+- **[AutoCAD MCP整合方案](./doc/AutoCAD_MCP_Integration_Plan.md)** - 第三方AutoCAD工具整合計劃
+- **[Context Engineering分析](./doc/Context_Engineering_Analysis.md)** - AI協作開發方法論應用
+
+### Context Engineering 工作流程
+- **[初始需求](./INITIAL.md)** - 功能需求定義
+- **[Context Engineering框架](./context_engineering/README.md)** - 開發方法論實施
+- **自定義命令**: `/generate-prp` 和 `/execute-prp` 用於標準化開發流程
+
 ## 🛠️ 開發
 
 此專案遵循TDD方法論，詳細開發指引請參考 [`CLAUDE.md`](./CLAUDE.md)。

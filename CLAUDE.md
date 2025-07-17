@@ -1,8 +1,8 @@
 # CLAUDE.md
 
 > **版本**: 5.0 (MCP整合完整版)  
-> **最後更新**: 2024年7月15日  
-> **新功能**: AI助手整合，7個MCP工具，完整TDD覆蓋
+> **最後更新**: 2025年7月16日  
+> **新功能**: AI助手整合，7個MCP工具完整實作，完整TDD覆蓋
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Windows desktop application that bridges Odoo ERP and AutoCAD for engineering/construction workflows. The application enables automated extraction of drawing parameters from AutoCAD, manages BOQ (Bill of Quantities), and handles Purchase Requisition processing through Odoo's REST API.
 
-**v5.0 新增功能**: 完整的MCP (Model Context Protocol) 整合，提供AI助手功能，支援自然語言操作AutoCAD和Odoo系統。
+**v5.0 新增功能**: 完整的MCP (Model Context Protocol) 整合，提供AI助手功能，支援自然語言操作AutoCAD和Odoo系統。包含7個完整實作的MCP工具，可透過Gemini CLI進行實際AutoCAD和Odoo系統操作。
 
 ## Architecture
 
@@ -20,6 +20,8 @@ This is a Windows desktop application that bridges Odoo ERP and AutoCAD for engi
 - Bravado/Swagger client for Odoo REST API communication
 - SQLAlchemy ORM with SQLite for local data caching
 - YAML configuration management for multiple environments
+- **MCP (Model Context Protocol)** with FastMCP SDK for AI助手整合
+- **SSE (Server-Sent Events)** 傳輸協定用於MCP通訊
 
 ### Key Components
 
@@ -45,12 +47,23 @@ This is a Windows desktop application that bridges Odoo ERP and AutoCAD for engi
 - `utility/util_com_server.py` - Python COM server for AutoCAD integration
 - `cuix/odoo_autocad.cuix` - AutoCAD UI customization and ribbon interface
 
+**MCP/AI Assistant**
+- `mcp_server_fastmcp.py` - FastMCP SSE伺服器，提供7個MCP工具
+- `utility/util_mcp_sse_manager.py` - SSE伺服器管理器，與GUI整合
+
 ## Data Flow
 
+### 傳統工作流程
 1. **Configuration Setup**: Load YAML configs → Sync to SQLite → Establish Odoo/AutoCAD connections
 2. **Parameter Extraction**: AutoCAD COM → Extract drawing parameters → Validate against Odoo products
 3. **BOQ Processing**: Parameters → Generate BOQ entries → Push to Odoo project
 4. **PR Generation**: BOQ data → Create Purchase Requisitions → Submit to Odoo purchasing workflow
+
+### MCP AI助手工作流程 (v5.0新增)
+1. **SSE Server啟動**: GUI啟動 → MCPSSEManager → FastMCP SSE Server (port 8083)
+2. **AI整合**: Gemini CLI連接 → MCP協定 → 自然語言指令
+3. **工具執行**: MCP工具呼叫 → 實際AutoCAD/Odoo操作 → 回傳結果
+4. **即時回饋**: 操作結果 → 透過SSE回傳 → AI助手顯示
 
 ## Development Commands
 
@@ -66,6 +79,9 @@ pip install -r requirements-windows.txt
 # Install testing dependencies for TDD workflow
 pip install pytest pytest-cov pytest-mock pytest-watch
 pip install coverage[toml] pytest-html pytest-xdist
+
+# Install MCP dependencies for AI assistant integration
+pip install fastmcp mcp starlette uvicorn
 ```
 
 ### Building Application
@@ -103,6 +119,9 @@ python -m PyInstaller --onefile --windowed --name "odoo-autocad-integration" --i
 # Run main application
 python odoo.py
 
+# Run main application with MCP SSE server auto-start
+python odoo.py --enable-mcp
+
 # Test modern UI implementations
 python tests/test_modern_ui.py
 python tests/test_enhanced_ui.py
@@ -110,6 +129,9 @@ python tests/test_ui_cross_platform.py
 
 # Debug launch with enhanced logging
 python debug_launch.py
+
+# Start MCP SSE server manually (for testing)
+python mcp_server_fastmcp.py --mode sse --port 8083
 ```
 
 ### AutoCAD Integration
@@ -128,6 +150,64 @@ python utility/util_com_server.py
 # Manual SQLite access: sqlite3 db/database.db
 ```
 
+### Process Management and Debugging
+```bash
+# Stop specific processes by PID using PowerShell
+powershell "Stop-Process -Id 5412 -Force"
+
+# Check port usage
+netstat -ano | findstr ":808"
+
+# Test port availability
+powershell "Test-NetConnection -ComputerName localhost -Port 8083 -InformationLevel Quiet"
+
+# Stop Python processes occupying specific ports
+powershell "Get-Process python | Where-Object {$_.Id -eq 1234} | Stop-Process -Force"
+
+# Find processes using specific ports (alternative method)
+powershell "Get-NetTCPConnection | Where-Object LocalPort -eq 8083 | Select-Object OwningProcess"
+
+# Clear ports 8080-8083 for SSE testing
+netstat -ano | findstr ":808"  # Check current usage
+powershell "Stop-Process -Id <PID> -Force"  # Replace <PID> with actual process ID
+```
+
+### MCP SSE Server Management
+```bash
+# Start GUI with auto-start SSE server (RECOMMENDED)
+python odoo.py --enable-mcp
+
+# Start SSE server manually for debugging
+python mcp_server_fastmcp.py --mode sse --port 8083
+
+# Test SSE server health
+curl http://localhost:8083/health
+
+# Clean up SSE ports before testing
+# 1. Find processes using ports 8080-8083
+netstat -ano | findstr ":808"
+# 2. Stop specific processes
+powershell "Stop-Process -Id <PID1> -Force"
+powershell "Stop-Process -Id <PID2> -Force"
+powershell "Stop-Process -Id <PID3> -Force"
+# 3. Verify ports are free
+powershell "Test-NetConnection -ComputerName localhost -Port 8083 -InformationLevel Quiet"
+
+# Test MCP tools using Gemini CLI (需要先設定Gemini CLI)
+# 參考 doc/GEMINI_CLI_SETUP.md 進行設定
+```
+
+### MCP工具說明 (v5.0新增)
+本專案提供7個完整實作的MCP工具，透過AI助手可進行自然語言操作：
+
+1. **test_connection()** - 測試MCP連接狀態
+2. **get_server_info()** - 獲取伺服器資訊和功能
+3. **check_autocad_status()** - 檢查AutoCAD連接狀態，返回應用程式資訊
+4. **check_odoo_status()** - 檢查Odoo連接狀態，返回伺服器資訊
+5. **extract_autocad_parameters(drawing_path, use_current_drawing)** - 從AutoCAD圖檔提取參數
+6. **sync_to_odoo(data, sync_type)** - 同步資料到Odoo系統 (參數/BOQ/專案)
+7. **generate_boq(project_id, include_autocad_data)** - 生成工程量清單，可包含AutoCAD資料
+
 ### Test-Driven Development (TDD)
 
 This project follows TDD principles inspired by best practices. Always follow the TDD cycle: **Red → Green → Refactor**.
@@ -145,11 +225,14 @@ tests/
 │   ├── test_autocad_utils.py    # AutoCAD utility functions
 │   ├── test_odoo_api.py         # Odoo API integration
 │   ├── test_boq_processing.py   # BOQ data processing logic
-│   └── test_mcp_integration.py  # MCP server functionality
+│   ├── test_mcp_integration.py  # MCP server functionality
+│   └── test_direct_sse_manager.py # Direct SSE manager integration
 ├── integration/             # Integration tests for workflows
 │   ├── test_autocad_odoo_flow.py # End-to-end AutoCAD-Odoo workflow
 │   ├── test_mcp_e2e.py          # MCP server end-to-end testing
-│   └── test_gui_integration.py   # GUI integration scenarios
+│   ├── test_gui_integration.py   # GUI integration scenarios
+│   ├── test_simple_sse.py       # Simple SSE functionality
+│   └── test_gui_sse.py          # GUI SSE integration
 ├── performance/            # Performance and benchmark tests
 │   ├── test_autocad_performance.py # AutoCAD operation performance
 │   └── test_odoo_sync_performance.py # Odoo synchronization performance
@@ -173,6 +256,10 @@ python -m pytest tests/unit/          # Unit tests only
 python -m pytest tests/integration/   # Integration tests only
 python -m pytest tests/performance/   # Performance tests only
 python -m pytest tests/ui/           # UI tests only
+
+# Run SSE-specific tests
+cd tests && python run_sse_tests.py  # All SSE tests with custom runner
+python -m pytest tests/ -k "sse" -v  # SSE tests with pytest
 
 # Test coverage reporting
 python -m pytest --cov=. --cov-report=html tests/
@@ -344,6 +431,8 @@ output/
 - ✅ 跨平台字體管理系統 (`ui/ui_fonts.py`) 
 - ✅ 現代化主表單重構 (`forms/form_main_modern.py`)
 - ✅ 改善的連接狀態指示器
+- ✅ **MCP SSE整合** (`utility/util_mcp_sse_manager.py`)
+- ✅ **AI助手功能完整實作** (`mcp_server_fastmcp.py`)
 
 ### 待完成任務
 - 🔄 **當前**: 測試新UI (需要conda環境配置tkinter)
@@ -358,9 +447,13 @@ output/
 
 ### 新增的UI檔案
 - `ui/` - UI主題和字體管理模組
-- `forms/form_main_modern.py` - 現代化主表單
+- `forms/form_main_modern.py` - 現代化主表單 (含MCP SSE整合)
 - `tests/` - UI測試檔案目錄
 - `doc/UI_IMPROVEMENT_PLAN.md` - 完整改善計劃
+
+### v5.0 MCP整合檔案
+- `mcp_server_fastmcp.py` - MCP SSE伺服器，7個完整實作工具
+- `utility/util_mcp_sse_manager.py` - SSE伺服器管理器，GUI整合
 
 ---
 
@@ -379,7 +472,7 @@ output/
 - **核心業務邏輯**: 95%+（util_autocad.py, util_odoo.py）
 - **UI組件**: 80%+（forms/, ui/）
 - **整合流程**: 90%+（端對端工作流程）
-- **MCP整合**: 95%+（ai_assistant/）
+- **MCP整合**: 95%+（mcp_server_fastmcp.py, util_mcp_sse_manager.py）
 
 ### 快速測試指令
 ```bash

@@ -11,6 +11,7 @@ from utility.util_autocad import UtilAutoCAD
 from utility.util_push_to_boq import UtilPushToBoq
 from utility.util_transfer_boq_to_pr import UtilTransferBoqToPr
 from utility.util_log import UtilLog
+from utility.util_mcp_sse_manager import MCPSSEManager
 from ai_assistant.mcp_server_manager import MCPServerManager
 from forms.form_autocad_param import FormAutoCADParam
 from forms.form_autocad_param_enhanced import EnhancedFormAutoCADParam
@@ -100,6 +101,11 @@ class ModernFormMain(ctk.CTk):
         
         # 初始化AI助手相關組件
         self.mcp_server_manager = None  # 將在需要時初始化
+        self.mcp_sse_manager = MCPSSEManager(port=8083)  # SSE 伺服器管理器
+        self.mcp_sse_manager.set_status_callback(self.on_mcp_sse_status_update)
+        
+        # 自動啟動 SSE 伺服器以供 Gemini CLI 連接
+        self.auto_start_sse_server()
     
     def create_ui(self):
         """創建使用者介面"""
@@ -167,32 +173,13 @@ class ModernFormMain(ctk.CTk):
         
         # AI助手控制區域
         self.create_ai_control_banner()
+        
+        # 添加 SSE 狀態指示器
+        self.create_sse_status_indicator()
     
     def create_ai_control_banner(self):
         """在頂部banner中創建AI助手控制區域"""
-        # AI助手狀態圖示 (可點擊的狀態指示器)
-        self.mcp_status_label = ctk.CTkLabel(
-            self.status_frame,
-            text="🔴",  # 只顯示狀態圖示
-            font=("Microsoft JhengHei UI", 16),  # 稍大的圖示
-            text_color="white"
-        )
-        self.mcp_status_label.grid(row=0, column=2, padx=5)
-        
-        # AI助手控制按鈕 (純圖示)
-        self.mcp_toggle_button = ctk.CTkButton(
-            self.status_frame,
-            text="🚀",  # 只顯示圖示
-            command=self.toggle_mcp_server,
-            height=32,   # 圓形按鈕
-            width=32,    # 圓形按鈕
-            font=("Microsoft JhengHei UI", 14),
-            corner_radius=16,  # 圓形
-            fg_color="#4CAF50",  # 綠色啟動按鈕
-            hover_color="#388E3C",
-            text_color="white"
-        )
-        self.mcp_toggle_button.grid(row=0, column=3, padx=5)
+        # MCP 按鈕已移除 - 只保留 SSE 功能
         
         # 保留TCP信息標籤，但使其在banner中更簡潔
         self.tcp_info_label = ctk.CTkLabel(
@@ -201,9 +188,44 @@ class ModernFormMain(ctk.CTk):
             font=("Microsoft JhengHei UI", 9),
             text_color="#E0E0E0"
         )
-        self.tcp_info_label.grid(row=1, column=2, columnspan=2, pady=(2, 0), sticky="e")
+        self.tcp_info_label.grid(row=1, column=1, columnspan=2, pady=(2, 0), sticky="e")
         
         self.pipe_info_label = None  # 在banner中不顯示pipe信息以節省空間
+    
+    def create_sse_status_indicator(self):
+        """創建 SSE 狀態指示器"""
+        # SSE 狀態指示器
+        self.sse_status_label = ctk.CTkLabel(
+            self.status_frame,
+            text="🔴",  # 初始為紅色（未啟動）
+            font=("Microsoft JhengHei UI", 14),
+            text_color="white"
+        )
+        self.sse_status_label.grid(row=0, column=4, padx=5)
+        
+        # SSE 控制按鈕
+        self.sse_toggle_button = ctk.CTkButton(
+            self.status_frame,
+            text="🌊",  # SSE 波浪圖示
+            command=self.toggle_sse_server,
+            height=28,
+            width=28,
+            font=("Microsoft JhengHei UI", 12),
+            corner_radius=14,
+            fg_color="#FF9800",  # 橘色 SSE 按鈕
+            hover_color="#F57C00",
+            text_color="white"
+        )
+        self.sse_toggle_button.grid(row=0, column=5, padx=5)
+        
+        # SSE 信息標籤
+        self.sse_info_label = ctk.CTkLabel(
+            self.status_frame,
+            text="",
+            font=("Microsoft JhengHei UI", 9),
+            text_color="#E0E0E0"
+        )
+        self.sse_info_label.grid(row=1, column=4, columnspan=2, pady=(2, 0), sticky="e")
     
     def create_sidebar(self):
         """創建左側邊欄"""
@@ -372,6 +394,24 @@ class ModernFormMain(ctk.CTk):
             text_color="white"
         )
         self.btn_clear_all_tables.pack(fill="x", padx=20, pady=5)
+        
+        # 分隔線
+        separator3 = ctk.CTkFrame(self.sidebar, height=2, fg_color=theme.get_color('border'))
+        separator3.pack(fill="x", padx=20, pady=10)
+        
+        # AI助手控制按鈕
+        self.btn_sse_control = ctk.CTkButton(
+            self.sidebar,
+            text="🌊 SSE 伺服器控制",
+            command=self.create_sse_control_panel,
+            height=40,
+            font=("Microsoft JhengHei UI", 13, "bold"),
+            corner_radius=8,
+            fg_color="#FF9800",  # 橘色，與頂部 SSE 按鈕一致
+            hover_color="#F57C00",
+            text_color="white"
+        )
+        self.btn_sse_control.pack(fill="x", padx=20, pady=5)
     
     def create_main_content(self):
         """創建主要內容區域"""
@@ -592,71 +632,330 @@ class ModernFormMain(ctk.CTk):
             self.log_util.safe_log_insert(f"MCP服務管理器初始化失敗: {e}\n")
             messagebox.showerror("錯誤", f"無法初始化AI助手服務管理器：{e}")
     
-    def toggle_mcp_server(self):
-        """切換MCP服務狀態（啟動/停止）"""
-        try:
-            # 確保MCP服務管理器已初始化
-            if self.mcp_server_manager is None:
-                self.initialize_mcp_server_manager()
-            
-            if self.mcp_server_manager.is_running():
-                # 停止服務
-                self.mcp_server_manager.stop_all_servers()
-                self.log_util.safe_log_insert("AI助手服務已停止\n")
-            else:
-                # 啟動服務
-                self.mcp_server_manager.start_all_servers()
-                self.log_util.safe_log_insert("AI助手服務已啟動\n")
-            
-            # 更新狀態顯示
-            self.update_mcp_status_display()
-            
-        except Exception as e:
-            self.log_util.safe_log_insert(f"切換AI助手服務狀態失敗: {e}\n")
-            messagebox.showerror("錯誤", f"無法切換AI助手服務狀態：{e}")
+    # toggle_mcp_server 方法已移除 - MCP 按鈕已從 UI 中移除
     
-    def update_mcp_status_display(self):
-        """更新MCP服務狀態顯示"""
+    # update_mcp_status_display 方法已移除 - MCP 按鈕已從 UI 中移除
+    
+    def toggle_sse_server(self):
+        """切換 SSE 伺服器狀態"""
+        self.log_util.safe_log_insert(f"[SSE GUI] toggle_sse_server 被呼叫\n")
         try:
-            if self.mcp_server_manager is None:
-                # 服務管理器未初始化
-                self.mcp_status_label.configure(text="🔴")  # 紅色圓圈
-                self.mcp_toggle_button.configure(text="🚀")  # 啟動圖示
-                self.tcp_info_label.configure(text="")
-                if self.pipe_info_label:  # 檢查是否存在
-                    self.pipe_info_label.configure(text="Pipe: 未啟動")
-                return
+            current_status = self.mcp_sse_manager.is_running
+            self.log_util.safe_log_insert(f"[SSE GUI] 當前 SSE 伺服器狀態: {current_status}\n")
             
-            if self.mcp_server_manager.is_running():
-                # 服務運行中
-                self.mcp_status_label.configure(text="🟢")  # 綠色圓圈
-                self.mcp_toggle_button.configure(text="⏹️")  # 停止圖示
-                
-                # 顯示連接資訊 - 在banner中更簡潔
-                tcp_port = self.mcp_server_manager.get_tcp_port()
-                pipe_name = self.mcp_server_manager.get_pipe_name()
-                
-                if tcp_port and pipe_name:
-                    self.tcp_info_label.configure(text=f"AI: :8000")  # 更簡潔
-                elif tcp_port:
-                    self.tcp_info_label.configure(text=f"AI: :8000")
+            if current_status:
+                # 停止 SSE 伺服器
+                self.log_util.safe_log_insert("[SSE GUI] 準備停止 SSE 伺服器\n")
+                stop_result = self.mcp_sse_manager.stop_server()
+                self.log_util.safe_log_insert(f"[SSE GUI] 停止 SSE 伺服器結果: {stop_result}\n")
+                if stop_result:
+                    self.log_util.safe_log_insert("[SSE GUI] ✅ SSE 伺服器已成功停止\n")
                 else:
-                    self.tcp_info_label.configure(text="AI: ...")
+                    self.log_util.safe_log_insert("[SSE GUI] ❌ SSE 伺服器停止失敗\n")
             else:
-                # 服務停止
-                self.mcp_status_label.configure(text="🔴")  # 紅色圓圈
-                self.mcp_toggle_button.configure(text="🚀")  # 啟動圖示
-                self.tcp_info_label.configure(text="")
-                if self.pipe_info_label:  # 檢查是否存在
-                    self.pipe_info_label.configure(text="Pipe: 未啟動")
+                # 啟動 SSE 伺服器
+                self.log_util.safe_log_insert("[SSE GUI] 準備啟動 SSE 伺服器（端口: 8083）\n")
+                import threading
+                thread = threading.Thread(target=self._start_sse_server_async, daemon=True)
+                self.log_util.safe_log_insert(f"[SSE GUI] 創建啟動執行緒: {thread.name}\n")
+                thread.start()
+                self.log_util.safe_log_insert("[SSE GUI] 啟動執行緒已開始\n")
                 
         except Exception as e:
-            # 發生錯誤時顯示錯誤狀態
-            self.mcp_status_label.configure(text="⚠️")  # 錯誤圖示
-            self.tcp_info_label.configure(text="錯誤")
-            if self.pipe_info_label:  # 檢查是否存在
-                self.pipe_info_label.configure(text="Pipe: 錯誤")
-            self.log_util.safe_log_insert(f"更新AI助手狀態顯示失敗: {e}\n")
+            import traceback
+            error_trace = traceback.format_exc()
+            self.log_util.safe_log_insert(f"[SSE GUI] ❌ 切換 SSE 伺服器狀態發生異常: {e}\n")
+            self.log_util.safe_log_insert(f"[SSE GUI] 錯誤追蹤:\n{error_trace}\n")
+            messagebox.showerror("錯誤", f"無法切換 SSE 伺服器狀態：{e}")
+    
+    def auto_start_sse_server(self):
+        """自動啟動 SSE 伺服器以供 Gemini CLI 連接"""
+        try:
+            # 在應用程式啟動時自動啟動 SSE 伺服器
+            # 這解決了 Gemini CLI 在 SSE 伺服器啟動之前就嘗試連接的時機問題
+            if hasattr(self, 'log_util') and self.log_util:
+                self.log_util.safe_log_insert("[SSE GUI] 開始自動啟動 SSE 伺服器流程\n")
+                self.log_util.safe_log_insert(f"[SSE GUI] 目標端口: {getattr(self.mcp_sse_manager, 'port', '未知')}\n")
+            
+            import threading
+            thread = threading.Thread(target=self._start_sse_server_async, daemon=True)
+            if hasattr(self, 'log_util') and self.log_util:
+                self.log_util.safe_log_insert(f"[SSE GUI] 創建自動啟動執行緒: {thread.name}\n")
+            thread.start()
+            
+            if hasattr(self, 'log_util') and self.log_util:
+                self.log_util.safe_log_insert("[SSE GUI] 自動啟動執行緒已開始執行\n")
+            
+        except Exception as e:
+            # 如果自動啟動失敗，記錄錯誤但不阻止應用程式啟動
+            import traceback
+            error_trace = traceback.format_exc()
+            if hasattr(self, 'log_util') and self.log_util:
+                self.log_util.safe_log_insert(f"[SSE GUI] ❌ 自動啟動 SSE 伺服器失敗: {e}\n")
+                self.log_util.safe_log_insert(f"[SSE GUI] 錯誤追蹤:\n{error_trace}\n")
+            else:
+                print(f"[SSE GUI] 自動啟動 SSE 伺服器失敗: {e}")
+                print(f"[SSE GUI] 錯誤追蹤:\n{error_trace}")
+    
+    def _start_sse_server_async(self):
+        """異步啟動 SSE 伺服器"""
+        import threading
+        thread_name = threading.current_thread().name
+        
+        # 使用 after 確保日誌在主執行緒中記錄
+        self.after(0, lambda: self.log_util.safe_log_insert(f"[SSE GUI] _start_sse_server_async 開始執行 (執行緒: {thread_name})\n"))
+        
+        try:
+            self.after(0, lambda: self.log_util.safe_log_insert("[SSE GUI] 呼叫 mcp_sse_manager.start_server()\n"))
+            success = self.mcp_sse_manager.start_server()
+            
+            self.after(0, lambda: self.log_util.safe_log_insert(f"[SSE GUI] start_server() 回傳結果: {success}\n"))
+            
+            if success:
+                self.after(0, lambda: self.log_util.safe_log_insert("[SSE GUI] ✅ SSE 伺服器啟動成功\n"))
+                # 驗證伺服器狀態
+                final_status = self.mcp_sse_manager.is_running
+                self.after(0, lambda: self.log_util.safe_log_insert(f"[SSE GUI] 最終伺服器狀態: {final_status}\n"))
+            else:
+                self.after(0, lambda: self.log_util.safe_log_insert("[SSE GUI] ❌ SSE 伺服器啟動失敗\n"))
+                
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            self.after(0, lambda: self.log_util.safe_log_insert(f"[SSE GUI] ❌ _start_sse_server_async 發生異常: {e}\n"))
+            self.after(0, lambda: self.log_util.safe_log_insert(f"[SSE GUI] 錯誤追蹤:\n{error_trace}\n"))
+    
+    def on_mcp_sse_status_update(self, message: str, is_running: bool):
+        """SSE 狀態更新回調"""
+        def update_ui():
+            self.log_util.safe_log_insert(f"[SSE GUI] 收到狀態更新回調: message='{message}', is_running={is_running}\n")
+            
+            # 更新 SSE 狀態顯示
+            if is_running:
+                self.log_util.safe_log_insert("[SSE GUI] 更新 UI 為運行狀態\n")
+                self.sse_status_label.configure(text="🟢")  # 綠色表示運行中
+                self.sse_toggle_button.configure(text="⏹️")  # 停止圖示
+                self.sse_info_label.configure(text=f"SSE: :{self.mcp_sse_manager.port}")
+            else:
+                self.log_util.safe_log_insert("[SSE GUI] 更新 UI 為停止狀態\n")
+                self.sse_status_label.configure(text="🔴")  # 紅色表示停止
+                self.sse_toggle_button.configure(text="🌊")  # 啟動圖示
+                self.sse_info_label.configure(text="")
+            
+            # 記錄狀態消息
+            self.log_util.safe_log_insert(f"[SSE 狀態] {message}\n")
+            
+            # 更新面板狀態（如果面板已打開）
+            try:
+                self.update_sse_panel_status()
+                self.log_util.safe_log_insert("[SSE GUI] 面板狀態已更新\n")
+            except Exception as e:
+                self.log_util.safe_log_insert(f"[SSE GUI] 更新面板狀態失敗: {e}\n")
+        
+        self.after(0, update_ui)
+    
+    def show_sse_status(self):
+        """顯示 SSE 伺服器詳細狀態"""
+        status = self.mcp_sse_manager.get_server_status()
+        
+        status_text = f"""
+SSE 伺服器狀態:
+運行狀態: {'🟢 運行中' if status['is_running'] else '🔴 已停止'}
+端口: {status['port']}
+模式: 直接整合 MCPSSEServer
+健康檢查: {'✅ 正常' if status['health_check'] else '❌ 異常'}
+        """
+        
+        # 添加伺服器資訊（如果可用）
+        if 'server_name' in status:
+            status_text += f"\n伺服器名稱: {status['server_name']}"
+            status_text += f"\n版本: {status['server_version']}"
+            status_text += f"\n活動連接: {status['active_connections']}"
+        
+        messagebox.showinfo("SSE 伺服器狀態", status_text)
+    
+    def test_sse_connection(self):
+        """測試 SSE 連接"""
+        self.log_util.safe_log_insert("[SSE GUI] 開始測試 SSE 連接\n")
+        
+        try:
+            # 記錄測試前的狀態
+            server_status = self.mcp_sse_manager.get_server_status()
+            self.log_util.safe_log_insert(f"[SSE GUI] 測試前伺服器狀態: {server_status}\n")
+            
+            # 執行連接測試
+            self.log_util.safe_log_insert("[SSE GUI] 呼叫 test_mcp_connection()\n")
+            result = self.mcp_sse_manager.test_mcp_connection()
+            self.log_util.safe_log_insert(f"[SSE GUI] 測試結果: {result}\n")
+            
+            if result["success"]:
+                test_result = result.get('test_result', '未知')
+                message = f"✅ SSE 連接成功\n工具數量: {result['tools_count']}\n可用工具: {', '.join(result['tools'])}\n\n工具測試結果:\n{test_result}"
+                self.log_util.safe_log_insert("[SSE GUI] ✅ SSE 連接測試成功\n")
+                messagebox.showinfo("SSE 連接測試", message)
+            else:
+                error_msg = result.get('error', '未知錯誤')
+                self.log_util.safe_log_insert(f"[SSE GUI] ❌ SSE 連接測試失敗: {error_msg}\n")
+                messagebox.showerror("SSE 連接測試", f"❌ SSE 連接失敗\n錯誤: {error_msg}")
+                
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            self.log_util.safe_log_insert(f"[SSE GUI] ❌ 測試 SSE 連接時發生異常: {e}\n")
+            self.log_util.safe_log_insert(f"[SSE GUI] 錯誤追蹤:\n{error_trace}\n")
+            messagebox.showerror("SSE 連接測試", f"❌ 測試過程發生錯誤：{e}")
+    
+    def create_sse_control_panel(self):
+        """創建 SSE 控制面板"""
+        # 清除主要內容
+        self.clear_main_content()
+        
+        # 創建 SSE 控制面板
+        panel_frame = ctk.CTkFrame(self.main_content)
+        panel_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # 標題
+        title_label = ctk.CTkLabel(
+            panel_frame,
+            text="🌊 SSE 伺服器控制面板",
+            font=get_app_font('title'),
+            text_color=theme.get_color('text_primary')
+        )
+        title_label.pack(pady=(20, 10))
+        
+        # 狀態顯示
+        status_frame = ctk.CTkFrame(panel_frame)
+        status_frame.pack(fill="x", padx=20, pady=10)
+        
+        self.sse_panel_status_label = ctk.CTkLabel(
+            status_frame,
+            text="狀態: 未知",
+            font=get_app_font('body'),
+            text_color=theme.get_color('text_secondary')
+        )
+        self.sse_panel_status_label.pack(pady=10)
+        
+        # 控制按鈕
+        button_frame = ctk.CTkFrame(panel_frame)
+        button_frame.pack(fill="x", padx=20, pady=10)
+        
+        # 啟動/停止按鈕
+        self.sse_panel_toggle_button = ctk.CTkButton(
+            button_frame,
+            text="🚀 啟動 SSE 伺服器",
+            command=self.toggle_sse_server,
+            height=40,
+            font=get_app_font('button'),
+            corner_radius=8,
+            fg_color="#4CAF50",  # 綠色啟動按鈕
+            hover_color="#388E3C"
+        )
+        self.sse_panel_toggle_button.pack(side="left", padx=5)
+        
+        # 測試連接按鈕
+        test_button = ctk.CTkButton(
+            button_frame,
+            text="🧪 測試連接",
+            command=self.test_sse_connection,
+            height=40,
+            font=get_app_font('button'),
+            corner_radius=8,
+            fg_color="#2196F3",  # 藍色測試按鈕
+            hover_color="#1976D2"
+        )
+        test_button.pack(side="left", padx=5)
+        
+        # 查看狀態按鈕
+        status_button = ctk.CTkButton(
+            button_frame,
+            text="📊 查看狀態",
+            command=self.show_sse_status,
+            height=40,
+            font=get_app_font('button'),
+            corner_radius=8,
+            fg_color="#9C27B0",  # 紫色狀態按鈕
+            hover_color="#7B1FA2"
+        )
+        status_button.pack(side="left", padx=5)
+        
+        # 配置信息
+        config_frame = ctk.CTkFrame(panel_frame)
+        config_frame.pack(fill="x", padx=20, pady=10)
+        
+        config_title = ctk.CTkLabel(
+            config_frame,
+            text="⚙️ 配置信息",
+            font=get_app_font('heading'),
+            text_color=theme.get_color('text_primary')
+        )
+        config_title.pack(pady=(10, 5))
+        
+        # 配置詳情
+        config_details = ctk.CTkTextbox(
+            config_frame,
+            height=100,
+            font=get_app_font('body')
+        )
+        config_details.pack(fill="x", padx=10, pady=5)
+        
+        # 插入配置信息
+        config_text = f"""端口: {self.mcp_sse_manager.port}
+整合模式: 直接整合 MCPSSEServer 類別
+Gemini CLI 配置:
+{{
+  "autocad-odoo-sse": {{
+    "url": "http://localhost:{self.mcp_sse_manager.port}/sse",
+    "timeout": 30000,
+    "description": "AutoCAD-Odoo Integration with SSE transport"
+  }}
+}}"""
+        config_details.insert("0.0", config_text)
+        config_details.configure(state="disabled")
+        
+        # 使用說明
+        help_frame = ctk.CTkFrame(panel_frame)
+        help_frame.pack(fill="x", padx=20, pady=10)
+        
+        help_title = ctk.CTkLabel(
+            help_frame,
+            text="💡 使用說明",
+            font=get_app_font('heading'),
+            text_color=theme.get_color('text_primary')
+        )
+        help_title.pack(pady=(10, 5))
+        
+        help_text = ctk.CTkLabel(
+            help_frame,
+            text="1. 點擊 '🚀 啟動 SSE 伺服器' 來啟動伺服器\n2. 伺服器啟動後，可以在 Gemini CLI 中使用 SSE 模式\n3. 使用 '🧪 測試連接' 來驗證伺服器是否正常運行\n4. 查看頂部橫幅的 SSE 狀態指示器瞭解即時狀態",
+            font=get_app_font('body'),
+            text_color=theme.get_color('text_secondary'),
+            justify="left"
+        )
+        help_text.pack(padx=10, pady=5)
+        
+        # 更新面板狀態
+        self.update_sse_panel_status()
+    
+    def update_sse_panel_status(self):
+        """更新 SSE 面板狀態"""
+        if hasattr(self, 'sse_panel_status_label'):
+            status = self.mcp_sse_manager.get_server_status()
+            if status['is_running']:
+                self.sse_panel_status_label.configure(text="狀態: 🟢 運行中")
+                if hasattr(self, 'sse_panel_toggle_button'):
+                    self.sse_panel_toggle_button.configure(
+                        text="⏹️ 停止 SSE 伺服器",
+                        fg_color="#f44336",  # 紅色停止按鈕
+                        hover_color="#d32f2f"
+                    )
+            else:
+                self.sse_panel_status_label.configure(text="狀態: 🔴 已停止")
+                if hasattr(self, 'sse_panel_toggle_button'):
+                    self.sse_panel_toggle_button.configure(
+                        text="🚀 啟動 SSE 伺服器",
+                        fg_color="#4CAF50",  # 綠色啟動按鈕
+                        hover_color="#388E3C"
+                    )
     
     def on_closing(self):
         """視窗關閉事件"""
@@ -667,6 +966,14 @@ class ModernFormMain(ctk.CTk):
                 self.log_util.safe_log_insert("AI助手服務已停止\n")
         except Exception as e:
             self.log_util.safe_log_insert(f"停止AI助手服務失敗: {e}\n")
+        
+        # 停止 SSE 伺服器
+        try:
+            if self.mcp_sse_manager and self.mcp_sse_manager.is_running:
+                self.mcp_sse_manager.cleanup()
+                self.log_util.safe_log_insert("SSE 伺服器已停止\n")
+        except Exception as e:
+            self.log_util.safe_log_insert(f"停止 SSE 伺服器失敗: {e}\n")
         
         if self.log_util:
             self.log_util.safe_log_insert("正在關閉應用程式...\n")

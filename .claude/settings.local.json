@@ -10,7 +10,15 @@
       "Bash(python -m pytest tests/unit/test_mcp_server_manager.py::TestMCPServerManagerInitialization::test_mcp_server_manager_can_be_created -v)",
       "Bash(python -m pytest tests/unit/test_mcp_server_manager.py -v)",
       "Bash(git add:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "mcp__context7__get-library-docs",
+      "WebFetch(domain:modelcontextprotocol.io)",
+      "Bash(pip install:*)",
+      "Bash(mv:*)",
+      "Bash(powershell:*)",
+      "Bash(curl:*)",
+      "WebFetch(domain:gelembjuk.hashnode.dev)",
+      "WebFetch(domain:www.ragie.ai)"
     ],
     "deny": []
   }

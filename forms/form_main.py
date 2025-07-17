@@ -2,6 +2,7 @@
 import logging
 import base64
 import requests
+import time
 import tkinter as tk
 from tkinter import ttk, messagebox
 
@@ -10,6 +11,7 @@ from utility.util_autocad import UtilAutoCAD
 from utility.util_push_to_boq import UtilPushToBoq
 from utility.util_transfer_boq_to_pr import UtilTransferBoqToPr
 from utility.util_log import UtilLog
+from utility.util_mcp_sse_manager import MCPSSEManager
 from forms.form_autocad_param import FormAutoCADParam
 from bravado.requests_client import RequestsClient
 from bravado.client import SwaggerClient
@@ -66,6 +68,10 @@ class FormMain(tk.Tk):
         self.autocad_util = UtilAutoCAD(self.odoo_util, self.log_util)
         self.push_to_boq_util = UtilPushToBoq(self.odoo_util, self.autocad_util, self.log_util)
         self.transfer_boq_to_pr_util = UtilTransferBoqToPr(self.odoo_util, self.autocad_util, self.log_util)
+        
+        # Initialize MCP SSE Manager
+        self.mcp_sse_manager = MCPSSEManager(port=8081)
+        self.mcp_sse_manager.set_status_callback(self.on_mcp_status_update)
 
         # Add buttons to the side menu
         self.add_side_menu_buttons()
@@ -74,6 +80,7 @@ class FormMain(tk.Tk):
         buttons = [
             ("連接到 Odoo", self.connect_odoo, 'button_connect_odoo'),
             ("連接到 AutoCAD", self.connect_autocad, 'button_connect_autocad'),
+            ("🤖 AI助手 (SSE)", self.toggle_mcp_sse, 'button_mcp_sse'),
             ("從 Odoo 獲取參數", self.get_parameters_from_odoo, 'button_get_parameters'),
             ("推送到 BOQ", self.push_to_boq, 'button_push_to_boq'),
             ("轉移 BOQ 到 PR", self.transfer_boq_to_pr, 'button_transfer_boq_to_pr'),
@@ -152,6 +159,131 @@ class FormMain(tk.Tk):
     def show_error_message(self, title, message):
         self.update_idletasks()  # 確保窗口已更新
         messagebox.showerror(title, message, parent=self)
+    
+    def toggle_mcp_sse(self):
+        """Toggle MCP SSE server on/off"""
+        if self.mcp_sse_manager.is_running:
+            self.stop_mcp_sse()
+        else:
+            self.start_mcp_sse()
+    
+    def start_mcp_sse(self):
+        """Start MCP SSE server"""
+        self.clear_main_content()
+        
+        # Create status display
+        status_frame = tk.Frame(self.main_content)
+        status_frame.pack(fill="x", padx=10, pady=5)
+        
+        tk.Label(status_frame, text="🤖 AI助手 SSE 伺服器", font=("Arial", 14, "bold")).pack(anchor="w")
+        
+        self.mcp_status_label = tk.Label(status_frame, text="正在啟動...", fg="orange")
+        self.mcp_status_label.pack(anchor="w")
+        
+        # Create control buttons
+        control_frame = tk.Frame(self.main_content)
+        control_frame.pack(fill="x", padx=10, pady=5)
+        
+        tk.Button(control_frame, text="重新啟動", command=self.restart_mcp_sse).pack(side="left", padx=5)
+        tk.Button(control_frame, text="測試連接", command=self.test_mcp_connection).pack(side="left", padx=5)
+        tk.Button(control_frame, text="伺服器狀態", command=self.show_mcp_status).pack(side="left", padx=5)
+        
+        # Create log display
+        log_frame = tk.Frame(self.main_content)
+        log_frame.pack(fill="both", expand=True, padx=10, pady=5)
+        
+        tk.Label(log_frame, text="伺服器日誌:", font=("Arial", 10, "bold")).pack(anchor="w")
+        
+        self.mcp_log_text = tk.Text(log_frame, height=15, wrap=tk.WORD)
+        scrollbar = tk.Scrollbar(log_frame, orient=tk.VERTICAL, command=self.mcp_log_text.yview)
+        self.mcp_log_text.configure(yscrollcommand=scrollbar.set)
+        
+        self.mcp_log_text.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Start the server
+        import threading
+        threading.Thread(target=self._start_mcp_sse_async, daemon=True).start()
+    
+    def _start_mcp_sse_async(self):
+        """Start MCP SSE server in background thread"""
+        success = self.mcp_sse_manager.start_server()
+        if success:
+            self.after(0, self._update_mcp_button_success)
+        else:
+            self.after(0, self._update_mcp_button_error)
+    
+    def stop_mcp_sse(self):
+        """Stop MCP SSE server"""
+        self.mcp_sse_manager.stop_server()
+        self._update_mcp_button_stopped()
+    
+    def restart_mcp_sse(self):
+        """Restart MCP SSE server"""
+        self.mcp_status_label.config(text="正在重新啟動...", fg="orange")
+        import threading
+        threading.Thread(target=self._restart_mcp_sse_async, daemon=True).start()
+    
+    def _restart_mcp_sse_async(self):
+        """Restart MCP SSE server in background thread"""
+        success = self.mcp_sse_manager.restart_server()
+        if success:
+            self.after(0, self._update_mcp_button_success)
+        else:
+            self.after(0, self._update_mcp_button_error)
+    
+    def test_mcp_connection(self):
+        """Test MCP connection"""
+        result = self.mcp_sse_manager.test_mcp_connection()
+        
+        if result["success"]:
+            message = f"✅ 連接成功\\n工具數量: {result['tools_count']}\\n可用工具: {', '.join(result['tools'])}"
+            messagebox.showinfo("MCP 連接測試", message)
+        else:
+            messagebox.showerror("MCP 連接測試", f"❌ 連接失敗\\n錯誤: {result['error']}")
+    
+    def show_mcp_status(self):
+        """Show detailed MCP server status"""
+        status = self.mcp_sse_manager.get_server_status()
+        
+        status_text = f"""
+伺服器狀態: {'🟢 運行中' if status['is_running'] else '🔴 已停止'}
+端口: {status['port']}
+腳本: {status['server_script']}
+健康檢查: {'✅ 正常' if status['health_check'] else '❌ 異常'}
+        """
+        
+        messagebox.showinfo("MCP 伺服器狀態", status_text)
+    
+    def on_mcp_status_update(self, message: str, is_running: bool):
+        """Callback for MCP status updates"""
+        def update_ui():
+            if hasattr(self, 'mcp_status_label'):
+                color = "green" if is_running else "red"
+                self.mcp_status_label.config(text=message, fg=color)
+            
+            if hasattr(self, 'mcp_log_text'):
+                self.mcp_log_text.insert(tk.END, f"[{time.strftime('%H:%M:%S')}] {message}\\n")
+                self.mcp_log_text.see(tk.END)
+        
+        self.after(0, update_ui)
+    
+    def _update_mcp_button_success(self):
+        """Update MCP button to success state"""
+        self.button_mcp_sse.config(text="🤖 AI助手 (運行中)", bg="green")
+    
+    def _update_mcp_button_error(self):
+        """Update MCP button to error state"""
+        self.button_mcp_sse.config(text="🤖 AI助手 (錯誤)", bg="red")
+    
+    def _update_mcp_button_stopped(self):
+        """Update MCP button to stopped state"""
+        self.button_mcp_sse.config(text="🤖 AI助手 (SSE)", bg="SystemButtonFace")
+    
+    def cleanup(self):
+        """Clean up resources when closing"""
+        if hasattr(self, 'mcp_sse_manager'):
+            self.mcp_sse_manager.cleanup()
 
     def show_info_message(self, title, message):
         self.update_idletasks()  # 確保窗口已更新

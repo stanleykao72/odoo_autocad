@@ -17,11 +17,13 @@ customtkinter>=5.2.0
 pywin32
 
 # MCP (Model Context Protocol) integration
-mcp
+mcp[cli]
 fastapi
 uvicorn[standard]
 websockets
 pydantic
+sse-starlette
+sseclient-py
 
 # Testing framework for TDD
 pytest
@@ -30,6 +32,7 @@ pytest-mock
 pytest-watch
 pytest-html
 pytest-xdist
+pytest-asyncio
 coverage[toml]
 
 # Development and optional dependencies
