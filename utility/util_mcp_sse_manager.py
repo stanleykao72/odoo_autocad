@@ -22,7 +22,7 @@ from mcp_server_fastmcp import mcp
 class MCPSSEManager:
     """Manager for MCP SSE Server in GUI using FastMCP SDK integration"""
     
-    def __init__(self, port: int = 8081):
+    def __init__(self, port: int = 8081, autocad_util=None, odoo_util=None):
         self.port = port
         self.actual_port = port  # Track the actual port where server is running
         self.server = None  # Will hold the FastMCP instance
@@ -31,11 +31,36 @@ class MCPSSEManager:
         self.status_callback = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         
+        # Store shared utility instances
+        self.autocad_util = autocad_util
+        self.odoo_util = odoo_util
+        
         # Configure logging
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)  # 設定更詳細的日誌級別
         
         self.logger.info(f"[SSE Manager] MCPSSEManager 初始化，端口: {port}")
+        
+        # Set shared utility instances in MCP server if provided
+        if autocad_util or odoo_util:
+            self._set_shared_utilities()
+    
+    def _set_shared_utilities(self):
+        """Set shared utility instances in MCP server"""
+        try:
+            # Import the shared utility setter functions
+            from mcp_server_fastmcp import set_shared_autocad_util, set_shared_odoo_util
+            
+            if self.autocad_util:
+                set_shared_autocad_util(self.autocad_util)
+                self.logger.info("[SSE Manager] AutoCAD 工具實例已共享到 MCP 伺服器")
+            
+            if self.odoo_util:
+                set_shared_odoo_util(self.odoo_util)
+                self.logger.info("[SSE Manager] Odoo 工具實例已共享到 MCP 伺服器")
+                
+        except Exception as e:
+            self.logger.error(f"[SSE Manager] 設置共享工具實例時發生錯誤: {e}")
         
     def set_status_callback(self, callback):
         """Set callback function for status updates"""

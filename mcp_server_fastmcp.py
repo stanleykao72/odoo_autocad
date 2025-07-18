@@ -41,6 +41,18 @@ _autocad_util = None
 _odoo_util = None
 _db_util = None
 
+def set_shared_autocad_util(autocad_util):
+    """Set shared AutoCAD utility instance from GUI"""
+    global _autocad_util
+    _autocad_util = autocad_util
+    logger.info("Shared AutoCAD utility instance set from GUI")
+
+def set_shared_odoo_util(odoo_util):
+    """Set shared Odoo utility instance from GUI"""
+    global _odoo_util
+    _odoo_util = odoo_util
+    logger.info("Shared Odoo utility instance set from GUI")
+
 def get_odoo_connection_config():
     """Get Odoo connection configuration from database"""
     try:

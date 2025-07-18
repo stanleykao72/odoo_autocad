@@ -18,7 +18,9 @@
       "Bash(powershell:*)",
       "Bash(curl:*)",
       "WebFetch(domain:gelembjuk.hashnode.dev)",
-      "WebFetch(domain:www.ragie.ai)"
+      "WebFetch(domain:www.ragie.ai)",
+      "Bash(tasklist:*)",
+      "Bash(wmic:*)"
     ],
     "deny": []
   }

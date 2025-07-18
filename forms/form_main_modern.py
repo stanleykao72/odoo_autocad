@@ -101,7 +101,11 @@ class ModernFormMain(ctk.CTk):
         
         # 初始化AI助手相關組件
         self.mcp_server_manager = None  # 將在需要時初始化
-        self.mcp_sse_manager = MCPSSEManager(port=8083)  # SSE 伺服器管理器
+        self.mcp_sse_manager = MCPSSEManager(
+            port=8083, 
+            autocad_util=self.autocad_util, 
+            odoo_util=self.odoo_util
+        )  # SSE 伺服器管理器，傳遞已連接的工具實例
         self.mcp_sse_manager.set_status_callback(self.on_mcp_sse_status_update)
         
         # 自動啟動 SSE 伺服器以供 Gemini CLI 連接
