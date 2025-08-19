@@ -286,8 +286,8 @@ def start_gui_application(enable_mcp=False, mcp_args=None):
             try:
                 form_main.initialize_mcp_server_manager()
                 if form_main.mcp_server_manager:
-                    form_main.mcp_server_manager.start_all_servers()
-                    _logger.info("GUI模式下自動啟動MCP伺服器")
+                    form_main.mcp_server_manager.start_server()
+                    _logger.info("GUI模式下自動啟動MCP SSE伺服器")
             except Exception as e:
                 _logger.warning(f"GUI模式下自動啟動MCP伺服器失敗: {e}")
         

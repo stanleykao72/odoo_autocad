@@ -1,8 +1,8 @@
 # CLAUDE.md
 
-> **版本**: 5.0 (MCP整合完整版)  
-> **最後更新**: 2025年7月16日  
-> **新功能**: AI助手整合，7個MCP工具完整實作，完整TDD覆蓋
+> **版本**: 5.1 (GUI代理執行系統)  
+> **最後更新**: 2025年8月19日  
+> **新功能**: GUI代理執行系統，解決COM線程衝突，完整實現AC6，所有AutoCAD操作線程安全
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -10,7 +10,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Windows desktop application that bridges Odoo ERP and AutoCAD for engineering/construction workflows. The application enables automated extraction of drawing parameters from AutoCAD, manages BOQ (Bill of Quantities), and handles Purchase Requisition processing through Odoo's REST API.
 
-**v5.0 新增功能**: 完整的MCP (Model Context Protocol) 整合，提供AI助手功能，支援自然語言操作AutoCAD和Odoo系統。包含7個完整實作的MCP工具，可透過Gemini CLI進行實際AutoCAD和Odoo系統操作。
+**v5.1 新增功能**: 創新的GUI代理執行系統，完全解決MCP Server與GUI間的COM線程衝突問題。通過消息隊列架構，確保所有AutoCAD COM操作都在GUI主線程中執行，實現真正的線程安全和資料一致性。
+
+**v5.0 功能**: 完整的MCP (Model Context Protocol) 整合，提供AI助手功能，支援自然語言操作AutoCAD和Odoo系統。包含7個完整實作的MCP工具，可透過Gemini CLI進行實際AutoCAD和Odoo系統操作。
 
 ## Architecture
 
@@ -22,6 +24,7 @@ This is a Windows desktop application that bridges Odoo ERP and AutoCAD for engi
 - YAML configuration management for multiple environments
 - **MCP (Model Context Protocol)** with FastMCP SDK for AI助手整合
 - **SSE (Server-Sent Events)** 傳輸協定用於MCP通訊
+- **GUI代理執行系統** 解決COM線程衝突，確保線程安全
 
 ### Key Components
 
@@ -50,6 +53,7 @@ This is a Windows desktop application that bridges Odoo ERP and AutoCAD for engi
 **MCP/AI Assistant**
 - `mcp_server_fastmcp.py` - FastMCP SSE伺服器，提供7個MCP工具
 - `utility/util_mcp_sse_manager.py` - SSE伺服器管理器，與GUI整合
+- `utility/util_gui_proxy.py` - **GUI代理執行系統，解決COM線程衝突 (v5.1新增)**
 
 ## Data Flow
 
@@ -59,11 +63,12 @@ This is a Windows desktop application that bridges Odoo ERP and AutoCAD for engi
 3. **BOQ Processing**: Parameters → Generate BOQ entries → Push to Odoo project
 4. **PR Generation**: BOQ data → Create Purchase Requisitions → Submit to Odoo purchasing workflow
 
-### MCP AI助手工作流程 (v5.0新增)
-1. **SSE Server啟動**: GUI啟動 → MCPSSEManager → FastMCP SSE Server (port 8083)
+### MCP AI助手工作流程 (v5.1優化)
+1. **SSE Server啟動**: GUI啟動 → MCPSSEManager → FastMCP SSE Server (port 8084)
 2. **AI整合**: Gemini CLI連接 → MCP協定 → 自然語言指令
-3. **工具執行**: MCP工具呼叫 → 實際AutoCAD/Odoo操作 → 回傳結果
+3. **GUI代理執行**: MCP工具呼叫 → GUI代理消息隊列 → GUI主線程執行 → 線程安全COM操作
 4. **即時回饋**: 操作結果 → 透過SSE回傳 → AI助手顯示
+5. **線程安全保證**: 所有AutoCAD COM操作都在GUI主線程中執行，完全避免線程衝突
 
 ## Development Commands
 
@@ -450,6 +455,11 @@ output/
 - `forms/form_main_modern.py` - 現代化主表單 (含MCP SSE整合)
 - `tests/` - UI測試檔案目錄
 - `doc/UI_IMPROVEMENT_PLAN.md` - 完整改善計劃
+
+### v5.1 GUI代理執行系統 (新增)
+- `utility/util_gui_proxy.py` - **GUI代理執行系統核心**，消息隊列架構，線程安全COM操作
+- 修改 `utility/util_mcp_sse_manager.py` - 所有AutoCAD工具使用GUI代理執行
+- 修改 `forms/form_main_modern.py` - 整合GUI代理處理器，100ms定時輪詢
 
 ### v5.0 MCP整合檔案
 - `mcp_server_fastmcp.py` - MCP SSE伺服器，7個完整實作工具

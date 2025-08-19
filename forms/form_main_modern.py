@@ -13,6 +13,7 @@ from utility.util_transfer_boq_to_pr import UtilTransferBoqToPr
 from utility.util_log import UtilLog
 from utility.util_mcp_sse_manager import MCPSSEManager
 from ai_assistant.mcp_server_manager import MCPServerManager
+from utility.util_gui_proxy import setup_gui_proxy_handlers, get_gui_proxy
 from forms.form_autocad_param import FormAutoCADParam
 from forms.form_autocad_param_enhanced import EnhancedFormAutoCADParam
 from ui.ui_theme import UITheme, theme
@@ -102,11 +103,18 @@ class ModernFormMain(ctk.CTk):
         # 初始化AI助手相關組件
         self.mcp_server_manager = None  # 將在需要時初始化
         self.mcp_sse_manager = MCPSSEManager(
-            port=8083, 
+            port=8084, 
             autocad_util=self.autocad_util, 
             odoo_util=self.odoo_util
-        )  # SSE 伺服器管理器，傳遞已連接的工具實例
+        )  # 標準 MCP SSE 伺服器管理器，傳遞已連接的工具實例
         self.mcp_sse_manager.set_status_callback(self.on_mcp_sse_status_update)
+        
+        # 初始化GUI代理系統 (解決COM線程問題)
+        self.gui_proxy = setup_gui_proxy_handlers(self.autocad_util, self.log_util)
+        self.log_util.safe_log_insert("[GUI] GUI代理系統已初始化\n")
+        
+        # 啟動GUI代理處理定時器
+        self.start_gui_proxy_processing()
         
         # 自動啟動 SSE 伺服器以供 Gemini CLI 連接
         self.auto_start_sse_server()
@@ -572,6 +580,16 @@ class ModernFormMain(ctk.CTk):
         if self.autocad_util.connected_autocad():
             if self.log_util:
                 self.log_util.safe_log_insert("✅ 與 AutoCAD 連線成功\n")
+            
+            # 更新MCP伺服器的AutoCAD狀態快取
+            if hasattr(self, 'mcp_server_manager') and self.mcp_server_manager:
+                try:
+                    self.mcp_server_manager.update_autocad_status_cache()
+                    if self.log_util:
+                        self.log_util.safe_log_insert("🔄 MCP狀態快取已更新\n")
+                except Exception as e:
+                    if self.log_util:
+                        self.log_util.safe_log_insert(f"⚠️ MCP狀態快取更新失敗: {e}\n")
     
     def get_parameters_from_odoo(self):
         """從Odoo獲取參數 - 使用改進的界面"""
@@ -623,17 +641,17 @@ class ModernFormMain(ctk.CTk):
         messagebox.showinfo(title, message, parent=self)
     
     def initialize_mcp_server_manager(self):
-        """初始化MCP服務管理器"""
+        """初始化MCP SSE服務管理器（使用已存在的mcp_sse_manager）"""
         try:
-            if self.mcp_server_manager is None:
-                self.mcp_server_manager = MCPServerManager(
-                    autocad_util=self.autocad_util,
-                    odoo_util=self.odoo_util,
-                    log_util=self.log_util
-                )
-                self.log_util.safe_log_insert("MCP服務管理器初始化完成\n")
+            # 使用已經初始化的 mcp_sse_manager，將其賦值給 mcp_server_manager
+            # 這樣可以保持與 odoo.py 中自動啟動邏輯的相容性
+            self.mcp_server_manager = self.mcp_sse_manager
+            
+            self.log_util.safe_log_insert("MCP SSE服務管理器已準備就緒（使用共享實例）\n")
+            self.log_util.safe_log_insert(f"MCP伺服器端口: {self.mcp_server_manager.port}\n")
+            
         except Exception as e:
-            self.log_util.safe_log_insert(f"MCP服務管理器初始化失敗: {e}\n")
+            self.log_util.safe_log_insert(f"MCP SSE服務管理器初始化失敗: {e}\n")
             messagebox.showerror("錯誤", f"無法初始化AI助手服務管理器：{e}")
     
     # toggle_mcp_server 方法已移除 - MCP 按鈕已從 UI 中移除
@@ -960,6 +978,25 @@ Gemini CLI 配置:
                         fg_color="#4CAF50",  # 綠色啟動按鈕
                         hover_color="#388E3C"
                     )
+    
+    def start_gui_proxy_processing(self):
+        """啟動GUI代理請求處理"""
+        self.process_gui_proxy_requests()
+    
+    def process_gui_proxy_requests(self):
+        """處理GUI代理請求 (在主線程中運行)"""
+        try:
+            # 處理所有待處理的請求
+            processed = self.gui_proxy.process_requests()
+            
+            if processed > 0:
+                self.log_util.safe_log_insert(f"[GUI Proxy] 處理了 {processed} 個請求\n")
+                
+        except Exception as e:
+            self.log_util.safe_log_insert(f"[GUI Proxy] 處理請求時發生錯誤: {e}\n")
+        
+        # 每100毫秒檢查一次
+        self.after(100, self.process_gui_proxy_requests)
     
     def on_closing(self):
         """視窗關閉事件"""

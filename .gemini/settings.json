@@ -1,14 +1,10 @@
 {
   "mcpServers": {
     "autocad": {
-      "url": "http://localhost:8083/sse",
+      "httpUrl": "http://localhost:8084/messages",
+      "trust": false,
       "timeout": 30000,
-      "description": "AutoCAD-Odoo Integration with FastMCP SSE (Default Port)"
+      "description": "AutoCAD-Odoo Integration"
     }
-    // "autocad-odoo-sse-8083": {
-    //   "url": "http://localhost:8083/sse",
-    //   "timeout": 30000,
-    //   "description": "AutoCAD-Odoo Integration with FastMCP SSE (Custom Port)"
-    // }
   }
 }

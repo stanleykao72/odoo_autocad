@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "autocad": {
+      "url": "http://localhost:8000",
+      "timeout": 30000,
+      "description": "AutoCAD-Odoo Integration (Port 8000)"
+    }
+  }
+}

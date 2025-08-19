@@ -21,6 +21,9 @@ from starlette.routing import Mount, Route
 from starlette.responses import JSONResponse
 from fastapi import FastAPI
 
+# Import the new natural language processor
+from utility.util_nlp_processor import NaturalLanguageProcessor, DrawingIntent
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -40,6 +43,7 @@ mcp = FastMCP("AutoCAD-Odoo Integration")
 _autocad_util = None
 _odoo_util = None
 _db_util = None
+_nlp_processor = None
 
 def set_shared_autocad_util(autocad_util):
     """Set shared AutoCAD utility instance from GUI"""
@@ -111,28 +115,9 @@ def get_odoo_connection_config():
         return None
 
 def get_autocad_util():
-    """Get or create AutoCAD utility instance"""
+    """Get shared AutoCAD utility instance (does not auto-create)"""
     global _autocad_util
-    if _autocad_util is None:
-        try:
-            import sys
-            sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-            from utility.util_autocad import UtilAutoCAD
-            from utility.util_log import UtilLog
-            
-            # Initialize log utility (None for GUI frame since this is server-only)
-            log_util = UtilLog(None)
-            
-            # Get Odoo utility first (AutoCAD utility depends on it)
-            odoo_util = get_odoo_util()
-            if not odoo_util:
-                raise Exception("無法初始化Odoo工具，AutoCAD工具需要Odoo工具")
-            
-            _autocad_util = UtilAutoCAD(odoo_util, log_util)
-            logger.info("AutoCAD utility initialized")
-        except Exception as e:
-            logger.error(f"Failed to initialize AutoCAD utility: {e}")
-            _autocad_util = None
+    # Return shared instance only, do not auto-create
     return _autocad_util
 
 def get_odoo_util():
@@ -274,8 +259,10 @@ def check_autocad_status() -> Dict[str, Any]:
         return {
             "status": "error",
             "connected": False,
-            "message": "AutoCAD utility not available",
-            "error": "Failed to initialize AutoCAD utility"
+            "message": "AutoCAD connection not established",
+            "error": "No shared AutoCAD instance available",
+            "suggestion": "Please connect to AutoCAD through the GUI first, then the MCP server will use the shared connection",
+            "connection_type": "shared_instance_required"
         }
     
     try:
@@ -428,8 +415,10 @@ def extract_autocad_parameters(drawing_path: str = None, use_current_drawing: bo
     if autocad_util is None:
         return {
             "status": "error",
-            "message": "AutoCAD utility not available",
-            "error": "Failed to initialize AutoCAD utility"
+            "message": "AutoCAD connection not established",
+            "error": "No shared AutoCAD instance available",
+            "suggestion": "Please connect to AutoCAD through the GUI first, then the MCP server will use the shared connection",
+            "connection_type": "shared_instance_required"
         }
     
     try:
@@ -767,12 +756,14 @@ def create_new_drawing(
         }
     
     # 檢查 AutoCAD 連接
-    autocad_util = _autocad_util
+    autocad_util = get_autocad_util()
     if not autocad_util:
         return {
             "status": "error",
             "message": "AutoCAD 連接未建立",
-            "error_code": "AUTOCAD_NOT_CONNECTED"
+            "error_code": "AUTOCAD_NOT_CONNECTED",
+            "suggestion": "請先透過GUI建立AutoCAD連接，MCP伺服器將使用共享連接",
+            "connection_type": "shared_instance_required"
         }
     
     # 驗證模板檔案（如果提供）
@@ -868,12 +859,14 @@ def draw_line(
             }
         
         # 檢查 AutoCAD 連接
-        autocad_util = _autocad_util
+        autocad_util = get_autocad_util()
         if not autocad_util:
             return {
                 "status": "error",
                 "message": "AutoCAD 連接未建立",
-                "error_code": "AUTOCAD_NOT_CONNECTED"
+                "error_code": "AUTOCAD_NOT_CONNECTED",
+                "suggestion": "請先透過GUI建立AutoCAD連接，MCP伺服器將使用共享連接",
+                "connection_type": "shared_instance_required"
             }
         
         # 繪製直線
@@ -969,12 +962,14 @@ def draw_circle(
             }
         
         # 檢查 AutoCAD 連接
-        autocad_util = _autocad_util
+        autocad_util = get_autocad_util()
         if not autocad_util:
             return {
                 "status": "error",
                 "message": "AutoCAD 連接未建立",
-                "error_code": "AUTOCAD_NOT_CONNECTED"
+                "error_code": "AUTOCAD_NOT_CONNECTED",
+                "suggestion": "請先透過GUI建立AutoCAD連接，MCP伺服器將使用共享連接",
+                "connection_type": "shared_instance_required"
             }
         
         # 繪製圓形
@@ -1038,12 +1033,14 @@ def set_layer(
             }
         
         # 檢查 AutoCAD 連接
-        autocad_util = _autocad_util
+        autocad_util = get_autocad_util()
         if not autocad_util:
             return {
                 "status": "error",
                 "message": "AutoCAD 連接未建立",
-                "error_code": "AUTOCAD_NOT_CONNECTED"
+                "error_code": "AUTOCAD_NOT_CONNECTED",
+                "suggestion": "請先透過GUI建立AutoCAD連接，MCP伺服器將使用共享連接",
+                "connection_type": "shared_instance_required"
             }
         
         # 設定圖層
@@ -1105,12 +1102,14 @@ def list_layers(
             }
         
         # 檢查 AutoCAD 連接
-        autocad_util = _autocad_util
+        autocad_util = get_autocad_util()
         if not autocad_util:
             return {
                 "status": "error",
                 "message": "AutoCAD 連接未建立",
-                "error_code": "AUTOCAD_NOT_CONNECTED"
+                "error_code": "AUTOCAD_NOT_CONNECTED",
+                "suggestion": "請先透過GUI建立AutoCAD連接，MCP伺服器將使用共享連接",
+                "connection_type": "shared_instance_required"
             }
         
         # 列出圖層
@@ -1184,12 +1183,14 @@ def scan_elements(
                 }
         
         # 檢查 AutoCAD 連接
-        autocad_util = _autocad_util
+        autocad_util = get_autocad_util()
         if not autocad_util:
             return {
                 "status": "error",
                 "message": "AutoCAD 連接未建立",
-                "error_code": "AUTOCAD_NOT_CONNECTED"
+                "error_code": "AUTOCAD_NOT_CONNECTED",
+                "suggestion": "請先透過GUI建立AutoCAD連接，MCP伺服器將使用共享連接",
+                "connection_type": "shared_instance_required"
             }
         
         # 掃描元素
@@ -1272,12 +1273,14 @@ def export_to_database(
                 }
         
         # 檢查 AutoCAD 連接
-        autocad_util = _autocad_util
+        autocad_util = get_autocad_util()
         if not autocad_util:
             return {
                 "status": "error",
                 "message": "AutoCAD 連接未建立",
-                "error_code": "AUTOCAD_NOT_CONNECTED"
+                "error_code": "AUTOCAD_NOT_CONNECTED",
+                "suggestion": "請先透過GUI建立AutoCAD連接，MCP伺服器將使用共享連接",
+                "connection_type": "shared_instance_required"
             }
         
         # 開始計時
@@ -1500,12 +1503,14 @@ def create_text(
             }
         
         # 檢查 AutoCAD 連接
-        autocad_util = _autocad_util
+        autocad_util = get_autocad_util()
         if not autocad_util:
             return {
                 "status": "error",
                 "message": "AutoCAD 連接未建立",
-                "error_code": "AUTOCAD_NOT_CONNECTED"
+                "error_code": "AUTOCAD_NOT_CONNECTED",
+                "suggestion": "請先透過GUI建立AutoCAD連接，MCP伺服器將使用共享連接",
+                "connection_type": "shared_instance_required"
             }
         
         # 創建文字
@@ -1638,12 +1643,14 @@ def add_dimension(
         layer = layer.strip()
         
         # 檢查 AutoCAD 連接
-        autocad_util = _autocad_util
+        autocad_util = get_autocad_util()
         if not autocad_util:
             return {
                 "status": "error",
                 "message": "AutoCAD 連接未建立",
-                "error_code": "AUTOCAD_NOT_CONNECTED"
+                "error_code": "AUTOCAD_NOT_CONNECTED",
+                "suggestion": "請先透過GUI建立AutoCAD連接，MCP伺服器將使用共享連接",
+                "connection_type": "shared_instance_required"
             }
         
         # 創建尺寸
@@ -1758,12 +1765,14 @@ def sync_drawing_to_odoo(
                 }
         
         # 檢查系統連接
-        autocad_util = _autocad_util
+        autocad_util = get_autocad_util()
         if not autocad_util:
             return {
                 "status": "error",
                 "message": "AutoCAD 連接未建立",
-                "error_code": "AUTOCAD_NOT_CONNECTED"
+                "error_code": "AUTOCAD_NOT_CONNECTED",
+                "suggestion": "請先透過GUI建立AutoCAD連接，MCP伺服器將使用共享連接",
+                "connection_type": "shared_instance_required"
             }
         
         odoo_util = _odoo_util
@@ -1965,12 +1974,14 @@ def generate_boq_from_drawing(
             }
         
         # 檢查系統連接
-        autocad_util = _autocad_util
+        autocad_util = get_autocad_util()
         if not autocad_util:
             return {
                 "status": "error",
                 "message": "AutoCAD 連接未建立",
-                "error_code": "AUTOCAD_NOT_CONNECTED"
+                "error_code": "AUTOCAD_NOT_CONNECTED",
+                "suggestion": "請先透過GUI建立AutoCAD連接，MCP伺服器將使用共享連接",
+                "connection_type": "shared_instance_required"
             }
         
         odoo_util = _odoo_util
@@ -2136,6 +2147,122 @@ def generate_boq_from_drawing(
             "error_code": "BOQ_GENERATION_ERROR"
         }
 
+def get_nlp_processor():
+    """Get or create Natural Language Processor instance"""
+    global _nlp_processor
+    if _nlp_processor is None:
+        _nlp_processor = NaturalLanguageProcessor()
+        logger.info("Created new NaturalLanguageProcessor instance")
+    return _nlp_processor
+
+@mcp.tool()
+def process_natural_language_command(
+    command: str,
+    user_context: Dict[str, Any] = None
+) -> Dict[str, Any]:
+    """
+    Process natural language drawing command and execute corresponding CAD operations
+    
+    Args:
+        command: Natural language command in Chinese (e.g., "畫一個半徑10的圓形")
+        user_context: Optional user context for personalization
+    
+    Returns:
+        Dict containing execution result, drawing info, and AI insights
+    """
+    start_time = datetime.now()
+    
+    try:
+        logger.info(f"Processing natural language command: {command}")
+        
+        # Get NLP processor
+        nlp = get_nlp_processor()
+        
+        # Parse the natural language command
+        intent = nlp.parse_drawing_intent(command)
+        
+        if intent.action == "unknown":
+            return {
+                "status": "error",
+                "error_code": "COMMAND_NOT_RECOGNIZED",
+                "message": "無法理解指令",
+                "suggestions": intent.suggestions,
+                "confidence": intent.confidence,
+                "timestamp": start_time.isoformat()
+            }
+        
+        # Execute the corresponding drawing action
+        result = None
+        execution_time = None
+        
+        if intent.action == "draw_circle":
+            logger.info(f"Executing draw_circle with parameters: {intent.parameters}")
+            result = draw_circle(
+                center_point=intent.parameters["center_point"],
+                radius=intent.parameters["radius"],
+                layer=intent.parameters.get("layer", "0")
+            )
+            
+        elif intent.action == "draw_line":
+            logger.info(f"Executing draw_line with parameters: {intent.parameters}")
+            result = draw_line(
+                start_point=intent.parameters["start_point"],
+                end_point=intent.parameters["end_point"],
+                layer=intent.parameters.get("layer", "0")
+            )
+            
+        elif intent.action == "create_text":
+            logger.info(f"Executing create_text with parameters: {intent.parameters}")
+            result = create_text(
+                position=intent.parameters["position"],
+                text_content=intent.parameters["text_content"],
+                height=intent.parameters.get("height", 2.5),
+                layer=intent.parameters.get("layer", "0")
+            )
+        
+        # Calculate execution time
+        end_time = datetime.now()
+        execution_time = (end_time - start_time).total_seconds()
+        
+        # Generate AI insights based on the command and result
+        ai_insights = []
+        if intent.confidence < 0.9:
+            ai_insights.append(f"指令理解置信度: {intent.confidence:.1%}")
+        if intent.suggestions:
+            ai_insights.extend(intent.suggestions)
+        if execution_time > 2.0:
+            ai_insights.append("執行時間較長，建議檢查AutoCAD連接")
+        
+        # Return comprehensive result
+        return {
+            "status": "success",
+            "data": {
+                "original_command": command,
+                "parsed_intent": {
+                    "action": intent.action,
+                    "parameters": intent.parameters,
+                    "confidence": intent.confidence
+                },
+                "drawing_result": result.get("data") if result and result.get("status") == "success" else None,
+                "execution_time": execution_time,
+                "ai_insights": ai_insights
+            },
+            "message": f"成功處理自然語言指令: {intent.action}",
+            "timestamp": end_time.isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in process_natural_language_command: {e}")
+        execution_time = (datetime.now() - start_time).total_seconds()
+        
+        return {
+            "status": "error",
+            "error_code": "NLP_PROCESSING_ERROR",
+            "message": f"自然語言處理失敗: {str(e)}",
+            "execution_time": execution_time,
+            "timestamp": datetime.now().isoformat()
+        }
+
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(description="AutoCAD-Odoo MCP SSE Server")
@@ -2169,7 +2296,7 @@ def main():
             
             # Run FastMCP with SSE transport
             logger.info(f"Starting MCP SSE server on {args.host}:{args.port}")
-            mcp.run(transport="sse", host=args.host, port=args.port)
+            mcp.run(transport="sse")
             
         except KeyboardInterrupt:
             logger.info("Server stopped by user")
