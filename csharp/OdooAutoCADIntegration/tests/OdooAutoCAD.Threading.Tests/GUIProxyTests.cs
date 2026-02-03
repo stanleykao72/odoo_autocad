@@ -2,6 +2,7 @@
 // Unit tests for GUI Proxy
 
 using FluentAssertions;
+using OdooAutoCAD.Core.Threading;
 using Xunit;
 
 namespace OdooAutoCAD.Threading.Tests;

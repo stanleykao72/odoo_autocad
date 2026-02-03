@@ -288,9 +288,9 @@ public class MCPContent
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? MimeType { get; set; }
 
-    public static MCPContent Text(string text) => new() { Type = "text", Text = text };
+    public static MCPContent CreateText(string text) => new() { Type = "text", Text = text };
 
-    public static MCPContent Image(string base64Data, string mimeType = "image/png") =>
+    public static MCPContent CreateImage(string base64Data, string mimeType = "image/png") =>
         new() { Type = "image", Data = base64Data, MimeType = mimeType };
 }
 

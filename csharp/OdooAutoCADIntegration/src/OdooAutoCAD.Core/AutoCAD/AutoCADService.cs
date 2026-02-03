@@ -22,6 +22,29 @@ public class AutoCADService : IAutoCADService, IDisposable
 
     private const string DefaultProgId = "AutoCAD.Application";
 
+    #region COM Interop for GetActiveObject (removed in .NET Core)
+
+    [DllImport("oleaut32.dll", PreserveSig = false)]
+    private static extern void GetActiveObject(ref Guid rclsid, IntPtr pvReserved, [MarshalAs(UnmanagedType.IUnknown)] out object ppunk);
+
+    [DllImport("ole32.dll")]
+    private static extern int CLSIDFromProgID([MarshalAs(UnmanagedType.LPWStr)] string lpszProgID, out Guid pclsid);
+
+    /// <summary>
+    /// Gets an active COM object by ProgID (replacement for Marshal.GetActiveObject in .NET Core)
+    /// </summary>
+    private static object GetActiveObject(string progId)
+    {
+        int hr = CLSIDFromProgID(progId, out Guid clsid);
+        if (hr < 0)
+            Marshal.ThrowExceptionForHR(hr);
+
+        GetActiveObject(ref clsid, IntPtr.Zero, out object obj);
+        return obj;
+    }
+
+    #endregion
+
     public AutoCADService(ILogger<AutoCADService>? logger = null)
     {
         _logger = logger;
@@ -43,7 +66,7 @@ public class AutoCADService : IAutoCADService, IDisposable
             // Try to get running instance first
             try
             {
-                _acadApp = Marshal.GetActiveObject(DefaultProgId);
+                _acadApp = GetActiveObject(DefaultProgId);
                 _logger?.LogInformation("Connected to existing AutoCAD instance");
             }
             catch (COMException)

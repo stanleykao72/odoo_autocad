@@ -4,7 +4,7 @@
 using Microsoft.Extensions.Logging;
 using OdooAutoCAD.Core.AutoCAD;
 using OdooAutoCAD.Core.Odoo;
-using OdooAutoCAD.Threading;
+using OdooAutoCAD.Core.Threading;
 
 namespace OdooAutoCAD.Core.BOQ;
 

@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using OdooAutoCAD.Core.AutoCAD;
 using OdooAutoCAD.Core.Odoo;
 using OdooAutoCAD.MCP.Server;
+using OdooAutoCAD.Core.Threading;
 using OdooAutoCAD.Threading;
 
 namespace OdooAutoCAD.App.ViewModels;
@@ -115,13 +116,13 @@ public partial class MainViewModel : ObservableObject
     {
         if (_mcpServer.IsRunning)
         {
-            MCPStatusText = $"Port {_mcpServer.Port}";
-            MCPStatusColor = Brushes.Green;
+            McpStatusText = $"Port {_mcpServer.Port}";
+            McpStatusColor = Brushes.Green;
         }
         else
         {
-            MCPStatusText = "Stopped";
-            MCPStatusColor = Brushes.Gray;
+            McpStatusText = "Stopped";
+            McpStatusColor = Brushes.Gray;
         }
     }
 

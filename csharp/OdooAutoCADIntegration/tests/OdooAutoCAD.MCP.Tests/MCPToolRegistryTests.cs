@@ -6,9 +6,9 @@ using Moq;
 using OdooAutoCAD.Core.AutoCAD;
 using OdooAutoCAD.Core.BOQ;
 using OdooAutoCAD.Core.Odoo;
+using OdooAutoCAD.Core.Threading;
 using OdooAutoCAD.MCP.Protocol;
 using OdooAutoCAD.MCP.Tools;
-using OdooAutoCAD.Threading;
 using Xunit;
 
 namespace OdooAutoCAD.MCP.Tests;
@@ -236,7 +236,7 @@ public class MCPModelsTests
     public void MCPContent_Text_ShouldCreateTextContent()
     {
         // Arrange & Act
-        var content = MCPContent.Text("Hello World");
+        var content = MCPContent.CreateText("Hello World");
 
         // Assert
         content.Type.Should().Be("text");
@@ -247,7 +247,7 @@ public class MCPModelsTests
     public void MCPContent_Image_ShouldCreateImageContent()
     {
         // Arrange & Act
-        var content = MCPContent.Image("base64data", "image/png");
+        var content = MCPContent.CreateImage("base64data", "image/png");
 
         // Assert
         content.Type.Should().Be("image");

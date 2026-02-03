@@ -13,6 +13,7 @@ using OdooAutoCAD.Core.BOQ;
 using OdooAutoCAD.Core.Odoo;
 using OdooAutoCAD.MCP.Server;
 using OdooAutoCAD.MCP.Tools;
+using OdooAutoCAD.Core.Threading;
 using OdooAutoCAD.Threading;
 using Serilog;
 

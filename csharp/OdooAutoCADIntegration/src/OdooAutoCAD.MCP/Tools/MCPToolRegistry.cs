@@ -7,7 +7,7 @@ using OdooAutoCAD.Core.AutoCAD;
 using OdooAutoCAD.Core.BOQ;
 using OdooAutoCAD.Core.Odoo;
 using OdooAutoCAD.MCP.Protocol;
-using OdooAutoCAD.Threading;
+using OdooAutoCAD.Core.Threading;
 
 namespace OdooAutoCAD.MCP.Tools;
 
@@ -380,7 +380,7 @@ public class MCPToolRegistry
 
         return new MCPToolCallResult
         {
-            Content = new List<MCPContent> { MCPContent.Text(json) },
+            Content = new List<MCPContent> { MCPContent.CreateText(json) },
             IsError = false
         };
     }
@@ -389,7 +389,7 @@ public class MCPToolRegistry
     {
         return new MCPToolCallResult
         {
-            Content = new List<MCPContent> { MCPContent.Text(errorMessage) },
+            Content = new List<MCPContent> { MCPContent.CreateText(errorMessage) },
             IsError = true
         };
     }
