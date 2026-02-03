@@ -1,0 +1,675 @@
+// OdooAutoCAD.Core/Odoo/OdooService.cs
+// Odoo REST API Service Implementation - equivalent to Python util_odoo.py
+
+using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
+
+namespace OdooAutoCAD.Core.Odoo;
+
+/// <summary>
+/// Odoo REST API Service implementation.
+/// Uses HttpClient for REST API communication.
+/// </summary>
+public class OdooService : IOdooService, IDisposable
+{
+    private readonly ILogger<OdooService>? _logger;
+    private readonly HttpClient _httpClient;
+
+    private string? _serverUrl;
+    private string? _database;
+    private string? _username;
+    private string? _sessionId;
+    private int? _userId;
+    private DateTime? _lastSyncTime;
+    private bool _isConnected;
+
+    public OdooService(ILogger<OdooService>? logger = null)
+    {
+        _logger = logger;
+        _httpClient = new HttpClient();
+        _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+    }
+
+    public bool IsConnected => _isConnected && !string.IsNullOrEmpty(_sessionId);
+
+    #region Connection Management
+
+    public async Task<bool> ConnectAsync(string serverUrl, string database, string username, string password)
+    {
+        try
+        {
+            _serverUrl = serverUrl.TrimEnd('/');
+            _database = database;
+            _username = username;
+
+            // Authenticate using JSON-RPC
+            var authRequest = new
+            {
+                jsonrpc = "2.0",
+                method = "call",
+                @params = new
+                {
+                    db = database,
+                    login = username,
+                    password = password
+                },
+                id = 1
+            };
+
+            var response = await PostJsonRpcAsync("/web/session/authenticate", authRequest);
+
+            if (response?.TryGetProperty("result", out var result) == true)
+            {
+                if (result.TryGetProperty("uid", out var uid) && uid.ValueKind != JsonValueKind.False)
+                {
+                    _userId = uid.GetInt32();
+                    _isConnected = true;
+                    _logger?.LogInformation("Connected to Odoo: {ServerUrl}, Database: {Database}, User: {Username}",
+                        _serverUrl, _database, _username);
+                    return true;
+                }
+            }
+
+            _logger?.LogWarning("Authentication failed for user: {Username}", username);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to connect to Odoo");
+            _isConnected = false;
+            return false;
+        }
+    }
+
+    public async Task DisconnectAsync()
+    {
+        _sessionId = null;
+        _userId = null;
+        _isConnected = false;
+        _logger?.LogInformation("Disconnected from Odoo");
+        await Task.CompletedTask;
+    }
+
+    public async Task<OdooStatus> GetStatusAsync()
+    {
+        if (!IsConnected)
+        {
+            return new OdooStatus(
+                IsConnected: false,
+                ServerUrl: _serverUrl,
+                Database: _database,
+                Username: _username,
+                Version: null,
+                ErrorMessage: "Not connected");
+        }
+
+        try
+        {
+            var versionRequest = new
+            {
+                jsonrpc = "2.0",
+                method = "call",
+                @params = new { },
+                id = 1
+            };
+
+            var response = await PostJsonRpcAsync("/web/webclient/version_info", versionRequest);
+            string? version = null;
+
+            if (response?.TryGetProperty("result", out var result) == true)
+            {
+                if (result.TryGetProperty("server_version", out var serverVersion))
+                {
+                    version = serverVersion.GetString();
+                }
+            }
+
+            return new OdooStatus(
+                IsConnected: true,
+                ServerUrl: _serverUrl,
+                Database: _database,
+                Username: _username,
+                Version: version,
+                ErrorMessage: null);
+        }
+        catch (Exception ex)
+        {
+            return new OdooStatus(
+                IsConnected: false,
+                ServerUrl: _serverUrl,
+                Database: _database,
+                Username: _username,
+                Version: null,
+                ErrorMessage: ex.Message);
+        }
+    }
+
+    public async Task<bool> TestConnectionAsync()
+    {
+        try
+        {
+            var status = await GetStatusAsync();
+            return status.IsConnected;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    #endregion
+
+    #region Project Operations
+
+    public async Task<IReadOnlyList<OdooProject>> GetProjectsAsync(bool activeOnly = true)
+    {
+        var domain = activeOnly
+            ? new object[] { new object[] { "active", "=", true } }
+            : Array.Empty<object>();
+
+        var result = await SearchReadAsync("project.project", domain,
+            new[] { "id", "name", "code", "state", "date_start", "date" });
+
+        return result.Select(r => MapToOdooProject(r)).ToList();
+    }
+
+    public async Task<OdooProject?> GetProjectAsync(int projectId)
+    {
+        var result = await ReadAsync("project.project", new[] { projectId },
+            new[] { "id", "name", "code", "state", "date_start", "date" });
+
+        return result.FirstOrDefault() is { } data ? MapToOdooProject(data) : null;
+    }
+
+    public async Task<IReadOnlyList<OdooProject>> SearchProjectsAsync(string searchTerm)
+    {
+        var domain = new object[]
+        {
+            "|",
+            new object[] { "name", "ilike", searchTerm },
+            new object[] { "code", "ilike", searchTerm }
+        };
+
+        var result = await SearchReadAsync("project.project", domain,
+            new[] { "id", "name", "code", "state", "date_start", "date" });
+
+        return result.Select(r => MapToOdooProject(r)).ToList();
+    }
+
+    #endregion
+
+    #region Product Operations
+
+    public async Task<IReadOnlyList<OdooProduct>> GetProductsAsync()
+    {
+        var result = await SearchReadAsync("product.product", Array.Empty<object>(),
+            new[] { "id", "name", "default_code", "description", "list_price", "uom_id", "categ_id" });
+
+        return result.Select(r => MapToOdooProduct(r)).ToList();
+    }
+
+    public async Task<OdooProduct?> GetProductAsync(int productId)
+    {
+        var result = await ReadAsync("product.product", new[] { productId },
+            new[] { "id", "name", "default_code", "description", "list_price", "uom_id", "categ_id" });
+
+        return result.FirstOrDefault() is { } data ? MapToOdooProduct(data) : null;
+    }
+
+    public async Task<IReadOnlyList<OdooProduct>> SearchProductsAsync(string searchTerm)
+    {
+        var domain = new object[]
+        {
+            "|",
+            new object[] { "name", "ilike", searchTerm },
+            new object[] { "default_code", "ilike", searchTerm }
+        };
+
+        var result = await SearchReadAsync("product.product", domain,
+            new[] { "id", "name", "default_code", "description", "list_price", "uom_id", "categ_id" });
+
+        return result.Select(r => MapToOdooProduct(r)).ToList();
+    }
+
+    public async Task<IReadOnlyList<OdooProduct>> GetProductsByCategoryAsync(int categoryId)
+    {
+        var domain = new object[] { new object[] { "categ_id", "=", categoryId } };
+
+        var result = await SearchReadAsync("product.product", domain,
+            new[] { "id", "name", "default_code", "description", "list_price", "uom_id", "categ_id" });
+
+        return result.Select(r => MapToOdooProduct(r)).ToList();
+    }
+
+    #endregion
+
+    #region BOQ Operations
+
+    public async Task<SyncResult> ImportToBOQAsync(IEnumerable<BOQEntry> entries)
+    {
+        var entryList = entries.ToList();
+        int created = 0, updated = 0, failed = 0;
+        var errors = new List<string>();
+
+        foreach (var entry in entryList)
+        {
+            try
+            {
+                var values = new Dictionary<string, object>
+                {
+                    ["project_id"] = entry.ProjectId,
+                    ["product_id"] = entry.ProductId,
+                    ["quantity"] = entry.Quantity,
+                    ["description"] = entry.Description ?? ""
+                };
+
+                if (entry.Id.HasValue)
+                {
+                    // Update existing
+                    await WriteAsync("boq.line", new[] { entry.Id.Value }, values);
+                    updated++;
+                }
+                else
+                {
+                    // Create new
+                    await CreateAsync("boq.line", values);
+                    created++;
+                }
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                errors.Add($"Failed to process entry {entry.ProductName}: {ex.Message}");
+                _logger?.LogWarning(ex, "Failed to import BOQ entry: {ProductName}", entry.ProductName);
+            }
+        }
+
+        _lastSyncTime = DateTime.UtcNow;
+
+        return new SyncResult(
+            Success: failed == 0,
+            RecordsProcessed: entryList.Count,
+            RecordsCreated: created,
+            RecordsUpdated: updated,
+            RecordsFailed: failed,
+            Errors: errors.Count > 0 ? errors : null);
+    }
+
+    public async Task<IReadOnlyList<BOQEntry>> GetBOQEntriesAsync(int projectId)
+    {
+        var domain = new object[] { new object[] { "project_id", "=", projectId } };
+
+        var result = await SearchReadAsync("boq.line", domain,
+            new[] { "id", "project_id", "product_id", "quantity", "uom_id", "unit_price", "description" });
+
+        return result.Select(r => MapToBOQEntry(r)).ToList();
+    }
+
+    public async Task<bool> UpdateBOQEntryAsync(BOQEntry entry)
+    {
+        if (!entry.Id.HasValue) return false;
+
+        try
+        {
+            var values = new Dictionary<string, object>
+            {
+                ["quantity"] = entry.Quantity,
+                ["description"] = entry.Description ?? ""
+            };
+
+            await WriteAsync("boq.line", new[] { entry.Id.Value }, values);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to update BOQ entry: {EntryId}", entry.Id);
+            return false;
+        }
+    }
+
+    public async Task<bool> DeleteBOQEntryAsync(int entryId)
+    {
+        try
+        {
+            await UnlinkAsync("boq.line", new[] { entryId });
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to delete BOQ entry: {EntryId}", entryId);
+            return false;
+        }
+    }
+
+    #endregion
+
+    #region Purchase Requisition Operations
+
+    public async Task<PREntry?> ConvertBOQToPRAsync(int projectId, IEnumerable<int>? boqEntryIds = null)
+    {
+        try
+        {
+            var methodParams = new Dictionary<string, object>
+            {
+                ["project_id"] = projectId
+            };
+
+            if (boqEntryIds != null)
+            {
+                methodParams["boq_entry_ids"] = boqEntryIds.ToArray();
+            }
+
+            // Call custom Odoo method to convert BOQ to PR
+            var response = await CallMethodAsync("boq.line", "convert_to_pr", methodParams);
+
+            if (response?.TryGetProperty("result", out var result) == true)
+            {
+                var prId = result.GetInt32();
+                var prEntries = await GetPurchaseRequisitionsAsync(projectId);
+                return prEntries.FirstOrDefault(pr => pr.Id == prId);
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to convert BOQ to PR for project: {ProjectId}", projectId);
+            return null;
+        }
+    }
+
+    public async Task<IReadOnlyList<PREntry>> GetPurchaseRequisitionsAsync(int projectId)
+    {
+        var domain = new object[] { new object[] { "project_id", "=", projectId } };
+
+        var result = await SearchReadAsync("purchase.requisition", domain,
+            new[] { "id", "name", "state", "line_ids" });
+
+        var entries = new List<PREntry>();
+        foreach (var r in result)
+        {
+            var entry = new PREntry
+            {
+                Id = r.GetProperty("id").GetInt32(),
+                ProjectId = projectId,
+                Reference = r.GetProperty("name").GetString() ?? "",
+                State = r.GetProperty("state").GetString() ?? "draft"
+            };
+            entries.Add(entry);
+        }
+
+        return entries;
+    }
+
+    public async Task<bool> SubmitPRAsync(int prId)
+    {
+        try
+        {
+            await CallMethodAsync("purchase.requisition", "action_submit", new { id = prId });
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to submit PR: {PRId}", prId);
+            return false;
+        }
+    }
+
+    #endregion
+
+    #region Synchronization
+
+    public async Task<SyncResult> SyncToOdooAsync(object data, string syncType)
+    {
+        try
+        {
+            return syncType.ToLower() switch
+            {
+                "parameters" => await SyncParametersAsync(data),
+                "boq" => await SyncBOQAsync(data),
+                "project" => await SyncProjectAsync(data),
+                _ => new SyncResult(false, 0, 0, 0, 0, new List<string> { $"Unknown sync type: {syncType}" })
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Sync to Odoo failed: {SyncType}", syncType);
+            return new SyncResult(false, 0, 0, 0, 0, new List<string> { ex.Message });
+        }
+    }
+
+    public DateTime? GetLastSyncTime() => _lastSyncTime;
+
+    private async Task<SyncResult> SyncParametersAsync(object data)
+    {
+        // Implementation for syncing parameters
+        await Task.CompletedTask;
+        return new SyncResult(true, 0, 0, 0, 0, null);
+    }
+
+    private async Task<SyncResult> SyncBOQAsync(object data)
+    {
+        if (data is IEnumerable<BOQEntry> entries)
+        {
+            return await ImportToBOQAsync(entries);
+        }
+
+        return new SyncResult(false, 0, 0, 0, 0, new List<string> { "Invalid BOQ data format" });
+    }
+
+    private async Task<SyncResult> SyncProjectAsync(object data)
+    {
+        // Implementation for syncing project data
+        await Task.CompletedTask;
+        return new SyncResult(true, 0, 0, 0, 0, null);
+    }
+
+    #endregion
+
+    #region Private Helper Methods
+
+    private async Task<JsonElement?> PostJsonRpcAsync(string endpoint, object request)
+    {
+        var json = JsonSerializer.Serialize(request);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        var response = await _httpClient.PostAsync($"{_serverUrl}{endpoint}", content);
+        response.EnsureSuccessStatusCode();
+
+        var responseJson = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<JsonElement>(responseJson);
+    }
+
+    private async Task<IReadOnlyList<JsonElement>> SearchReadAsync(
+        string model, object[] domain, string[] fields, int? limit = null)
+    {
+        var request = new
+        {
+            jsonrpc = "2.0",
+            method = "call",
+            @params = new
+            {
+                model,
+                method = "search_read",
+                args = new object[] { domain },
+                kwargs = new { fields, limit = limit ?? 0 }
+            },
+            id = 1
+        };
+
+        var response = await PostJsonRpcAsync("/web/dataset/call_kw", request);
+
+        if (response?.TryGetProperty("result", out var result) == true)
+        {
+            return result.EnumerateArray().ToList();
+        }
+
+        return Array.Empty<JsonElement>();
+    }
+
+    private async Task<IReadOnlyList<JsonElement>> ReadAsync(string model, int[] ids, string[] fields)
+    {
+        var request = new
+        {
+            jsonrpc = "2.0",
+            method = "call",
+            @params = new
+            {
+                model,
+                method = "read",
+                args = new object[] { ids, fields }
+            },
+            id = 1
+        };
+
+        var response = await PostJsonRpcAsync("/web/dataset/call_kw", request);
+
+        if (response?.TryGetProperty("result", out var result) == true)
+        {
+            return result.EnumerateArray().ToList();
+        }
+
+        return Array.Empty<JsonElement>();
+    }
+
+    private async Task<int> CreateAsync(string model, Dictionary<string, object> values)
+    {
+        var request = new
+        {
+            jsonrpc = "2.0",
+            method = "call",
+            @params = new
+            {
+                model,
+                method = "create",
+                args = new object[] { values }
+            },
+            id = 1
+        };
+
+        var response = await PostJsonRpcAsync("/web/dataset/call_kw", request);
+
+        if (response?.TryGetProperty("result", out var result) == true)
+        {
+            return result.GetInt32();
+        }
+
+        throw new Exception("Failed to create record");
+    }
+
+    private async Task WriteAsync(string model, int[] ids, Dictionary<string, object> values)
+    {
+        var request = new
+        {
+            jsonrpc = "2.0",
+            method = "call",
+            @params = new
+            {
+                model,
+                method = "write",
+                args = new object[] { ids, values }
+            },
+            id = 1
+        };
+
+        await PostJsonRpcAsync("/web/dataset/call_kw", request);
+    }
+
+    private async Task UnlinkAsync(string model, int[] ids)
+    {
+        var request = new
+        {
+            jsonrpc = "2.0",
+            method = "call",
+            @params = new
+            {
+                model,
+                method = "unlink",
+                args = new object[] { ids }
+            },
+            id = 1
+        };
+
+        await PostJsonRpcAsync("/web/dataset/call_kw", request);
+    }
+
+    private async Task<JsonElement?> CallMethodAsync(string model, string method, object args)
+    {
+        var request = new
+        {
+            jsonrpc = "2.0",
+            method = "call",
+            @params = new
+            {
+                model,
+                method,
+                args = new object[] { args }
+            },
+            id = 1
+        };
+
+        return await PostJsonRpcAsync("/web/dataset/call_kw", request);
+    }
+
+    private static OdooProject MapToOdooProject(JsonElement data)
+    {
+        return new OdooProject(
+            Id: data.GetProperty("id").GetInt32(),
+            Name: data.GetProperty("name").GetString() ?? "",
+            Code: data.TryGetProperty("code", out var code) && code.ValueKind == JsonValueKind.String
+                ? code.GetString() : null,
+            State: data.TryGetProperty("state", out var state) ? state.GetString() ?? "draft" : "draft",
+            DateStart: data.TryGetProperty("date_start", out var dateStart) && dateStart.ValueKind == JsonValueKind.String
+                ? DateTime.Parse(dateStart.GetString()!) : null,
+            DateEnd: data.TryGetProperty("date", out var dateEnd) && dateEnd.ValueKind == JsonValueKind.String
+                ? DateTime.Parse(dateEnd.GetString()!) : null);
+    }
+
+    private static OdooProduct MapToOdooProduct(JsonElement data)
+    {
+        return new OdooProduct(
+            Id: data.GetProperty("id").GetInt32(),
+            Name: data.GetProperty("name").GetString() ?? "",
+            Code: data.TryGetProperty("default_code", out var code) && code.ValueKind == JsonValueKind.String
+                ? code.GetString() : null,
+            Description: data.TryGetProperty("description", out var desc) && desc.ValueKind == JsonValueKind.String
+                ? desc.GetString() : null,
+            ListPrice: data.TryGetProperty("list_price", out var price) && price.ValueKind == JsonValueKind.Number
+                ? price.GetDecimal() : null,
+            UnitOfMeasure: data.TryGetProperty("uom_id", out var uom) && uom.ValueKind == JsonValueKind.Array
+                ? uom[1].GetString() : null,
+            Category: data.TryGetProperty("categ_id", out var cat) && cat.ValueKind == JsonValueKind.Array
+                ? cat[1].GetString() : null);
+    }
+
+    private static BOQEntry MapToBOQEntry(JsonElement data)
+    {
+        return new BOQEntry
+        {
+            Id = data.GetProperty("id").GetInt32(),
+            ProjectId = data.TryGetProperty("project_id", out var projId) && projId.ValueKind == JsonValueKind.Array
+                ? projId[0].GetInt32() : 0,
+            ProductId = data.TryGetProperty("product_id", out var prodId) && prodId.ValueKind == JsonValueKind.Array
+                ? prodId[0].GetInt32() : 0,
+            ProductName = data.TryGetProperty("product_id", out var prodName) && prodName.ValueKind == JsonValueKind.Array
+                ? prodName[1].GetString() ?? "" : "",
+            Quantity = data.TryGetProperty("quantity", out var qty) ? qty.GetDecimal() : 0,
+            UnitOfMeasure = data.TryGetProperty("uom_id", out var uom) && uom.ValueKind == JsonValueKind.Array
+                ? uom[1].GetString() ?? "pcs" : "pcs",
+            UnitPrice = data.TryGetProperty("unit_price", out var price) && price.ValueKind == JsonValueKind.Number
+                ? price.GetDecimal() : null,
+            Description = data.TryGetProperty("description", out var desc) && desc.ValueKind == JsonValueKind.String
+                ? desc.GetString() : null
+        };
+    }
+
+    #endregion
+
+    public void Dispose()
+    {
+        _httpClient.Dispose();
+        GC.SuppressFinalize(this);
+    }
+}
