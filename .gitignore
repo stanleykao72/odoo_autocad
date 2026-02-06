@@ -52,6 +52,11 @@ installer/*.msi
 # Keep ISS configuration files
 !installer/*.iss
 
+# C# build outputs
+csharp/publish/
+csharp/installer/*.exe
+!csharp/installer/*.iss
+
 # Certificates directory - exclude sensitive files but keep documentation
 certs/*.pfx
 certs/*.p12
