@@ -24,18 +24,18 @@ public class MCPToolRegistry
 {
     private readonly ILogger<MCPToolRegistry>? _logger;
     private readonly IGUIProxy _guiProxy;
-    private readonly IAutoCADService _autoCADService;
-    private readonly IOdooService _odooService;
-    private readonly IBOQProcessor _boqProcessor;
+    private readonly IAutoCADService? _autoCADService;
+    private readonly IOdooService? _odooService;
+    private readonly IBOQProcessor? _boqProcessor;
 
     private readonly Dictionary<string, MCPTool> _toolDefinitions = new();
     private readonly Dictionary<string, MCPToolExecutor> _toolExecutors = new();
 
     public MCPToolRegistry(
         IGUIProxy guiProxy,
-        IAutoCADService autoCADService,
-        IOdooService odooService,
-        IBOQProcessor boqProcessor,
+        IAutoCADService? autoCADService = null,
+        IOdooService? odooService = null,
+        IBOQProcessor? boqProcessor = null,
         ILogger<MCPToolRegistry>? logger = null)
     {
         _guiProxy = guiProxy;
@@ -248,6 +248,11 @@ public class MCPToolRegistry
 
     private async Task<MCPToolCallResult> CheckOdooStatusAsync(Dictionary<string, object?>? arguments)
     {
+        if (_odooService == null)
+        {
+            return CreateErrorResult("Odoo service is not configured. Please set up Odoo connection in Settings.");
+        }
+
         try
         {
             var status = await _odooService.GetStatusAsync();
@@ -294,6 +299,11 @@ public class MCPToolRegistry
 
     private async Task<MCPToolCallResult> SyncToOdooAsync(Dictionary<string, object?>? arguments)
     {
+        if (_odooService == null)
+        {
+            return CreateErrorResult("Odoo service is not configured. Please set up Odoo connection in Settings.");
+        }
+
         var data = arguments?.GetValueOrDefault("data");
         var syncType = arguments?.GetValueOrDefault("sync_type") as string;
 
@@ -326,6 +336,11 @@ public class MCPToolRegistry
 
     private async Task<MCPToolCallResult> GenerateBOQAsync(Dictionary<string, object?>? arguments)
     {
+        if (_boqProcessor == null)
+        {
+            return CreateErrorResult("BOQ processor is not configured. Please set up connections first.");
+        }
+
         var projectIdObj = arguments?.GetValueOrDefault("project_id");
         var includeAutoCADData = arguments?.GetValueOrDefault("include_autocad_data") as bool? ?? true;
 

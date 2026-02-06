@@ -74,18 +74,21 @@ public partial class App : Application
         // Core services
         services.AddSingleton<IGUIProxy, GUIProxy>();
 
-        // Register service implementations (these will be created later)
-        // For now, use placeholder registrations
-        services.AddSingleton<IAutoCADService>(sp =>
-            throw new NotImplementedException("AutoCADService not yet implemented"));
-        services.AddSingleton<IOdooService>(sp =>
-            throw new NotImplementedException("OdooService not yet implemented"));
-        services.AddSingleton<IBOQProcessor>(sp =>
-            throw new NotImplementedException("BOQProcessor not yet implemented"));
+        // Note: IAutoCADService, IOdooService, IBOQProcessor are not registered yet.
+        // They will be added when real implementations are available.
+        // MCPToolRegistry accepts them as optional (nullable) parameters.
 
-        // MCP services
-        services.AddSingleton<MCPToolRegistry>();
-        services.AddSingleton<MCPSSEServer>();
+        // MCP services - use factory to control construction
+        services.AddSingleton<MCPToolRegistry>(sp => new MCPToolRegistry(
+            sp.GetRequiredService<IGUIProxy>(),
+            sp.GetService<IAutoCADService>(),
+            sp.GetService<IOdooService>(),
+            sp.GetService<IBOQProcessor>(),
+            sp.GetService<ILogger<MCPToolRegistry>>()));
+        services.AddSingleton<MCPSSEServer>(sp => new MCPSSEServer(
+            sp.GetRequiredService<MCPToolRegistry>(),
+            8084,
+            sp.GetService<ILogger<MCPSSEServer>>()));
 
         // ViewModels
         services.AddTransient<MainViewModel>();
