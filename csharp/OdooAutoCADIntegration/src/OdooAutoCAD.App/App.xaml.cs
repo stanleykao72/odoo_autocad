@@ -34,6 +34,11 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // Global exception handlers
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+
         // Configure Serilog
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
@@ -43,30 +48,73 @@ public partial class App : Application
                 retainedFileCountLimit: 7)
             .CreateLogger();
 
-        // Build host with DI
-        _host = Host.CreateDefaultBuilder()
-            .UseSerilog()
-            .ConfigureServices((context, services) =>
-            {
-                ConfigureServices(services);
-            })
-            .Build();
-
-        Services = _host.Services;
-
-        // Start the host
-        await _host.StartAsync();
-
-        // Initialize GUI Proxy timer
-        InitializeGUIProxyTimer();
-
-        // Check for --enable-mcp flag
-        if (e.Args.Contains("--enable-mcp"))
+        try
         {
-            await StartMCPServerAsync();
-        }
+            // Build host with DI
+            _host = Host.CreateDefaultBuilder()
+                .UseSerilog()
+                .ConfigureServices((context, services) =>
+                {
+                    ConfigureServices(services);
+                })
+                .Build();
 
-        Log.Information("Application started");
+            Services = _host.Services;
+
+            // Start the host
+            await _host.StartAsync();
+
+            // Initialize GUI Proxy timer
+            InitializeGUIProxyTimer();
+
+            // Check for --enable-mcp flag
+            if (e.Args.Contains("--enable-mcp"))
+            {
+                await StartMCPServerAsync();
+            }
+
+            // Manually create and show the main window
+            var mainWindow = new Views.MainWindow();
+            mainWindow.Show();
+
+            Log.Information("Application started successfully with main window");
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "Application startup failed");
+            await Log.CloseAndFlushAsync();
+            MessageBox.Show(
+                $"Application failed to start:\n\n{ex.Message}\n\n{ex.StackTrace}",
+                "Startup Error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            Shutdown(1);
+        }
+    }
+
+    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        Log.Error(e.Exception, "Unhandled dispatcher exception");
+        MessageBox.Show(
+            $"An error occurred:\n\n{e.Exception.Message}",
+            "Error",
+            MessageBoxButton.OK,
+            MessageBoxImage.Error);
+        e.Handled = true;
+    }
+
+    private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        if (e.ExceptionObject is Exception ex)
+        {
+            Log.Fatal(ex, "Unhandled domain exception");
+        }
+    }
+
+    private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        Log.Error(e.Exception, "Unobserved task exception");
+        e.SetObserved();
     }
 
     private void ConfigureServices(IServiceCollection services)
