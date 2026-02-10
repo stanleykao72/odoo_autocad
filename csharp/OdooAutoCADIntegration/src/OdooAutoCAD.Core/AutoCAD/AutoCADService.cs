@@ -223,83 +223,65 @@ public class AutoCADService : IAutoCADService, IDisposable
     /// <summary>
     /// Internal connection method executed on GUI thread.
     /// Implements retry logic for ActiveDocument (5 attempts, 1-second intervals).
-    /// Uses GetActiveObject → CreateInstance fallback pattern.
+    ///
+    /// Uses Activator.CreateInstance (CoCreateInstance) as the PRIMARY connection method.
+    /// AutoCAD is a singleton COM server, so CoCreateInstance returns the existing
+    /// running instance — no need for GetActiveObject (ROT lookup).
+    ///
+    /// This approach avoids the P/Invoke GetActiveObject code path which triggers
+    /// "Unhandled Access Violation Reading 0x0050 Exception at 53ac1e63h" crashes
+    /// in AutoCAD 2014. The CoCreateInstance path uses COM's standard class factory
+    /// mechanism which is more compatible with older AutoCAD versions.
+    ///
+    /// All property access uses Type.InvokeMember instead of dynamic/DLR to give
+    /// explicit control over IDispatch calls and avoid DLR overhead.
     /// </summary>
     private bool ConnectInternal()
     {
         try
         {
             // Register COM message filter to handle rejected calls from AutoCAD.
-            // AutoCAD (2010+) rejects COM calls during WPF layout processing,
-            // which causes "Unhandled Access Violation" crashes without this filter.
-            // The filter auto-retries rejected calls after 1 second.
             OleMessageFilter.Register();
 
-            bool isNewInstance = false;
-
-            // Try to get running instance first using GetActiveObject
-            // (matches Python: client.GetActiveObject("AutoCAD.Application"))
-            try
+            // Use Activator.CreateInstance (CoCreateInstance) as primary method.
+            // For singleton COM servers like AutoCAD, this returns the existing
+            // running instance — equivalent to Python's client.Dispatch().
+            var acadType = Type.GetTypeFromProgID(DefaultProgId);
+            if (acadType == null)
             {
-                _acadApp = GetActiveObject(DefaultProgId);
-                _logger?.LogInformation("Connected to existing AutoCAD instance via GetActiveObject");
-            }
-            catch (COMException ex)
-            {
-                _logger?.LogDebug(ex, "GetActiveObject failed, trying Activator.CreateInstance");
-
-                // Fallback: Try to create new instance
-                // (matches Python: client.Dispatch("AutoCAD.Application"))
-                var acadType = Type.GetTypeFromProgID(DefaultProgId);
-                if (acadType == null)
-                {
-                    _logger?.LogError("AutoCAD is not installed or ProgID not found");
-                    return false;
-                }
-
-                _acadApp = Activator.CreateInstance(acadType);
-                isNewInstance = true;
-                _logger?.LogInformation("Created new AutoCAD instance");
-            }
-
-            if (_acadApp == null)
-            {
-                _logger?.LogError("Failed to obtain AutoCAD COM object");
+                _logger?.LogError("AutoCAD is not installed or ProgID '{ProgId}' not found", DefaultProgId);
                 return false;
             }
 
-            // Only set Visible on newly created instances (matching Python behavior).
-            // Setting Visible on an already-running AutoCAD 2014 instance can trigger
-            // an access violation (0x0050) inside AutoCAD's COM server.
-            // Also: no Thread.Sleep here — blocking the STA message pump prevents COM
-            // message processing and can cause the out-of-process server to crash.
-            if (isNewInstance)
+            _acadApp = Activator.CreateInstance(acadType);
+            if (_acadApp == null)
             {
-                try
-                {
-                    _acadApp.Visible = true;
-                    _logger?.LogDebug("Set AutoCAD.Visible = true (new instance)");
-                }
-                catch (COMException ex)
-                {
-                    _logger?.LogWarning(ex, "Failed to set AutoCAD.Visible (non-fatal, continuing)");
-                }
+                _logger?.LogError("Failed to create AutoCAD COM instance");
+                return false;
             }
+
+            _logger?.LogInformation("Connected to AutoCAD via Activator.CreateInstance (CoCreateInstance)");
 
             // Retry logic for ActiveDocument (5 attempts, 1-second intervals)
             // Matches Python: retry_count = 5, time.sleep(1)
+            // Uses Type.InvokeMember instead of dynamic to avoid DLR overhead
+            // and give explicit control over IDispatch calls.
             for (int attempt = 1; attempt <= MaxRetryAttempts; attempt++)
             {
                 try
                 {
-                    _acadDoc = _acadApp.ActiveDocument;
+                    _acadDoc = _acadApp.GetType().InvokeMember(
+                        "ActiveDocument",
+                        System.Reflection.BindingFlags.GetProperty,
+                        null, _acadApp, null);
                     if (_acadDoc != null)
                     {
                         _logger?.LogInformation("ActiveDocument acquired on attempt {Attempt}", attempt);
                         break;
                     }
                 }
-                catch (COMException ex)
+                catch (Exception ex) when (ex is COMException || ex.InnerException is COMException
+                                           || ex is System.Reflection.TargetInvocationException)
                 {
                     _logger?.LogDebug(ex, "ActiveDocument attempt {Attempt} failed", attempt);
                 }
@@ -313,7 +295,6 @@ public class AutoCADService : IAutoCADService, IDisposable
             if (_acadDoc == null)
             {
                 _logger?.LogWarning("ActiveDocument is null after {Attempts} attempts", MaxRetryAttempts);
-                // Still consider it connected even if no document is open
             }
 
             _isConnected = true;
