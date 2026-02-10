@@ -3,6 +3,7 @@
 
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
+using OdooAutoCAD.Core.Threading;
 
 namespace OdooAutoCAD.Core.AutoCAD;
 
@@ -16,11 +17,14 @@ namespace OdooAutoCAD.Core.AutoCAD;
 public class AutoCADService : IAutoCADService, IDisposable
 {
     private readonly ILogger<AutoCADService>? _logger;
+    private readonly IGUIProxy _guiProxy;
     private dynamic? _acadApp;
     private dynamic? _acadDoc;
     private bool _isConnected;
 
     private const string DefaultProgId = "AutoCAD.Application";
+    private const int MaxRetryAttempts = 5;
+    private const int RetryDelayMs = 1000;
 
     #region COM Interop for GetActiveObject (removed in .NET Core)
 
@@ -45,33 +49,162 @@ public class AutoCADService : IAutoCADService, IDisposable
 
     #endregion
 
-    public AutoCADService(ILogger<AutoCADService>? logger = null)
+    public AutoCADService(IGUIProxy guiProxy, ILogger<AutoCADService>? logger = null)
     {
+        _guiProxy = guiProxy ?? throw new ArgumentNullException(nameof(guiProxy));
         _logger = logger;
+
+        // Register GUI proxy handlers for AutoCAD operations
+        RegisterGUIProxyHandlers();
     }
 
-    public bool IsConnected => _isConnected && _acadApp != null;
+    /// <summary>
+    /// Registers handlers for AutoCAD operations in the GUI proxy.
+    /// This ensures all COM operations are executed on the STA thread.
+    /// </summary>
+    private void RegisterGUIProxyHandlers()
+    {
+        _guiProxy.RegisterHandler("autocad_connect", async (parameters) =>
+        {
+            return await Task.FromResult(ConnectInternal());
+        });
+
+        _guiProxy.RegisterHandler("autocad_disconnect", async (parameters) =>
+        {
+            DisconnectInternal();
+            return await Task.FromResult<object?>(null);
+        });
+
+        _guiProxy.RegisterHandler("autocad_get_status", async (parameters) =>
+        {
+            return await Task.FromResult(GetStatusInternal());
+        });
+
+        _guiProxy.RegisterHandler("autocad_get_layouts", async (parameters) =>
+        {
+            return await Task.FromResult(GetLayoutsInternal());
+        });
+
+        _guiProxy.RegisterHandler("autocad_get_active_layout", async (parameters) =>
+        {
+            return await Task.FromResult(GetCurrentLayoutName());
+        });
+
+        _guiProxy.RegisterHandler("autocad_set_active_layout", async (parameters) =>
+        {
+            parameters.TryGetValue("layoutName", out var val);
+            var layoutName = val as string;
+            if (layoutName != null)
+            {
+                return await Task.FromResult(SwitchToLayout(layoutName));
+            }
+            return await Task.FromResult(false);
+        });
+
+        _guiProxy.RegisterHandler("autocad_extract_parameters", async (parameters) =>
+        {
+            parameters.TryGetValue("layoutName", out var val);
+            var layoutName = val as string;
+            if (layoutName != null)
+            {
+                return await Task.FromResult(GetLayoutValuesInternal(layoutName));
+            }
+            return await Task.FromResult(new LayoutData());
+        });
+
+        _guiProxy.RegisterHandler("autocad_open_document", async (parameters) =>
+        {
+            parameters.TryGetValue("filePath", out var val);
+            var filePath = val as string;
+            if (string.IsNullOrEmpty(filePath) || !_isConnected) return await Task.FromResult(false);
+            try
+            {
+                _acadDoc = _acadApp!.Documents.Open(filePath);
+                _logger?.LogInformation("Opened document: {FilePath}", filePath);
+                return await Task.FromResult(true);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to open document: {FilePath}", filePath);
+                return await Task.FromResult(false);
+            }
+        });
+
+        _guiProxy.RegisterHandler("autocad_save_document", async (parameters) =>
+        {
+            if (_acadDoc == null) return await Task.FromResult(false);
+            try
+            {
+                _acadDoc.Save();
+                _logger?.LogInformation("Document saved");
+                return await Task.FromResult(true);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to save document");
+                return await Task.FromResult(false);
+            }
+        });
+
+        _guiProxy.RegisterHandler("autocad_close_document", async (parameters) =>
+        {
+            if (_acadDoc == null) return await Task.FromResult(false);
+            try
+            {
+                var save = true;
+                if (parameters.TryGetValue("save", out var saveProp) && saveProp is bool s)
+                    save = s;
+                _acadDoc.Close(save);
+                _acadDoc = _acadApp?.ActiveDocument;
+                _logger?.LogInformation("Document closed");
+                return await Task.FromResult(true);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to close document");
+                return await Task.FromResult(false);
+            }
+        });
+
+        _logger?.LogDebug("AutoCAD GUI proxy handlers registered");
+    }
+
+    // Only use the boolean flag — touching _acadApp from a non-STA thread triggers COM marshaling
+    // and can cause access violations inside AutoCAD.
+    public bool IsConnected => _isConnected;
 
     #region Connection Management
 
     public async Task<bool> ConnectAsync()
     {
-        return await Task.Run(() => Connect());
+        var response = await _guiProxy.ExecuteInGuiAsync("autocad_connect", null, timeout: 15000);
+        return response.Success && response.Result is bool connected && connected;
     }
 
-    private bool Connect()
+    /// <summary>
+    /// Internal connection method executed on GUI thread.
+    /// Implements retry logic for ActiveDocument (5 attempts, 1-second intervals).
+    /// Uses GetActiveObject → CreateInstance fallback pattern.
+    /// </summary>
+    private bool ConnectInternal()
     {
         try
         {
-            // Try to get running instance first
+            bool isNewInstance = false;
+
+            // Try to get running instance first using GetActiveObject
+            // (matches Python: client.GetActiveObject("AutoCAD.Application"))
             try
             {
                 _acadApp = GetActiveObject(DefaultProgId);
-                _logger?.LogInformation("Connected to existing AutoCAD instance");
+                _logger?.LogInformation("Connected to existing AutoCAD instance via GetActiveObject");
             }
-            catch (COMException)
+            catch (COMException ex)
             {
-                // No running instance, try to create new
+                _logger?.LogDebug(ex, "GetActiveObject failed, trying Activator.CreateInstance");
+
+                // Fallback: Try to create new instance
+                // (matches Python: client.Dispatch("AutoCAD.Application"))
                 var acadType = Type.GetTypeFromProgID(DefaultProgId);
                 if (acadType == null)
                 {
@@ -80,18 +213,72 @@ public class AutoCADService : IAutoCADService, IDisposable
                 }
 
                 _acadApp = Activator.CreateInstance(acadType);
-                _acadApp.Visible = true;
-                _logger?.LogInformation("Started new AutoCAD instance");
+                isNewInstance = true;
+                _logger?.LogInformation("Created new AutoCAD instance");
             }
 
-            _acadDoc = _acadApp?.ActiveDocument;
-            _isConnected = true;
+            if (_acadApp == null)
+            {
+                _logger?.LogError("Failed to obtain AutoCAD COM object");
+                return false;
+            }
 
+            // Only set Visible on newly created instances (matching Python behavior).
+            // Setting Visible on an already-running AutoCAD 2014 instance can trigger
+            // an access violation (0x0050) inside AutoCAD's COM server.
+            // Also: no Thread.Sleep here — blocking the STA message pump prevents COM
+            // message processing and can cause the out-of-process server to crash.
+            if (isNewInstance)
+            {
+                try
+                {
+                    _acadApp.Visible = true;
+                    _logger?.LogDebug("Set AutoCAD.Visible = true (new instance)");
+                }
+                catch (COMException ex)
+                {
+                    _logger?.LogWarning(ex, "Failed to set AutoCAD.Visible (non-fatal, continuing)");
+                }
+            }
+
+            // Retry logic for ActiveDocument (5 attempts, 1-second intervals)
+            // Matches Python: retry_count = 5, time.sleep(1)
+            for (int attempt = 1; attempt <= MaxRetryAttempts; attempt++)
+            {
+                try
+                {
+                    _acadDoc = _acadApp.ActiveDocument;
+                    if (_acadDoc != null)
+                    {
+                        _logger?.LogInformation("ActiveDocument acquired on attempt {Attempt}", attempt);
+                        break;
+                    }
+                }
+                catch (COMException ex)
+                {
+                    _logger?.LogDebug(ex, "ActiveDocument attempt {Attempt} failed", attempt);
+                }
+
+                if (attempt < MaxRetryAttempts)
+                {
+                    Thread.Sleep(RetryDelayMs);
+                }
+            }
+
+            if (_acadDoc == null)
+            {
+                _logger?.LogWarning("ActiveDocument is null after {Attempts} attempts", MaxRetryAttempts);
+                // Still consider it connected even if no document is open
+            }
+
+            _isConnected = true;
             return true;
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to connect to AutoCAD");
+            _acadDoc = null;
+            _acadApp = null;
             _isConnected = false;
             return false;
         }
@@ -99,61 +286,102 @@ public class AutoCADService : IAutoCADService, IDisposable
 
     public async Task DisconnectAsync()
     {
-        await Task.Run(() =>
+        await _guiProxy.ExecuteInGuiAsync("autocad_disconnect", null, timeout: 5000);
+    }
+
+    /// <summary>
+    /// Internal disconnection method executed on GUI thread.
+    /// Properly releases COM objects to avoid leaks.
+    /// </summary>
+    private void DisconnectInternal()
+    {
+        _isConnected = false;
+        ReleaseCOMObjects();
+        _logger?.LogInformation("Disconnected from AutoCAD");
+    }
+
+    /// <summary>
+    /// Safely releases COM object references.
+    /// </summary>
+    private void ReleaseCOMObjects()
+    {
+        if (_acadDoc != null)
         {
+            try { Marshal.ReleaseComObject(_acadDoc); } catch { /* ignore release errors */ }
             _acadDoc = null;
+        }
+        if (_acadApp != null)
+        {
+            try { Marshal.ReleaseComObject(_acadApp); } catch { /* ignore release errors */ }
             _acadApp = null;
-            _isConnected = false;
-            _logger?.LogInformation("Disconnected from AutoCAD");
-        });
+        }
     }
 
     public async Task<AutoCADStatus> GetStatusAsync()
     {
-        return await Task.Run(() =>
+        var response = await _guiProxy.ExecuteInGuiAsync("autocad_get_status", null, timeout: 5000);
+
+        if (response.Success && response.Result is AutoCADStatus status)
         {
-            if (!IsConnected || _acadApp == null)
+            return status;
+        }
+
+        return new AutoCADStatus(
+            IsConnected: false,
+            ApplicationName: null,
+            Version: null,
+            CurrentDocument: null,
+            OpenDocuments: null,
+            ErrorMessage: response.ErrorMessage ?? "Failed to get AutoCAD status");
+    }
+
+    /// <summary>
+    /// Internal status retrieval method executed on GUI thread.
+    /// </summary>
+    private AutoCADStatus GetStatusInternal()
+    {
+        if (!_isConnected || _acadApp == null)
+        {
+            return new AutoCADStatus(
+                IsConnected: false,
+                ApplicationName: null,
+                Version: null,
+                CurrentDocument: null,
+                OpenDocuments: null,
+                ErrorMessage: "Not connected to AutoCAD");
+        }
+
+        try
+        {
+            string appName = _acadApp.Name;
+            string version = _acadApp.Version;
+            string? currentDoc = _acadDoc?.Name;
+
+            var openDocs = new List<string>();
+            foreach (dynamic doc in _acadApp.Documents)
             {
-                return new AutoCADStatus(
-                    IsConnected: false,
-                    ApplicationName: null,
-                    Version: null,
-                    CurrentDocument: null,
-                    OpenDocuments: null,
-                    ErrorMessage: "Not connected to AutoCAD");
+                openDocs.Add(doc.Name);
             }
 
-            try
-            {
-                string appName = _acadApp.Name;
-                string version = _acadApp.Version;
-                string? currentDoc = _acadDoc?.Name;
-
-                var openDocs = new List<string>();
-                foreach (dynamic doc in _acadApp.Documents)
-                {
-                    openDocs.Add(doc.Name);
-                }
-
-                return new AutoCADStatus(
-                    IsConnected: true,
-                    ApplicationName: appName,
-                    Version: version,
-                    CurrentDocument: currentDoc,
-                    OpenDocuments: openDocs,
-                    ErrorMessage: null);
-            }
-            catch (Exception ex)
-            {
-                return new AutoCADStatus(
-                    IsConnected: false,
-                    ApplicationName: null,
-                    Version: null,
-                    CurrentDocument: null,
-                    OpenDocuments: null,
-                    ErrorMessage: ex.Message);
-            }
-        });
+            return new AutoCADStatus(
+                IsConnected: true,
+                ApplicationName: appName,
+                Version: version,
+                CurrentDocument: currentDoc,
+                OpenDocuments: openDocs,
+                ErrorMessage: null);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to get AutoCAD status");
+            return new AutoCADStatus(
+                IsConnected: false,
+                ApplicationName: null,
+                Version: null,
+                CurrentDocument: null,
+                OpenDocuments: null,
+                ErrorMessage: ex.Message);
+        }
     }
 
     #endregion
@@ -162,63 +390,22 @@ public class AutoCADService : IAutoCADService, IDisposable
 
     public async Task<bool> OpenDocumentAsync(string filePath)
     {
-        return await Task.Run(() =>
-        {
-            try
-            {
-                if (!IsConnected) return false;
-
-                _acadDoc = _acadApp.Documents.Open(filePath);
-                _logger?.LogInformation("Opened document: {FilePath}", filePath);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to open document: {FilePath}", filePath);
-                return false;
-            }
-        });
+        var response = await _guiProxy.ExecuteInGuiAsync("autocad_open_document",
+            new Dictionary<string, object?> { ["filePath"] = filePath }, timeout: 10000);
+        return response.Success && response.Result is bool opened && opened;
     }
 
     public async Task<bool> SaveDocumentAsync()
     {
-        return await Task.Run(() =>
-        {
-            try
-            {
-                if (_acadDoc == null) return false;
-
-                _acadDoc.Save();
-                _logger?.LogInformation("Document saved");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to save document");
-                return false;
-            }
-        });
+        var response = await _guiProxy.ExecuteInGuiAsync("autocad_save_document", null, timeout: 10000);
+        return response.Success && response.Result is bool saved && saved;
     }
 
     public async Task<bool> CloseDocumentAsync(bool save = true)
     {
-        return await Task.Run(() =>
-        {
-            try
-            {
-                if (_acadDoc == null) return false;
-
-                _acadDoc.Close(save);
-                _acadDoc = _acadApp?.ActiveDocument;
-                _logger?.LogInformation("Document closed");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to close document");
-                return false;
-            }
-        });
+        var response = await _guiProxy.ExecuteInGuiAsync("autocad_close_document",
+            new Dictionary<string, object?> { ["save"] = save }, timeout: 10000);
+        return response.Success && response.Result is bool closed && closed;
     }
 
     public string? GetCurrentDocumentPath()
@@ -239,6 +426,14 @@ public class AutoCADService : IAutoCADService, IDisposable
 
     public IReadOnlyList<LayoutInfo> GetLayouts()
     {
+        return GetLayoutsInternal();
+    }
+
+    /// <summary>
+    /// Internal method to get layouts. Excludes "Model" layout per requirements.
+    /// </summary>
+    private List<LayoutInfo> GetLayoutsInternal()
+    {
         var layouts = new List<LayoutInfo>();
 
         try
@@ -247,10 +442,16 @@ public class AutoCADService : IAutoCADService, IDisposable
 
             foreach (dynamic layout in _acadDoc.Layouts)
             {
+                string layoutName = layout.Name;
+                
+                // Exclude Model layout
+                if (layoutName == "Model")
+                    continue;
+
                 layouts.Add(new LayoutInfo(
-                    Name: layout.Name,
+                    Name: layoutName,
                     TabOrder: layout.TabOrder,
-                    IsModelSpace: layout.Name == "Model",
+                    IsModelSpace: false,
                     PlotConfigurationName: layout.ConfigName ?? ""));
             }
 
@@ -515,6 +716,321 @@ public class AutoCADService : IAutoCADService, IDisposable
 
     #region Parameter Extraction
 
+    /// <summary>
+    /// Strips AutoCAD MText formatting codes.
+    /// Removes codes like \P (paragraph), \C (color), \F (font), \H (height), etc.
+    /// </summary>
+    private string LM_UnFormat(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return string.Empty;
+
+        // Remove common MText formatting codes
+        var result = text;
+
+        // Remove \P (paragraph break) - replace with space
+        result = System.Text.RegularExpressions.Regex.Replace(result, @"\\P", " ");
+
+        // Remove \C# (color codes like \C1, \C255)
+        result = System.Text.RegularExpressions.Regex.Replace(result, @"\\C\d+;", "");
+
+        // Remove \F (font)
+        result = System.Text.RegularExpressions.Regex.Replace(result, @"\\F[^;]*;", "");
+
+        // Remove \H (height)
+        result = System.Text.RegularExpressions.Regex.Replace(result, @"\\H[^;]*;", "");
+
+        // Remove \S (stacking)
+        result = System.Text.RegularExpressions.Regex.Replace(result, @"\\S[^;]*;", "");
+
+        // Remove \Q (obliquing angle)
+        result = System.Text.RegularExpressions.Regex.Replace(result, @"\\Q\d+;", "");
+
+        // Remove \T (tracking)
+        result = System.Text.RegularExpressions.Regex.Replace(result, @"\\T\d+;", "");
+
+        // Remove \W (width factor)
+        result = System.Text.RegularExpressions.Regex.Replace(result, @"\\W\d+\.?\d*;", "");
+
+        // Remove \A (alignment)
+        result = System.Text.RegularExpressions.Regex.Replace(result, @"\\A\d+;", "");
+
+        // Remove \L (underline on)
+        result = result.Replace("\\L", "");
+
+        // Remove \l (underline off)
+        result = result.Replace("\\l", "");
+
+        // Remove \O (overline on)
+        result = result.Replace("\\O", "");
+
+        // Remove \o (overline off)
+        result = result.Replace("\\o", "");
+
+        // Remove \~ (non-breaking space) - replace with space
+        result = result.Replace("\\~", " ");
+
+        // Remove curly braces {} (group delimiters)
+        result = result.Replace("{", "").Replace("}", "");
+
+        // Remove \\ (escaped backslash) - replace with single backslash
+        result = result.Replace("\\\\", "\\");
+
+        // Trim whitespace
+        result = result.Trim();
+
+        return result;
+    }
+
+    /// <summary>
+    /// Extracts block attributes from the layout.
+    /// Searches for standard attributes: pr_no, project_name, job_working_plan_name, 
+    /// product_name, spec, color_name, unit, remarks, block_name, quantity
+    /// </summary>
+    private Dictionary<string, object> GetAttributeValues(dynamic layout)
+    {
+        var attributes = new Dictionary<string, object>();
+
+        try
+        {
+            if (_acadDoc == null) return attributes;
+
+            // Get the PaperSpace or ModelSpace depending on layout
+            dynamic space = layout.Block;
+
+            // Iterate through all entities in the layout
+            foreach (dynamic entity in space)
+            {
+                try
+                {
+                    string entityType = entity.EntityName;
+
+                    // Check if it's a block reference with attributes
+                    if (entityType == "AcDbBlockReference")
+                    {
+                        if (entity.HasAttributes)
+                        {
+                            foreach (dynamic attr in entity.GetAttributes())
+                            {
+                                string tag = attr.TagString;
+                                string value = LM_UnFormat(attr.TextString);
+
+                                // Map standard attribute tags
+                                switch (tag.ToLower())
+                                {
+                                    case "pr_no":
+                                    case "project_name":
+                                    case "job_working_plan_name":
+                                    case "product_name":
+                                    case "spec":
+                                    case "color_name":
+                                    case "unit":
+                                    case "remarks":
+                                    case "block_name":
+                                    case "quantity":
+                                        attributes[tag] = value;
+                                        break;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    // Skip entities that can't be read
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to extract attribute values");
+        }
+
+        return attributes;
+    }
+
+    /// <summary>
+    /// Extracts table data from the layout.
+    /// Validates: exactly 9 columns, HEADER_ID in column 7 (index 6).
+    /// Returns rows with: Position, Product No, Width, Height, Length, Thickness, Qty, Description, Detail ID.
+    /// Filters empty rows (both qty AND product_no empty).
+    /// </summary>
+    private List<Dictionary<string, object>> GetTableData(dynamic layout)
+    {
+        var tableRows = new List<Dictionary<string, object>>();
+
+        try
+        {
+            if (_acadDoc == null) return tableRows;
+
+            dynamic space = layout.Block;
+
+            // Find table entities
+            foreach (dynamic entity in space)
+            {
+                try
+                {
+                    string entityType = entity.EntityName;
+
+                    if (entityType == "AcDbTable")
+                    {
+                        int rowCount = entity.Rows;
+                        int colCount = entity.Columns;
+
+                        // Validate: exactly 9 columns
+                        if (colCount != 9)
+                        {
+                            _logger?.LogWarning("Table has {ColCount} columns, expected 9. Skipping.", colCount);
+                            continue;
+                        }
+
+                        // Validate: column 6 (index 6, 7th column) contains "HEADER_ID" in header
+                        string headerCell = entity.GetText(0, 6) ?? "";
+                        if (!headerCell.Contains("HEADER_ID"))
+                        {
+                            _logger?.LogWarning("Column 6 does not contain HEADER_ID. Found: {Header}", headerCell);
+                            continue;
+                        }
+
+                        // Extract data rows (skip header row 0)
+                        for (int row = 1; row < rowCount; row++)
+                        {
+                            var position = LM_UnFormat(entity.GetText(row, 0) ?? "");
+                            var productNo = LM_UnFormat(entity.GetText(row, 1) ?? "");
+                            var width = LM_UnFormat(entity.GetText(row, 2) ?? "");
+                            var height = LM_UnFormat(entity.GetText(row, 3) ?? "");
+                            var length = LM_UnFormat(entity.GetText(row, 4) ?? "");
+                            var thickness = LM_UnFormat(entity.GetText(row, 5) ?? "");
+                            var qty = LM_UnFormat(entity.GetText(row, 6) ?? "");
+                            var description = LM_UnFormat(entity.GetText(row, 7) ?? "");
+                            var detailId = LM_UnFormat(entity.GetText(row, 8) ?? "");
+
+                            // Filter empty rows (both qty AND product_no empty)
+                            if (string.IsNullOrWhiteSpace(qty) && string.IsNullOrWhiteSpace(productNo))
+                            {
+                                continue;
+                            }
+
+                            var rowData = new Dictionary<string, object>
+                            {
+                                ["position"] = position,
+                                ["product_no"] = productNo,
+                                ["width"] = width,
+                                ["height"] = height,
+                                ["length"] = length,
+                                ["thickness"] = thickness,
+                                ["qty"] = qty,
+                                ["description"] = description,
+                                ["detail_id"] = detailId
+                            };
+
+                            tableRows.Add(rowData);
+                        }
+
+                        // Only process first valid table
+                        break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Error processing table entity");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to extract table data");
+        }
+
+        return tableRows;
+    }
+
+    /// <summary>
+    /// Orchestrates extraction from specified layout.
+    /// Switches to layout, extracts attributes and table data, combines into LayoutData.
+    /// </summary>
+    private LayoutData GetLayoutValuesInternal(string layoutName)
+    {
+        var data = new LayoutData();
+
+        try
+        {
+            if (_acadDoc == null)
+            {
+                _logger?.LogWarning("No active document for layout extraction");
+                return data;
+            }
+
+            // Switch to specified layout
+            bool switched = SwitchToLayout(layoutName);
+            if (!switched)
+            {
+                _logger?.LogWarning("Failed to switch to layout: {LayoutName}", layoutName);
+                return data;
+            }
+
+            data.LayoutName = layoutName;
+
+            // Get the layout object
+            dynamic layout = _acadDoc.Layouts.Item(layoutName);
+
+            // Extract block attributes
+            data.Parameters = GetAttributeValues(layout);
+
+            // Extract table data
+            var tableRows = GetTableData(layout);
+
+            // Convert to TableData format
+            if (tableRows.Count > 0)
+            {
+                var tableData = new TableData
+                {
+                    Name = "MainTable",
+                    RowCount = tableRows.Count + 1, // +1 for header
+                    ColumnCount = 9
+                };
+
+                // Add header row
+                tableData.Cells.Add(new List<string>
+                {
+                    "Position", "Product No", "Width", "Height", "Length", 
+                    "Thickness", "Qty", "Description", "HEADER_ID"
+                });
+
+                // Add data rows
+                foreach (var row in tableRows)
+                {
+                    tableData.Cells.Add(new List<string>
+                    {
+                        row["position"]?.ToString() ?? "",
+                        row["product_no"]?.ToString() ?? "",
+                        row["width"]?.ToString() ?? "",
+                        row["height"]?.ToString() ?? "",
+                        row["length"]?.ToString() ?? "",
+                        row["thickness"]?.ToString() ?? "",
+                        row["qty"]?.ToString() ?? "",
+                        row["description"]?.ToString() ?? "",
+                        row["detail_id"]?.ToString() ?? ""
+                    });
+                }
+
+                data.Tables.Add(tableData);
+            }
+
+            data.ExtractedAt = DateTime.UtcNow;
+            int rowCount = tableRows.Count;
+            int paramCount = data.Parameters.Count;
+            _logger?.LogInformation("Extracted {ParamCount} parameters and {RowCount} table rows from {LayoutName}",
+                (object)paramCount, (object)rowCount, (object)layoutName);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to extract layout values from {LayoutName}", layoutName);
+        }
+
+        return data;
+    }
+
     public LayoutData GetLayoutsValues()
     {
         var data = new LayoutData();
@@ -570,8 +1086,7 @@ public class AutoCADService : IAutoCADService, IDisposable
 
     public LayoutData GetLayoutValues(string layoutName)
     {
-        SwitchToLayout(layoutName);
-        return GetLayoutsValues();
+        return GetLayoutValuesInternal(layoutName);
     }
 
     public async Task<IReadOnlyList<string>> ExportLayoutImagesAsync(string outputDirectory, string format = "PNG")
@@ -862,10 +1377,8 @@ public class AutoCADService : IAutoCADService, IDisposable
 
     public void Dispose()
     {
-        _acadDoc = null;
-        _acadApp = null;
         _isConnected = false;
-
+        ReleaseCOMObjects();
         GC.SuppressFinalize(this);
     }
 }
