@@ -11,8 +11,11 @@ namespace OdooAutoCAD.Core.AutoCAD;
 /// AutoCAD COM Service implementation.
 /// Uses late binding (dynamic) for AutoCAD LT compatibility.
 ///
-/// All methods in this class must be called from the GUI (STA) thread
-/// via the GUIProxy system to ensure thread safety.
+/// All COM operations run on thread pool threads (MTA) via Task.Run, NOT on
+/// the WPF STA thread. AutoCAD 2014 crashes with "Unhandled Access Violation"
+/// when GetActiveObject is called from WPF's DispatcherTimer callback (STA).
+/// Running on MTA avoids this — for out-of-process COM servers like AutoCAD,
+/// COM handles cross-apartment marshaling transparently.
 /// </summary>
 public class AutoCADService : IAutoCADService, IDisposable
 {
@@ -99,34 +102,34 @@ public class AutoCADService : IAutoCADService, IDisposable
 
     /// <summary>
     /// Registers handlers for AutoCAD operations in the GUI proxy.
-    /// This ensures all COM operations are executed on the STA thread.
+    /// All handlers use Task.Run to execute COM operations on MTA thread pool
+    /// threads, avoiding the WPF STA thread which crashes AutoCAD 2014.
     /// </summary>
     private void RegisterGUIProxyHandlers()
     {
         _guiProxy.RegisterHandler("autocad_connect", async (parameters) =>
         {
-            return await Task.FromResult(ConnectInternal());
+            return await Task.Run(() => ConnectInternal());
         });
 
         _guiProxy.RegisterHandler("autocad_disconnect", async (parameters) =>
         {
-            DisconnectInternal();
-            return await Task.FromResult<object?>(null);
+            return await Task.Run(() => { DisconnectInternal(); return (object?)null; });
         });
 
         _guiProxy.RegisterHandler("autocad_get_status", async (parameters) =>
         {
-            return await Task.FromResult(GetStatusInternal());
+            return await Task.Run(() => GetStatusInternal());
         });
 
         _guiProxy.RegisterHandler("autocad_get_layouts", async (parameters) =>
         {
-            return await Task.FromResult(GetLayoutsInternal());
+            return await Task.Run(() => GetLayoutsInternal());
         });
 
         _guiProxy.RegisterHandler("autocad_get_active_layout", async (parameters) =>
         {
-            return await Task.FromResult(GetCurrentLayoutName());
+            return await Task.Run(() => (object?)GetCurrentLayoutName());
         });
 
         _guiProxy.RegisterHandler("autocad_set_active_layout", async (parameters) =>
@@ -135,9 +138,9 @@ public class AutoCADService : IAutoCADService, IDisposable
             var layoutName = val as string;
             if (layoutName != null)
             {
-                return await Task.FromResult(SwitchToLayout(layoutName));
+                return await Task.Run(() => SwitchToLayout(layoutName));
             }
-            return await Task.FromResult(false);
+            return false;
         });
 
         _guiProxy.RegisterHandler("autocad_extract_parameters", async (parameters) =>
@@ -146,63 +149,72 @@ public class AutoCADService : IAutoCADService, IDisposable
             var layoutName = val as string;
             if (layoutName != null)
             {
-                return await Task.FromResult(GetLayoutValuesInternal(layoutName));
+                return await Task.Run(() => GetLayoutValuesInternal(layoutName));
             }
-            return await Task.FromResult(new LayoutData());
+            return new LayoutData();
         });
 
         _guiProxy.RegisterHandler("autocad_open_document", async (parameters) =>
         {
             parameters.TryGetValue("filePath", out var val);
             var filePath = val as string;
-            if (string.IsNullOrEmpty(filePath) || !_isConnected) return await Task.FromResult(false);
-            try
+            if (string.IsNullOrEmpty(filePath) || !_isConnected) return false;
+            return await Task.Run(() =>
             {
-                _acadDoc = _acadApp!.Documents.Open(filePath);
-                _logger?.LogInformation("Opened document: {FilePath}", filePath);
-                return await Task.FromResult(true);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to open document: {FilePath}", filePath);
-                return await Task.FromResult(false);
-            }
+                try
+                {
+                    _acadDoc = _acadApp!.Documents.Open(filePath);
+                    _logger?.LogInformation("Opened document: {FilePath}", filePath);
+                    return (object)true;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Failed to open document: {FilePath}", filePath);
+                    return (object)false;
+                }
+            });
         });
 
         _guiProxy.RegisterHandler("autocad_save_document", async (parameters) =>
         {
-            if (_acadDoc == null) return await Task.FromResult(false);
-            try
+            if (_acadDoc == null) return false;
+            return await Task.Run(() =>
             {
-                _acadDoc.Save();
-                _logger?.LogInformation("Document saved");
-                return await Task.FromResult(true);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to save document");
-                return await Task.FromResult(false);
-            }
+                try
+                {
+                    _acadDoc.Save();
+                    _logger?.LogInformation("Document saved");
+                    return (object)true;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Failed to save document");
+                    return (object)false;
+                }
+            });
         });
 
         _guiProxy.RegisterHandler("autocad_close_document", async (parameters) =>
         {
-            if (_acadDoc == null) return await Task.FromResult(false);
-            try
+            if (_acadDoc == null) return false;
+            return await Task.Run(() =>
             {
-                var save = true;
-                if (parameters.TryGetValue("save", out var saveProp) && saveProp is bool s)
-                    save = s;
-                _acadDoc.Close(save);
-                _acadDoc = _acadApp?.ActiveDocument;
-                _logger?.LogInformation("Document closed");
-                return await Task.FromResult(true);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to close document");
-                return await Task.FromResult(false);
-            }
+                try
+                {
+                    var save = true;
+                    if (parameters.TryGetValue("save", out var saveProp) && saveProp is bool s)
+                        save = s;
+                    _acadDoc.Close(save);
+                    _acadDoc = _acadApp?.ActiveDocument;
+                    _logger?.LogInformation("Document closed");
+                    return (object)true;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Failed to close document");
+                    return (object)false;
+                }
+            });
         });
 
         _logger?.LogDebug("AutoCAD GUI proxy handlers registered");
@@ -221,29 +233,39 @@ public class AutoCADService : IAutoCADService, IDisposable
     }
 
     /// <summary>
-    /// Internal connection method executed on GUI thread.
-    ///
-    /// DIAGNOSTIC BUILD: Uses GetActiveObject (ROT lookup) but does NOT access
-    /// any AutoCAD properties (no ActiveDocument, no Visible, nothing).
-    /// This isolates whether the crash is in GetActiveObject itself or in
-    /// subsequent property access via IDispatch.
-    ///
-    /// If this does NOT crash → the problem is property access (IDispatch calls).
-    /// If this DOES crash → the problem is GetActiveObject/ROT itself.
+    /// Internal connection method — runs on MTA thread pool thread via Task.Run.
+    /// Matches the Python util_autocad.py connect_autocad() logic:
+    ///   1. GetActiveObject to get running AutoCAD instance
+    ///   2. Retry up to 5 times for ActiveDocument
     /// </summary>
     private bool ConnectInternal()
     {
         try
         {
-            // Register COM message filter
-            OleMessageFilter.Register();
-
-            // Step 1 ONLY: GetActiveObject from ROT — NO property access after this
             _acadApp = GetActiveObject(DefaultProgId);
-            _logger?.LogInformation("GetActiveObject succeeded — COM proxy obtained (no properties accessed)");
+            _logger?.LogInformation("GetActiveObject succeeded — connected to AutoCAD");
 
-            // DO NOT access any properties — just mark as connected
-            // to test if GetActiveObject alone causes the crash.
+            // Retry for ActiveDocument (matches Python's retry pattern)
+            for (int attempt = 1; attempt <= MaxRetryAttempts; attempt++)
+            {
+                try
+                {
+                    _acadDoc = _acadApp.ActiveDocument;
+                    if (_acadDoc != null)
+                    {
+                        string docName = _acadDoc.Name;
+                        _logger?.LogInformation("ActiveDocument: {Name}", docName);
+                        break;
+                    }
+                }
+                catch (Exception ex) when (attempt < MaxRetryAttempts)
+                {
+                    _logger?.LogWarning("Retry {Attempt}/{Max}: ActiveDocument not ready — {Error}",
+                        attempt, MaxRetryAttempts, ex.Message);
+                    Thread.Sleep(RetryDelayMs);
+                }
+            }
+
             _isConnected = true;
             return true;
         }
