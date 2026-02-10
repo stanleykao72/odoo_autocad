@@ -13,11 +13,13 @@ namespace OdooAutoCAD.Integration.Tests;
 public class SettingsViewModelTests
 {
     private readonly Mock<ISettingsService> _mockSettings;
+    private readonly Mock<IAppLogService> _mockLogService;
     private readonly SettingsViewModel _sut;
 
     public SettingsViewModelTests()
     {
         _mockSettings = new Mock<ISettingsService>();
+        _mockLogService = new Mock<IAppLogService>();
 
         // Default AppSettings
         _mockSettings.Setup(s => s.GetAppSettings()).Returns(new AppSettings
@@ -25,9 +27,7 @@ public class SettingsViewModelTests
             Application = new ApplicationInfo { Name = "Test App", Version = "6.0.0" },
             Odoo = new OdooSettings
             {
-                ServerUrl = "https://odoo.example.com",
-                Database = "test_db",
-                Username = "admin",
+                SwaggerUrl = "https://odoo.example.com/api/v1/boq_import_api/swagger.json?token=abc&db=test_db",
                 TimeoutSeconds = 30
             },
             AutoCAD = new AutoCADSettings
@@ -49,7 +49,7 @@ public class SettingsViewModelTests
         _mockSettings.Setup(s => s.LoadServerConfigsAsync())
             .ReturnsAsync(new Dictionary<string, string?>());
 
-        _sut = new SettingsViewModel(_mockSettings.Object);
+        _sut = new SettingsViewModel(_mockSettings.Object, _mockLogService.Object);
     }
 
     // --- LoadSettings ---
@@ -61,9 +61,7 @@ public class SettingsViewModelTests
         await _sut.LoadSettingsCommand.ExecuteAsync(null);
 
         // Assert
-        _sut.OdooServerUrl.Should().Be("https://odoo.example.com");
-        _sut.OdooDatabase.Should().Be("test_db");
-        _sut.OdooUsername.Should().Be("admin");
+        _sut.OdooSwaggerUrl.Should().Be("https://odoo.example.com/api/v1/boq_import_api/swagger.json?token=abc&db=test_db");
         _sut.OdooTimeoutSeconds.Should().Be(30);
     }
 
@@ -103,7 +101,7 @@ public class SettingsViewModelTests
         _mockSettings.Setup(s => s.LoadServerConfigsAsync())
             .ReturnsAsync(new Dictionary<string, string?>
             {
-                ["odoo_api_token"] = "secret-token-123"
+                ["odoo_user_token"] = "secret-token-123"
             });
 
         await _sut.LoadSettingsCommand.ExecuteAsync(null);
@@ -112,21 +110,17 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public async Task LoadSettings_OverridesFromDatabase_WhenPresent()
+    public async Task LoadSettings_OverridesSwaggerUrlFromDatabase_WhenPresent()
     {
         _mockSettings.Setup(s => s.LoadServerConfigsAsync())
             .ReturnsAsync(new Dictionary<string, string?>
             {
-                ["odoo_server_url"] = "https://db-override.com",
-                ["odoo_database"] = "db_override",
-                ["odoo_username"] = "db_user"
+                ["odoo_swagger_url"] = "https://db-override.com/api/v1/boq_import_api/swagger.json?token=xyz&db=override_db"
             });
 
         await _sut.LoadSettingsCommand.ExecuteAsync(null);
 
-        _sut.OdooServerUrl.Should().Be("https://db-override.com");
-        _sut.OdooDatabase.Should().Be("db_override");
-        _sut.OdooUsername.Should().Be("db_user");
+        _sut.OdooSwaggerUrl.Should().Be("https://db-override.com/api/v1/boq_import_api/swagger.json?token=xyz&db=override_db");
     }
 
     [Fact]
@@ -153,7 +147,7 @@ public class SettingsViewModelTests
         await _sut.LoadSettingsCommand.ExecuteAsync(null);
         _sut.HasUnsavedChanges.Should().BeFalse();
 
-        _sut.OdooServerUrl = "https://changed.com";
+        _sut.OdooSwaggerUrl = "https://changed.com/swagger.json?token=a&db=b";
 
         _sut.HasUnsavedChanges.Should().BeTrue();
     }
@@ -208,7 +202,7 @@ public class SettingsViewModelTests
     public async Task SaveSettings_CallsSaveAppSettings()
     {
         await _sut.LoadSettingsCommand.ExecuteAsync(null);
-        _sut.OdooServerUrl = "https://new-server.com";
+        _sut.OdooSwaggerUrl = "https://new-server.com/swagger.json?token=x&db=y";
 
         await _sut.SaveSettingsCommand.ExecuteAsync(null);
 
@@ -225,7 +219,7 @@ public class SettingsViewModelTests
 
         _mockSettings.Verify(s => s.SaveServerConfigsAsync(
             It.Is<Dictionary<string, string?>>(d =>
-                d["odoo_api_token"] == "my-secret-token")),
+                d["odoo_user_token"] == "my-secret-token")),
             Times.Once);
     }
 
@@ -233,7 +227,7 @@ public class SettingsViewModelTests
     public async Task SaveSettings_ClearsHasUnsavedChanges()
     {
         await _sut.LoadSettingsCommand.ExecuteAsync(null);
-        _sut.OdooServerUrl = "https://changed.com";
+        _sut.OdooSwaggerUrl = "https://changed.com/swagger.json?token=x&db=y";
         _sut.HasUnsavedChanges.Should().BeTrue();
 
         await _sut.SaveSettingsCommand.ExecuteAsync(null);
@@ -245,7 +239,7 @@ public class SettingsViewModelTests
     public async Task SaveSettings_SetsSuccessStatusMessage()
     {
         await _sut.LoadSettingsCommand.ExecuteAsync(null);
-        _sut.OdooServerUrl = "https://changed.com";
+        _sut.OdooSwaggerUrl = "https://changed.com/swagger.json?token=x&db=y";
 
         await _sut.SaveSettingsCommand.ExecuteAsync(null);
 
@@ -259,7 +253,7 @@ public class SettingsViewModelTests
             .ThrowsAsync(new InvalidOperationException("Write failed"));
 
         await _sut.LoadSettingsCommand.ExecuteAsync(null);
-        _sut.OdooServerUrl = "changed";
+        _sut.OdooSwaggerUrl = "changed";
 
         await _sut.SaveSettingsCommand.ExecuteAsync(null);
 
@@ -272,19 +266,19 @@ public class SettingsViewModelTests
     public async Task CancelChanges_RestoresOriginalValues()
     {
         await _sut.LoadSettingsCommand.ExecuteAsync(null);
-        var originalUrl = _sut.OdooServerUrl;
+        var originalUrl = _sut.OdooSwaggerUrl;
 
-        _sut.OdooServerUrl = "https://modified.com";
+        _sut.OdooSwaggerUrl = "https://modified.com/swagger.json?token=a&db=b";
         _sut.CancelChangesCommand.Execute(null);
 
-        _sut.OdooServerUrl.Should().Be(originalUrl);
+        _sut.OdooSwaggerUrl.Should().Be(originalUrl);
     }
 
     [Fact]
     public async Task CancelChanges_ClearsHasUnsavedChanges()
     {
         await _sut.LoadSettingsCommand.ExecuteAsync(null);
-        _sut.OdooServerUrl = "https://modified.com";
+        _sut.OdooSwaggerUrl = "https://modified.com/swagger.json?token=a&db=b";
         _sut.HasUnsavedChanges.Should().BeTrue();
 
         _sut.CancelChangesCommand.Execute(null);
@@ -296,15 +290,15 @@ public class SettingsViewModelTests
     public async Task CancelChanges_RestoresMultipleFields()
     {
         await _sut.LoadSettingsCommand.ExecuteAsync(null);
-        var originalDb = _sut.OdooDatabase;
+        var originalUrl = _sut.OdooSwaggerUrl;
         var originalPort = _sut.McpPort;
 
-        _sut.OdooDatabase = "changed_db";
+        _sut.OdooSwaggerUrl = "https://changed.com/swagger.json?token=x&db=y";
         _sut.McpPort = 1234;
 
         _sut.CancelChangesCommand.Execute(null);
 
-        _sut.OdooDatabase.Should().Be(originalDb);
+        _sut.OdooSwaggerUrl.Should().Be(originalUrl);
         _sut.McpPort.Should().Be(originalPort);
     }
 
@@ -312,7 +306,7 @@ public class SettingsViewModelTests
     public async Task CancelChanges_SetsStatusMessage()
     {
         await _sut.LoadSettingsCommand.ExecuteAsync(null);
-        _sut.OdooServerUrl = "changed";
+        _sut.OdooSwaggerUrl = "changed";
 
         _sut.CancelChangesCommand.Execute(null);
 

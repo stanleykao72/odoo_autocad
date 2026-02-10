@@ -3,6 +3,7 @@
 
 using System.Windows;
 using System.Windows.Threading;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -131,14 +132,34 @@ public partial class App : Application
             sp.GetRequiredService<AppDbContextFactory>().CreateDbContext());
 
         // Configuration
-        services.AddSingleton<ConfigurationLoader>();
+        services.AddSingleton<ConfigurationLoader>(sp =>
+        {
+            var loader = new ConfigurationLoader();
+            loader.LoadFromJson(); // Initialize settings on startup
+            return loader;
+        });
 
         // Settings service
         services.AddSingleton<ISettingsService, SettingsService>();
 
-        // Note: IAutoCADService, IOdooService, IBOQProcessor are not registered yet.
-        // They will be added when real implementations are available.
-        // MCPToolRegistry accepts them as optional (nullable) parameters.
+        // App log service (shared UI log)
+        services.AddSingleton<IAppLogService, AppLogService>();
+
+        // AutoCAD service (singleton for maintaining connection state)
+        services.AddSingleton<IAutoCADService, AutoCADService>();
+
+        // Odoo service with configured timeout
+        services.AddSingleton<IOdooService>(sp =>
+        {
+            var logger = sp.GetService<ILogger<OdooService>>();
+            var config = sp.GetRequiredService<IConfiguration>();
+            var timeoutSeconds = config.GetValue<int>("Odoo:TimeoutSeconds", 30);
+            return new OdooService(logger, timeoutSeconds);
+        });
+
+        // Note: IBOQProcessor is not registered yet.
+        // It will be added when real implementation is available.
+        // MCPToolRegistry accepts it as optional (nullable) parameter.
 
         // MCP services - use factory to control construction
         services.AddSingleton<MCPToolRegistry>(sp => new MCPToolRegistry(
@@ -155,8 +176,10 @@ public partial class App : Application
         // ViewModels
         services.AddTransient<MainViewModel>();
         services.AddTransient<ConnectionStatusViewModel>();
+        services.AddTransient<AutoCADViewModel>();
         services.AddTransient<BOQViewModel>();
         services.AddTransient<SettingsViewModel>();
+        services.AddTransient<OdooConnectionViewModel>();
 
         // Application services
         services.AddSingleton<INavigationService, NavigationService>();

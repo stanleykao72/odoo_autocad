@@ -15,19 +15,14 @@ namespace OdooAutoCAD.App.ViewModels;
 public partial class SettingsViewModel : ObservableObject
 {
     private readonly ISettingsService _settingsService;
+    private readonly IAppLogService _logService;
     private readonly ILogger<SettingsViewModel>? _logger;
     private bool _isLoading;
 
     // --- Connection (Odoo) ---
 
     [ObservableProperty]
-    private string _odooServerUrl = string.Empty;
-
-    [ObservableProperty]
-    private string _odooDatabase = string.Empty;
-
-    [ObservableProperty]
-    private string _odooUsername = string.Empty;
+    private string _odooSwaggerUrl = string.Empty;
 
     [ObservableProperty]
     private string _odooApiToken = string.Empty;
@@ -90,9 +85,11 @@ public partial class SettingsViewModel : ObservableObject
 
     public SettingsViewModel(
         ISettingsService settingsService,
+        IAppLogService logService,
         ILogger<SettingsViewModel>? logger = null)
     {
         _settingsService = settingsService;
+        _logService = logService;
         _logger = logger;
     }
 
@@ -106,9 +103,7 @@ public partial class SettingsViewModel : ObservableObject
 
             // Load from AppSettings (JSON/YAML)
             var appSettings = _settingsService.GetAppSettings();
-            OdooServerUrl = appSettings.Odoo.ServerUrl;
-            OdooDatabase = appSettings.Odoo.Database;
-            OdooUsername = appSettings.Odoo.Username;
+            OdooSwaggerUrl = appSettings.Odoo.SwaggerUrl;
             OdooTimeoutSeconds = appSettings.Odoo.TimeoutSeconds;
 
             AutoCADProgId = appSettings.AutoCAD.ProgId;
@@ -126,24 +121,22 @@ public partial class SettingsViewModel : ObservableObject
 
             // Load token from DB (sensitive — never in JSON)
             var configs = await _settingsService.LoadServerConfigsAsync();
-            if (configs.TryGetValue("odoo_api_token", out var token))
+            if (configs.TryGetValue("odoo_user_token", out var token))
                 OdooApiToken = token ?? string.Empty;
 
-            // Override from DB if values exist there
-            if (configs.TryGetValue("odoo_server_url", out var url) && !string.IsNullOrEmpty(url))
-                OdooServerUrl = url;
-            if (configs.TryGetValue("odoo_database", out var db) && !string.IsNullOrEmpty(db))
-                OdooDatabase = db;
-            if (configs.TryGetValue("odoo_username", out var user) && !string.IsNullOrEmpty(user))
-                OdooUsername = user;
+            // Override swagger URL from DB if value exists there
+            if (configs.TryGetValue("odoo_swagger_url", out var url) && !string.IsNullOrEmpty(url))
+                OdooSwaggerUrl = url;
 
             TakeSnapshot();
             HasUnsavedChanges = false;
             StatusMessage = "Settings loaded";
+            _logService.Log("Settings loaded", "Settings");
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to load settings");
+            _logService.Log($"Failed to load settings: {ex.Message}", "Settings", AppLogLevel.Error);
             StatusMessage = $"Failed to load settings: {ex.Message}";
         }
         finally
@@ -167,9 +160,7 @@ public partial class SettingsViewModel : ObservableObject
         {
             // Build AppSettings from current values
             var appSettings = _settingsService.GetAppSettings();
-            appSettings.Odoo.ServerUrl = OdooServerUrl;
-            appSettings.Odoo.Database = OdooDatabase;
-            appSettings.Odoo.Username = OdooUsername;
+            appSettings.Odoo.SwaggerUrl = OdooSwaggerUrl;
             appSettings.Odoo.TimeoutSeconds = OdooTimeoutSeconds;
 
             appSettings.AutoCAD.ConnectionTimeoutSeconds = AutoCADConnectionTimeout;
@@ -185,10 +176,8 @@ public partial class SettingsViewModel : ObservableObject
             // Save to DB (including token, which is sensitive)
             await _settingsService.SaveServerConfigsAsync(new Dictionary<string, string?>
             {
-                ["odoo_server_url"] = OdooServerUrl,
-                ["odoo_database"] = OdooDatabase,
-                ["odoo_username"] = OdooUsername,
-                ["odoo_api_token"] = OdooApiToken,
+                ["odoo_swagger_url"] = OdooSwaggerUrl,
+                ["odoo_user_token"] = OdooApiToken,
                 ["odoo_timeout"] = OdooTimeoutSeconds.ToString(),
                 ["autocad_connection_timeout"] = AutoCADConnectionTimeout.ToString(),
                 ["autocad_retry_attempts"] = AutoCADRetryAttempts.ToString(),
@@ -200,11 +189,13 @@ public partial class SettingsViewModel : ObservableObject
             TakeSnapshot();
             HasUnsavedChanges = false;
             StatusMessage = "Settings saved successfully";
+            _logService.Log("Settings saved successfully", "Settings");
             _logger?.LogInformation("Settings saved successfully");
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to save settings");
+            _logService.Log($"Failed to save settings: {ex.Message}", "Settings", AppLogLevel.Error);
             StatusMessage = $"Failed to save: {ex.Message}";
         }
         finally
@@ -248,9 +239,7 @@ public partial class SettingsViewModel : ObservableObject
     {
         _originalValues = new Dictionary<string, string?>
         {
-            [nameof(OdooServerUrl)] = OdooServerUrl,
-            [nameof(OdooDatabase)] = OdooDatabase,
-            [nameof(OdooUsername)] = OdooUsername,
+            [nameof(OdooSwaggerUrl)] = OdooSwaggerUrl,
             [nameof(OdooApiToken)] = OdooApiToken,
             [nameof(OdooTimeoutSeconds)] = OdooTimeoutSeconds.ToString(),
             [nameof(AutoCADConnectionTimeout)] = AutoCADConnectionTimeout.ToString(),
@@ -266,12 +255,8 @@ public partial class SettingsViewModel : ObservableObject
         _isLoading = true; // prevent dirty tracking during restore
         try
         {
-            if (_originalValues.TryGetValue(nameof(OdooServerUrl), out var url))
-                OdooServerUrl = url ?? string.Empty;
-            if (_originalValues.TryGetValue(nameof(OdooDatabase), out var db))
-                OdooDatabase = db ?? string.Empty;
-            if (_originalValues.TryGetValue(nameof(OdooUsername), out var user))
-                OdooUsername = user ?? string.Empty;
+            if (_originalValues.TryGetValue(nameof(OdooSwaggerUrl), out var url))
+                OdooSwaggerUrl = url ?? string.Empty;
             if (_originalValues.TryGetValue(nameof(OdooApiToken), out var token))
                 OdooApiToken = token ?? string.Empty;
             if (_originalValues.TryGetValue(nameof(OdooTimeoutSeconds), out var timeout))

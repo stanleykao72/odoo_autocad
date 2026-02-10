@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:converters="clr-namespace:OdooAutoCAD.App.Converters"
+        xmlns:controls="clr-namespace:OdooAutoCAD.App.Views.Controls"
         mc:Ignorable="d"
         Title="Odoo AutoCAD Integration"
         Height="720" Width="1280"
@@ -100,6 +101,8 @@
                             Style="{StaticResource NavButton}" Click="NavButton_Click"/>
                     <Button x:Name="BtnMCP" Tag="BtnMCP" Content="🤖 AI Assistant"
                             Style="{StaticResource NavButton}" Click="NavButton_Click"/>
+                    <Button x:Name="BtnLogs" Tag="BtnLogs" Content="📝 Logs"
+                            Style="{StaticResource NavButton}" Click="NavButton_Click"/>
                     <Button x:Name="BtnSettings" Tag="BtnSettings" Content="⚙️ Settings"
                             Style="{StaticResource NavButton}" Click="NavButton_Click"/>
                 </StackPanel>
@@ -161,6 +164,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- Header -->
@@ -186,8 +190,14 @@
             <!-- Content Frame -->
             <Frame Grid.Row="1" x:Name="MainFrame" NavigationUIVisibility="Hidden" Margin="20"/>
 
+            <!-- Log Panel (collapsible) -->
+            <Expander Grid.Row="2" Header="Logs" IsExpanded="False"
+                      BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+                <controls:LogPanelControl x:Name="LogPanel" Height="180"/>
+            </Expander>
+
             <!-- Status Bar -->
-            <Border Grid.Row="2" Background="{StaticResource SurfaceBrush}"
+            <Border Grid.Row="3" Background="{StaticResource SurfaceBrush}"
                     Padding="15,8" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
                 <Grid>
                     <Grid.ColumnDefinitions>

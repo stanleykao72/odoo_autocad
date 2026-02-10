@@ -29,6 +29,10 @@ public partial class MainWindow : Window
 
         DataContext = _viewModel;
 
+        // Wire the log panel to the shared log service
+        var logService = App.Services.GetRequiredService<IAppLogService>();
+        LogPanel.DataContext = logService;
+
         // Navigate to dashboard by default
         _viewModel.NavigateCommand.Execute("Dashboard");
     }
