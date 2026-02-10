@@ -4,18 +4,18 @@
 > **Parent FR**: [FR-008](FR-008-ui-framework.md)
 > **Priority**: P1
 > **Tasks**: 5 | **Effort**: 4S + 1M + 0L
-> **Status**: Not Started
+> **Status**: Done
 
 ## Prerequisites
-- [ ] None (font configuration is independent of other US stories)
+- [x] None (font configuration is independent of other US stories)
 
 ## Acceptance Criteria
-- [ ] AC-01: The application uses Microsoft JhengHei UI as the primary font family for all UI elements.
-- [ ] AC-02: A font fallback chain is defined: Microsoft JhengHei UI, Microsoft JhengHei, SimHei, Arial Unicode MS.
-- [ ] AC-03: The font family is set at the Window or Application level so it applies globally without per-element configuration.
-- [ ] AC-04: All Chinese labels, status messages, log entries, and user-facing text render correctly without missing glyphs or tofu characters.
-- [ ] AC-05: The font family resource is defined as a named resource (`AppFontFamily`) in the resource dictionary for consistent reference.
-- [ ] AC-06: All styles and templates reference the `AppFontFamily` resource rather than hardcoding font names.
+- [x] AC-01: The application uses Microsoft JhengHei UI as the primary font family for all UI elements.
+- [x] AC-02: A font fallback chain is defined: Microsoft JhengHei UI, Microsoft JhengHei, SimHei, Arial Unicode MS.
+- [x] AC-03: The font family is set at the Window or Application level so it applies globally without per-element configuration.
+- [x] AC-04: All Chinese labels, status messages, log entries, and user-facing text render correctly without missing glyphs or tofu characters.
+- [x] AC-05: The font family resource is defined as a named resource (`AppFontFamily`) in the resource dictionary for consistent reference.
+- [x] AC-06: All styles and templates reference the `AppFontFamily` resource rather than hardcoding font names.
 
 ---
 
@@ -45,8 +45,8 @@
 - Add `xmlns:sys="clr-namespace:System;assembly=mscorlib"` namespace if using `sys:Double`
 
 ### How to verify
-- [ ] AppFontFamily resource is defined with the correct fallback chain (AC-02, AC-05)
-- [ ] Resource is in the application-level ResourceDictionary (AC-05)
+- [x] AppFontFamily resource is defined with the correct fallback chain (AC-02, AC-05)
+- [x] Resource is in the application-level ResourceDictionary (AC-05)
 
 ---
 
@@ -66,9 +66,9 @@
 - WPF property value inheritance propagates the FontFamily to all descendant elements unless explicitly overridden
 
 ### How to verify
-- [ ] MainWindow.xaml has FontFamily set to AppFontFamily resource (AC-01, AC-03)
-- [ ] CJK characters render correctly throughout the window (AC-04)
-- [ ] No per-element font configuration is needed for basic CJK rendering (AC-03)
+- [x] MainWindow.xaml has FontFamily set to AppFontFamily resource (AC-01, AC-03)
+- [x] CJK characters render correctly throughout the window (AC-04)
+- [x] No per-element font configuration is needed for basic CJK rendering (AC-03)
 
 ---
 
@@ -98,8 +98,8 @@
 - Consider splitting resources into separate files (`Themes/Colors.xaml`, `Themes/Styles.xaml`, `Themes/Fonts.xaml`) if the number grows, per FR-008 implementation notes
 
 ### How to verify
-- [ ] Font resources are accessible from any window or page in the application (AC-03)
-- [ ] `{StaticResource AppFontFamily}` resolves correctly in all XAML files (AC-05)
+- [x] Font resources are accessible from any window or page in the application (AC-03)
+- [x] `{StaticResource AppFontFamily}` resolves correctly in all XAML files (AC-05)
 
 ---
 
@@ -121,9 +121,9 @@
 - Check that no styles hardcode a non-CJK font family (e.g., "Segoe UI" without fallback)
 
 ### How to verify
-- [ ] All named styles reference AppFontFamily resource (AC-06)
-- [ ] No hardcoded font names exist in styles or templates (AC-06)
-- [ ] CJK text renders correctly in buttons, text boxes, and card panels (AC-04)
+- [x] All named styles reference AppFontFamily resource (AC-06)
+- [x] No hardcoded font names exist in styles or templates (AC-06)
+- [x] CJK text renders correctly in buttons, text boxes, and card panels (AC-04)
 
 ---
 
@@ -149,9 +149,9 @@
 - Verify font sizes are consistent between CJK and Latin characters
 
 ### How to verify
-- [ ] Chinese labels render correctly in sidebar, header, status bar, and log panel (AC-04)
-- [ ] No missing glyphs or tofu characters (AC-04)
-- [ ] Font fallback chain activates when primary font is unavailable (AC-02)
+- [x] Chinese labels render correctly in sidebar, header, status bar, and log panel (AC-04)
+- [x] No missing glyphs or tofu characters (AC-04)
+- [x] Font fallback chain activates when primary font is unavailable (AC-02)
 
 ---
 

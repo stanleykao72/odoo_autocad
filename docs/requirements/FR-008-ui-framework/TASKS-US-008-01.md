@@ -4,23 +4,23 @@
 > **Parent FR**: [FR-008](FR-008-ui-framework.md)
 > **Priority**: P1
 > **Tasks**: 7 | **Effort**: 2S + 4M + 1L
-> **Status**: Not Started
+> **Status**: Done
 
 ## Prerequisites
-- [ ] None (this is the foundational US for the entire UI framework)
+- [x] None (this is the foundational US for the entire UI framework)
 
 ## Acceptance Criteria
-- [ ] AC-01: A fixed-width (250px) sidebar panel is displayed on the left side of the main window at all times.
-- [ ] AC-02: The sidebar displays a title area at the top with "Odoo AutoCAD" and "Integration System v6.0".
-- [ ] AC-03: The sidebar contains navigation buttons for all seven areas: Dashboard, AutoCAD, Odoo, BOQ Manager, Purchase Requisition, AI Assistant, Settings.
-- [ ] AC-04: Each navigation button displays an icon and a text label, left-aligned.
-- [ ] AC-05: Navigation buttons use the `NavButton` style with transparent background, left-aligned content, and a left-border accent on hover.
-- [ ] AC-06: Clicking a sidebar button loads the corresponding page into the main `Frame` via `INavigationService.NavigateTo()`.
-- [ ] AC-07: The application defaults to the Dashboard page on startup.
-- [ ] AC-08: The `Frame` element uses `NavigationUIVisibility="Hidden"` to suppress default WPF navigation chrome.
-- [ ] AC-09: `INavigationService.NavigateTo(pageName)` resolves pages by reflection from namespace `OdooAutoCAD.App.Views.Pages.{pageName}Page`.
-- [ ] AC-10: `INavigationService.GoBack()` navigates to the previous page when `CanGoBack` is true.
-- [ ] AC-11: If a resolved page type does not exist, navigation is silently skipped and a warning is logged.
+- [x] AC-01: A fixed-width (250px) sidebar panel is displayed on the left side of the main window at all times.
+- [x] AC-02: The sidebar displays a title area at the top with "Odoo AutoCAD" and "Integration System v6.0".
+- [x] AC-03: The sidebar contains navigation buttons for all seven areas: Dashboard, AutoCAD, Odoo, BOQ Manager, Purchase Requisition, AI Assistant, Settings.
+- [x] AC-04: Each navigation button displays an icon and a text label, left-aligned.
+- [x] AC-05: Navigation buttons use the `NavButton` style with transparent background, left-aligned content, and a left-border accent on hover.
+- [x] AC-06: Clicking a sidebar button loads the corresponding page into the main `Frame` via `INavigationService.NavigateTo()`.
+- [x] AC-07: The application defaults to the Dashboard page on startup.
+- [x] AC-08: The `Frame` element uses `NavigationUIVisibility="Hidden"` to suppress default WPF navigation chrome.
+- [x] AC-09: `INavigationService.NavigateTo(pageName)` resolves pages by reflection from namespace `OdooAutoCAD.App.Views.Pages.{pageName}Page`.
+- [x] AC-10: `INavigationService.GoBack()` navigates to the previous page when `CanGoBack` is true.
+- [x] AC-11: If a resolved page type does not exist, navigation is silently skipped and a warning is logged.
 
 ---
 
@@ -43,10 +43,10 @@
 - Ensure the `Frame` element (`MainFrame`) in content area has `NavigationUIVisibility="Hidden"` and 20px margin
 
 ### How to verify
-- [ ] Sidebar renders at 250px width on the left side at all times (AC-01)
-- [ ] Title area shows "Odoo AutoCAD" and "Integration System v6.0" (AC-02)
-- [ ] All seven navigation buttons are present with icon and text, left-aligned (AC-03, AC-04)
-- [ ] Frame element has `NavigationUIVisibility="Hidden"` (AC-08)
+- [x] Sidebar renders at 250px width on the left side at all times (AC-01)
+- [x] Title area shows "Odoo AutoCAD" and "Integration System v6.0" (AC-02)
+- [x] All seven navigation buttons are present with icon and text, left-aligned (AC-03, AC-04)
+- [x] Frame element has `NavigationUIVisibility="Hidden"` (AC-08)
 
 ---
 
@@ -67,9 +67,9 @@
 - Ensure the `ContentPresenter` uses `HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"` for left-aligned content
 
 ### How to verify
-- [ ] Navigation buttons have transparent background by default (AC-05)
-- [ ] On hover, buttons show `#F0F0F0` background and left border accent in primary color (AC-05)
-- [ ] Content is left-aligned within each button (AC-04)
+- [x] Navigation buttons have transparent background by default (AC-05)
+- [x] On hover, buttons show `#F0F0F0` background and left border accent in primary color (AC-05)
+- [x] Content is left-aligned within each button (AC-04)
 
 ---
 
@@ -91,8 +91,8 @@
 - Validate rule VR-008-003: document that `Frame` must be set before any navigation calls
 
 ### How to verify
-- [ ] Interface defines `NavigateTo`, `GoBack`, `CanGoBack`, and `Frame` members (AC-06, AC-09, AC-10)
-- [ ] Interface is in the correct namespace for DI registration (AC-09)
+- [x] Interface defines `NavigateTo`, `GoBack`, `CanGoBack`, and `Frame` members (AC-06, AC-09, AC-10)
+- [x] Interface is in the correct namespace for DI registration (AC-09)
 
 ---
 
@@ -115,10 +115,10 @@
 - Implement `CanGoBack` as `Frame?.CanGoBack ?? false`
 
 ### How to verify
-- [ ] Pages are resolved by reflection from `OdooAutoCAD.App.Views.Pages.{pageName}Page` namespace (AC-09)
-- [ ] Non-existent page types are silently skipped with a warning log (AC-11)
-- [ ] `GoBack()` checks `CanGoBack` before navigating (AC-10)
-- [ ] Null `Frame` does not throw exceptions (AC-09)
+- [x] Pages are resolved by reflection from `OdooAutoCAD.App.Views.Pages.{pageName}Page` namespace (AC-09)
+- [x] Non-existent page types are silently skipped with a warning log (AC-11)
+- [x] `GoBack()` checks `CanGoBack` before navigating (AC-10)
+- [x] Null `Frame` does not throw exceptions (AC-09)
 
 ---
 
@@ -139,9 +139,9 @@
 - Set default `CurrentPageTitle` to "Dashboard" on construction
 
 ### How to verify
-- [ ] `NavigateCommand` accepts string parameter and triggers `NavigateTo` on `INavigationService` (AC-06)
-- [ ] `CurrentPageTitle` updates to the correct display name on navigation (AC-06)
-- [ ] Default page title is "Dashboard" on startup (AC-07)
+- [x] `NavigateCommand` accepts string parameter and triggers `NavigateTo` on `INavigationService` (AC-06)
+- [x] `CurrentPageTitle` updates to the correct display name on navigation (AC-06)
+- [x] Default page title is "Dashboard" on startup (AC-07)
 
 ---
 
@@ -163,9 +163,9 @@
 - Update `NavButton_Click` to extract page name from button `Name` and invoke `_viewModel.NavigateCommand.Execute(pageName)`
 
 ### How to verify
-- [ ] `MainFrame` is assigned to `INavigationService.Frame` before any navigation (AC-08, AC-09)
-- [ ] Application defaults to Dashboard page on startup (AC-07)
-- [ ] Sidebar button clicks trigger `INavigationService.NavigateTo()` (AC-06)
+- [x] `MainFrame` is assigned to `INavigationService.Frame` before any navigation (AC-08, AC-09)
+- [x] Application defaults to Dashboard page on startup (AC-07)
+- [x] Sidebar button clicks trigger `INavigationService.NavigateTo()` (AC-06)
 
 ---
 
@@ -184,8 +184,8 @@
 - Verify no duplicate registrations exist for `INavigationService`
 
 ### How to verify
-- [ ] `INavigationService` resolves correctly from `App.Services` (AC-06)
-- [ ] Singleton lifetime ensures the same Frame reference is shared across the application (AC-09)
+- [x] `INavigationService` resolves correctly from `App.Services` (AC-06)
+- [x] Singleton lifetime ensures the same Frame reference is shared across the application (AC-09)
 
 ---
 

@@ -10,15 +10,15 @@
 - **Priority**: P1
 
 ## Acceptance Criteria
-- [ ] AC-01: The main window starts with a default size of 1280x720 pixels.
-- [ ] AC-02: The main window enforces a minimum size of 900x600 pixels that cannot be overridden at runtime.
-- [ ] AC-03: The main window is centered on screen using `WindowStartupLocation="CenterScreen"`.
-- [ ] AC-04: The main window uses a two-column Grid layout: fixed-width sidebar (250px left) and flexible content area (remaining width, `*`).
-- [ ] AC-05: The content area contains three rows: header (Auto height), content Frame (`*` fills remaining), and status bar (Auto height).
-- [ ] AC-06: The window background uses `BackgroundBrush` from the application resource dictionary.
-- [ ] AC-07: The sidebar width remains fixed at 250px while the content area fills the remaining space on resize.
-- [ ] AC-08: The content Frame expands to fill all available vertical space between the header and status bar.
-- [ ] AC-09: The window is resizable with proper content reflow and minimum size constraints enforced.
+- [x] AC-01: The main window starts with a default size of 1280x720 pixels.
+- [x] AC-02: The main window enforces a minimum size of 900x600 pixels that cannot be overridden at runtime.
+- [x] AC-03: The main window is centered on screen using `WindowStartupLocation="CenterScreen"`.
+- [x] AC-04: The main window uses a two-column Grid layout: fixed-width sidebar (250px left) and flexible content area (remaining width, `*`).
+- [x] AC-05: The content area contains three rows: header (Auto height), content Frame (`*` fills remaining), and status bar (Auto height).
+- [x] AC-06: The window background uses `BackgroundBrush` from the application resource dictionary.
+- [x] AC-07: The sidebar width remains fixed at 250px while the content area fills the remaining space on resize.
+- [x] AC-08: The content Frame expands to fill all available vertical space between the header and status bar.
+- [x] AC-09: The window is resizable with proper content reflow and minimum size constraints enforced.
 
 ## Related Functional Requirements
 | ID | Description | Priority |

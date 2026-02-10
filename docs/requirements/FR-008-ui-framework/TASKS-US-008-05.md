@@ -4,21 +4,21 @@
 > **Parent FR**: [FR-008](FR-008-ui-framework.md)
 > **Priority**: P1
 > **Tasks**: 5 | **Effort**: 5S + 0M + 0L
-> **Status**: Not Started
+> **Status**: Done
 
 ## Prerequisites
-- [ ] None (this is a standalone window layout concern, though the layout structure is consumed by US-008-01, US-008-03, US-008-04, US-008-08)
+- [x] None (this is a standalone window layout concern, though the layout structure is consumed by US-008-01, US-008-03, US-008-04, US-008-08)
 
 ## Acceptance Criteria
-- [ ] AC-01: The main window starts with a default size of 1280x720 pixels.
-- [ ] AC-02: The main window enforces a minimum size of 900x600 pixels that cannot be overridden at runtime.
-- [ ] AC-03: The main window is centered on screen using `WindowStartupLocation="CenterScreen"`.
-- [ ] AC-04: The main window uses a two-column Grid layout: fixed-width sidebar (250px left) and flexible content area (remaining width, `*`).
-- [ ] AC-05: The content area contains three rows: header (Auto height), content Frame (`*` fills remaining), and status bar (Auto height).
-- [ ] AC-06: The window background uses `BackgroundBrush` from the application resource dictionary.
-- [ ] AC-07: The sidebar width remains fixed at 250px while the content area fills the remaining space on resize.
-- [ ] AC-08: The content Frame expands to fill all available vertical space between the header and status bar.
-- [ ] AC-09: The window is resizable with proper content reflow and minimum size constraints enforced.
+- [x] AC-01: The main window starts with a default size of 1280x720 pixels.
+- [x] AC-02: The main window enforces a minimum size of 900x600 pixels that cannot be overridden at runtime.
+- [x] AC-03: The main window is centered on screen using `WindowStartupLocation="CenterScreen"`.
+- [x] AC-04: The main window uses a two-column Grid layout: fixed-width sidebar (250px left) and flexible content area (remaining width, `*`).
+- [x] AC-05: The content area contains three rows: header (Auto height), content Frame (`*` fills remaining), and status bar (Auto height).
+- [x] AC-06: The window background uses `BackgroundBrush` from the application resource dictionary.
+- [x] AC-07: The sidebar width remains fixed at 250px while the content area fills the remaining space on resize.
+- [x] AC-08: The content Frame expands to fill all available vertical space between the header and status bar.
+- [x] AC-09: The window is resizable with proper content reflow and minimum size constraints enforced.
 
 ---
 
@@ -39,10 +39,10 @@
 - Verify the skeleton already defines these attributes; confirm correctness
 
 ### How to verify
-- [ ] Window starts at 1280x720 (AC-01)
-- [ ] Window cannot be resized below 900x600 (AC-02)
-- [ ] Window is centered on screen (AC-03)
-- [ ] Background uses BackgroundBrush resource (AC-06)
+- [x] Window starts at 1280x720 (AC-01)
+- [x] Window cannot be resized below 900x600 (AC-02)
+- [x] Window is centered on screen (AC-03)
+- [x] Background uses BackgroundBrush resource (AC-06)
 
 ---
 
@@ -62,9 +62,9 @@
 - Verify the skeleton already has this structure; confirm correctness
 
 ### How to verify
-- [ ] Sidebar remains fixed at 250px on window resize (AC-04, AC-07)
-- [ ] Content area fills remaining horizontal space (AC-04, AC-07)
-- [ ] Layout reflows properly on resize (AC-09)
+- [x] Sidebar remains fixed at 250px on window resize (AC-04, AC-07)
+- [x] Content area fills remaining horizontal space (AC-04, AC-07)
+- [x] Layout reflows properly on resize (AC-09)
 
 ---
 
@@ -85,9 +85,9 @@
 - Verify the skeleton already has this structure; confirm correctness
 
 ### How to verify
-- [ ] Header row auto-sizes (AC-05)
-- [ ] Content Frame fills remaining vertical space between header and status bar (AC-05, AC-08)
-- [ ] Status bar row auto-sizes (AC-05)
+- [x] Header row auto-sizes (AC-05)
+- [x] Content Frame fills remaining vertical space between header and status bar (AC-05, AC-08)
+- [x] Status bar row auto-sizes (AC-05)
 
 ---
 
@@ -107,8 +107,8 @@
 - Ensure `BackgroundBrush` is referenced by MainWindow via `{StaticResource BackgroundBrush}`
 
 ### How to verify
-- [ ] BackgroundBrush resource exists with value #F5F5F5 (AC-06)
-- [ ] MainWindow references BackgroundBrush, not a hardcoded color (AC-06)
+- [x] BackgroundBrush resource exists with value #F5F5F5 (AC-06)
+- [x] MainWindow references BackgroundBrush, not a hardcoded color (AC-06)
 
 ---
 
@@ -128,8 +128,8 @@
 - Wrap icon loading in try-catch if done in code-behind to handle missing icon gracefully
 
 ### How to verify
-- [ ] Window title bar displays "Odoo AutoCAD Integration" (AC-01)
-- [ ] Window icon is displayed in the title bar and taskbar (AC-01)
+- [x] Window title bar displays "Odoo AutoCAD Integration" (AC-01)
+- [x] Window icon is displayed in the title bar and taskbar (AC-01)
 
 ---
 

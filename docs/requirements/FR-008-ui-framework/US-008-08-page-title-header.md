@@ -10,13 +10,13 @@
 - **Priority**: P1
 
 ## Acceptance Criteria
-- [ ] AC-01: A header bar is displayed at the top of the content area (above the main Frame, to the right of the sidebar).
-- [ ] AC-02: The header bar displays `CurrentPageTitle` as a 20pt SemiBold TextBlock bound to the MainViewModel.
-- [ ] AC-03: The header bar includes a "Refresh" button on the right side bound to `RefreshCommand`.
-- [ ] AC-04: The header bar optionally includes a "Help" button on the right side.
-- [ ] AC-05: The header bar uses `SurfaceBrush` background with a bottom border separator.
-- [ ] AC-06: `CurrentPageTitle` updates automatically when navigation occurs, reflecting the display name of the active page.
-- [ ] AC-07: Page title mapping follows the defined convention: Dashboard, AutoCAD Integration, Odoo Connection, BOQ Manager, Purchase Requisition, AI Assistant (MCP), Settings.
+- [x] AC-01: A header bar is displayed at the top of the content area (above the main Frame, to the right of the sidebar).
+- [x] AC-02: The header bar displays `CurrentPageTitle` as a 20pt SemiBold TextBlock bound to the MainViewModel.
+- [x] AC-03: The header bar includes a "Refresh" button on the right side bound to `RefreshCommand`.
+- [x] AC-04: The header bar optionally includes a "Help" button on the right side.
+- [x] AC-05: The header bar uses `SurfaceBrush` background with a bottom border separator.
+- [x] AC-06: `CurrentPageTitle` updates automatically when navigation occurs, reflecting the display name of the active page.
+- [x] AC-07: Page title mapping follows the defined convention: Dashboard, AutoCAD Integration, Odoo Connection, BOQ Manager, Purchase Requisition, AI Assistant (MCP), Settings.
 
 ## Related Functional Requirements
 | ID | Description | Priority |

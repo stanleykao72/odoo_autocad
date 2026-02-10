@@ -4,22 +4,22 @@
 > **Parent FR**: [FR-007](FR-007-settings.md)
 > **Priority**: P2
 > **Tasks**: 7 | **Effort**: 7S + 0M + 0L
-> **Status**: Not Started
+> **Status**: Done
 
 ## Prerequisites
-- [ ] US-007-01 (SettingsPage XAML and SettingsViewModel must exist with TabControl structure)
-- [ ] `AppDbContext` available for extracting the database connection string path
-- [ ] `ConfigurationLoader` available for extracting the config file path
+- [x] US-007-01 (SettingsPage XAML and SettingsViewModel must exist with TabControl structure)
+- [x] `AppDbContext` available for extracting the database connection string path
+- [x] `ConfigurationLoader` available for extracting the config file path
 
 ## Acceptance Criteria
-- [ ] AC-01: Settings Page displays the application version number (e.g., "6.0.0") as a read-only field in the Advanced tab under Application Info section
-- [ ] AC-02: Settings Page displays the database file path (e.g., `C:\Users\...\database.db`) as a read-only field
-- [ ] AC-03: Settings Page displays the config file path (e.g., `appsettings.json`) as a read-only field
-- [ ] AC-04: Settings Page displays the .NET Runtime version (e.g., ".NET 8.0") as a read-only field
-- [ ] AC-05: All Application Info fields are read-only and cannot be edited by the user
-- [ ] AC-06: Application info values are populated automatically on page load from runtime metadata
-- [ ] AC-07: Version number is sourced from the assembly version or application metadata
-- [ ] AC-08: Database path is sourced from the EF Core connection string or AppDbContext configuration
+- [x] AC-01: Settings Page displays the application version number (e.g., "6.0.0") as a read-only field in the Advanced tab under Application Info section
+- [x] AC-02: Settings Page displays the database file path (e.g., `C:\Users\...\database.db`) as a read-only field
+- [x] AC-03: Settings Page displays the config file path (e.g., `appsettings.json`) as a read-only field
+- [x] AC-04: Settings Page displays the .NET Runtime version (e.g., ".NET 8.0") as a read-only field
+- [x] AC-05: All Application Info fields are read-only and cannot be edited by the user
+- [x] AC-06: Application info values are populated automatically on page load from runtime metadata
+- [x] AC-07: Version number is sourced from the assembly version or application metadata
+- [x] AC-08: Database path is sourced from the EF Core connection string or AppDbContext configuration
 
 ---
 
@@ -43,8 +43,8 @@
 - Consider adding a small "copy to clipboard" button next to each field for user convenience
 
 ### How to verify
-- [ ] Four read-only fields render in the Application Info section (AC-01, AC-02, AC-03, AC-04)
-- [ ] Fields are visually distinct as non-editable (AC-05)
+- [x] Four read-only fields render in the Application Info section (AC-01, AC-02, AC-03, AC-04)
+- [x] Fields are visually distinct as non-editable (AC-05)
 
 ---
 
@@ -66,8 +66,8 @@
 - They should NOT participate in `HasUnsavedChanges` tracking (they are read-only display values)
 
 ### How to verify
-- [ ] All four properties are bindable and accessible (AC-01, AC-02, AC-03, AC-04)
-- [ ] Changing these properties does not trigger `HasUnsavedChanges` (AC-05)
+- [x] All four properties are bindable and accessible (AC-01, AC-02, AC-03, AC-04)
+- [x] Changing these properties does not trigger `HasUnsavedChanges` (AC-05)
 
 ---
 
@@ -88,8 +88,8 @@
 - Fall back to "Unknown" if both methods fail
 
 ### How to verify
-- [ ] `AppVersion` displays the correct version number (e.g., "6.0.0") (AC-01, AC-07)
-- [ ] Version is sourced from assembly metadata or AppSettings (AC-07)
+- [x] `AppVersion` displays the correct version number (e.g., "6.0.0") (AC-01, AC-07)
+- [x] Version is sourced from assembly metadata or AppSettings (AC-07)
 
 ---
 
@@ -111,8 +111,8 @@
 - Fall back to "Unknown" if the connection string cannot be parsed
 
 ### How to verify
-- [ ] `DatabasePath` displays the resolved absolute path to the SQLite database file (AC-02, AC-08)
-- [ ] Path is sourced from the EF Core connection string (AC-08)
+- [x] `DatabasePath` displays the resolved absolute path to the SQLite database file (AC-02, AC-08)
+- [x] Path is sourced from the EF Core connection string (AC-08)
 
 ---
 
@@ -133,8 +133,8 @@
 - Set `ConfigFilePath` to the resolved absolute path
 
 ### How to verify
-- [ ] `ConfigFilePath` displays the absolute path to `appsettings.json` (AC-03)
-- [ ] Path is resolved from the application base directory (AC-03)
+- [x] `ConfigFilePath` displays the absolute path to `appsettings.json` (AC-03)
+- [x] Path is resolved from the application base directory (AC-03)
 
 ---
 
@@ -154,8 +154,8 @@
 - No fallback needed as this API is always available in .NET 6+
 
 ### How to verify
-- [ ] `DotNetRuntime` displays the .NET runtime version (e.g., ".NET 8.0") (AC-04)
-- [ ] Value is populated automatically without user action (AC-06)
+- [x] `DotNetRuntime` displays the .NET runtime version (e.g., ".NET 8.0") (AC-04)
+- [x] Value is populated automatically without user action (AC-06)
 
 ---
 
@@ -179,9 +179,9 @@
 - Ensure the section has a clear visual separation from editable settings above
 
 ### How to verify
-- [ ] Application Info fields have distinct read-only styling (gray, no border) (AC-05)
-- [ ] Fields cannot be edited by typing or pasting (AC-05)
-- [ ] Values can be selected and copied (AC-05)
+- [x] Application Info fields have distinct read-only styling (gray, no border) (AC-05)
+- [x] Fields cannot be edited by typing or pasting (AC-05)
+- [x] Values can be selected and copied (AC-05)
 
 ---
 

@@ -4,19 +4,19 @@
 > **Parent FR**: [FR-007](FR-007-settings.md)
 > **Priority**: P2
 > **Tasks**: 6 | **Effort**: 5S + 1M + 0L
-> **Status**: Not Started
+> **Status**: In Progress
 
 ## Prerequisites
 - [ ] US-007-01 (SettingsPage XAML and SettingsViewModel must exist with TabControl structure)
 - [ ] `AppDbContext` with `ServerConfigs` and `SyncLogs` DbSets available
 
 ## Acceptance Criteria
-- [ ] AC-01: Settings Page displays an input field for MCP SSE Server port number in the MCP tab with default value 8084
+- [x] AC-01: Settings Page displays an input field for MCP SSE Server port number in the MCP tab with default value 8084
 - [ ] AC-02: Port number validates as integer between 1024 and 65535 inclusive, with inline error for out-of-range values
 - [ ] AC-03: A warning is displayed (non-blocking) if the entered port appears to be in use, with message "Port {port} appears to be in use. MCP server may not start. Choose a different port."
-- [ ] AC-04: Saving persists the port number to `ServerConfigs` database table with key `mcp.port`
-- [ ] AC-05: The port value is also saved to the `appsettings.json` MCP section
-- [ ] AC-06: Port setting is loaded from database on page initialization with fallback to default 8084
+- [x] AC-04: Saving persists the port number to `ServerConfigs` database table with key `mcp.port`
+- [x] AC-05: The port value is also saved to the `appsettings.json` MCP section
+- [x] AC-06: Port setting is loaded from database on page initialization with fallback to default 8084
 - [ ] AC-07: Settings change is logged to the `SyncLog` table with SyncType "settings_change"
 
 ---
@@ -38,8 +38,8 @@
 - Include inline validation error display via `Validation.ErrorTemplate`
 
 ### How to verify
-- [ ] MCP tab renders with port input field showing default 8084 (AC-01)
-- [ ] Warning text area is present but hidden when no warning (AC-03)
+- [x] MCP tab renders with port input field showing default 8084 (AC-01)
+- [x] Warning text area is present but hidden when no warning (AC-03)
 
 ---
 
@@ -58,8 +58,8 @@
 - Add `[ObservableProperty] string _mcpPortWarning` (default empty) for the port-in-use warning message
 
 ### How to verify
-- [ ] `MCPPort` property generates change notifications and is bindable (AC-01)
-- [ ] Default value is 8084 (AC-01)
+- [x] `MCPPort` property generates change notifications and is bindable (AC-01)
+- [x] Default value is 8084 (AC-01)
 
 ---
 
@@ -126,9 +126,9 @@
 - Update the original-values snapshot for `MCPPort` after save
 
 ### How to verify
-- [ ] After Save, `ServerConfigs` contains row with `mcp.port` and correct value (AC-04)
-- [ ] After Save, `appsettings.json` MCP section reflects the new port number (AC-05)
-- [ ] `SyncLog` entry includes the port change (AC-07)
+- [x] After Save, `ServerConfigs` contains row with `mcp.port` and correct value (AC-04)
+- [x] After Save, `appsettings.json` MCP section reflects the new port number (AC-05)
+- [x] `SyncLog` entry includes the port change (AC-07)
 
 ---
 
@@ -148,8 +148,8 @@
 - Include the loaded value in the original-values snapshot
 
 ### How to verify
-- [ ] On page load, port field shows the value from DB if present (AC-06)
-- [ ] On first load (no DB entry), port field shows default 8084 (AC-06)
+- [x] On page load, port field shows the value from DB if present (AC-06)
+- [x] On first load (no DB entry), port field shows default 8084 (AC-06)
 
 ---
 

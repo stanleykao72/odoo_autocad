@@ -10,14 +10,14 @@
 - **Priority**: P2
 
 ## Acceptance Criteria
-- [ ] AC-01: Settings Page displays the application version number (e.g., "6.0.0") as a read-only field in the Advanced tab under Application Info section
-- [ ] AC-02: Settings Page displays the database file path (e.g., `C:\Users\...\database.db`) as a read-only field
-- [ ] AC-03: Settings Page displays the config file path (e.g., `appsettings.json`) as a read-only field
-- [ ] AC-04: Settings Page displays the .NET Runtime version (e.g., ".NET 8.0") as a read-only field
-- [ ] AC-05: All Application Info fields are read-only and cannot be edited by the user
-- [ ] AC-06: Application info values are populated automatically on page load from runtime metadata
-- [ ] AC-07: Version number is sourced from the assembly version or application metadata
-- [ ] AC-08: Database path is sourced from the EF Core connection string or AppDbContext configuration
+- [x] AC-01: Settings Page displays the application version number (e.g., "6.0.0") as a read-only field in the Advanced tab under Application Info section
+- [x] AC-02: Settings Page displays the database file path (e.g., `C:\Users\...\database.db`) as a read-only field
+- [x] AC-03: Settings Page displays the config file path (e.g., `appsettings.json`) as a read-only field
+- [x] AC-04: Settings Page displays the .NET Runtime version (e.g., ".NET 8.0") as a read-only field
+- [x] AC-05: All Application Info fields are read-only and cannot be edited by the user
+- [x] AC-06: Application info values are populated automatically on page load from runtime metadata
+- [x] AC-07: Version number is sourced from the assembly version or application metadata
+- [x] AC-08: Database path is sourced from the EF Core connection string or AppDbContext configuration
 
 ## Related Functional Requirements
 | ID | Description | Priority |

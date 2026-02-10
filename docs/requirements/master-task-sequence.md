@@ -15,54 +15,63 @@ its parent User Story for full context and acceptance criteria.
 
 | Phase | Sprints | User Stories | Tasks | S | M | L | Status |
 |-------|---------|-------------|-------|---|---|---|--------|
-| Phase 1: Core Infrastructure | 1–3 | 17 | 103 | 57 | 39 | 7 | Not Started |
-| Phase 2: Business Logic | 4–6 | 17 | 121 | 71 | 38 | 12 | Not Started |
-| Phase 3: Feature Completion | 7–9 | 30 | 197 | 138 | 55 | 4 | Not Started |
+| Phase 1: Core Infrastructure | 1–3 | 17 | 103 | 57 | 39 | 7 | In Progress |
+| Phase 2: Business Logic | 4–6 | 17 | 121 | 71 | 38 | 12 | In Progress |
+| Phase 3: Feature Completion | 7–9 | 30 | 197 | 138 | 55 | 4 | In Progress |
 | Phase 4: AI Integration | 10–11 | 14 | 79 | 47 | 28 | 4 | Not Started |
 
 ---
 
+## Actual Implementation Order
+
+> The sprints below follow the **original planned sequence**. In practice, implementation proceeded in a different order to prioritize core user-facing features. Below is the mapping of actual implementation sprints to original sprint content.
+
+| Actual Sprint | Completed | Original Sprint(s) | Content |
+|---------------|-----------|-------------------|---------|
+| Sprint 1 | 2026-02-09 | Sprint 1 | App Shell & Navigation (US-008-01/02/05/08/09/10) |
+| Sprint 2 | 2026-02-10 | Sprint 6 (partial) + Sprint 9 (partial) | Settings Page Core (US-007-01/04/05/06/13) |
+
 ## Phase 1: Core Infrastructure
 
-### Sprint 1: App Shell & Navigation
+### Sprint 1: App Shell & Navigation ✅
 > **Focus**: Application skeleton, sidebar navigation, window management, fonts, clean shutdown
 > **User Stories**: US-008-01, US-008-02, US-008-05, US-008-08, US-008-09, US-008-10
 > **Tasks**: 32 (22S + 9M + 1L)
 
 | # | Task ID | Title | Target | Est | Depends On | Status |
 |---|---------|-------|--------|-----|------------|--------|
-| 1 | TASK-008-01-01 | Define sidebar XAML layout with title area, navigation buttons, and... | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | L | — | [ ] |
-| 2 | TASK-008-01-02 | Implement NavButton style with transparent background, left-align, ... | `...ainWindow.xaml` (Window.Resources) or `App.xaml` | M | TASK-008-01-01 | [ ] |
-| 3 | TASK-008-01-03 | Create INavigationService interface with NavigateTo, GoBack, CanGoB... | `src/OdooAutoCAD.App/Services/NavigationService.cs` | M | — | [ ] |
-| 4 | TASK-008-01-04 | Implement NavigationService with reflection-based page resolution | `src/OdooAutoCAD.App/Services/NavigationService.cs` | M | TASK-008-01-03 | [ ] |
-| 5 | TASK-008-01-05 | Add NavigateCommand and page title mapping to MainViewModel | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | M | TASK-008-01-03 | [ ] |
-| 6 | TASK-008-01-06 | Wire MainWindow constructor to set Frame on NavigationService and n... | `src/OdooAutoCAD.App/Views/MainWindow.xaml.cs` | S | TASK-008-01-04, TASK-008-01-05 | [ ] |
-| 7 | TASK-008-01-07 | Register INavigationService as singleton in DI container | `src/OdooAutoCAD.App/App.xaml.cs` | S | TASK-008-01-03 | [ ] |
-| 8 | TASK-008-02-01 | Add ActiveNavButton observable property to MainViewModel | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | — | [ ] |
-| 9 | TASK-008-02-02 | Implement NavButton style DataTriggers for active state highlighting | `` | M | TASK-008-02-01 | [ ] |
-| 10 | TASK-008-02-03 | Update NavigateCommand handler to set ActiveNavButton alongside Cur... | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | TASK-008-02-01 | [ ] |
-| 11 | TASK-008-02-04 | Assign Tag property to each sidebar button matching ActiveNavButton... | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | TASK-008-02-02 | [ ] |
-| 12 | TASK-008-05-01 | Define MainWindow XAML root element with size, position, and backgr... | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | — | [ ] |
-| 13 | TASK-008-05-02 | Define two-column Grid with fixed sidebar and star-sized content co... | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | TASK-008-05-01 | [ ] |
-| 14 | TASK-008-05-03 | Define three-row content area Grid | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | TASK-008-05-01 | [ ] |
-| 15 | TASK-008-05-04 | Define BackgroundBrush resource in application ResourceDictionary | `src/OdooAutoCAD.App/App.xaml` | S | — | [ ] |
-| 16 | TASK-008-05-05 | Set window Title and Icon | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | — | [ ] |
-| 17 | TASK-008-08-01 | Define header bar XAML with page title TextBlock and action buttons | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | M | — | [ ] |
-| 18 | TASK-008-08-02 | Add CurrentPageTitle observable property to MainViewModel | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | — | [ ] |
-| 19 | TASK-008-08-03 | Add RefreshCommand to MainViewModel | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | — | [ ] |
-| 20 | TASK-008-08-04 | Define page title display name mapping | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | TASK-008-08-02 | [ ] |
-| 21 | TASK-008-08-05 | Apply SurfaceBrush background and bottom border styling to header bar | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | TASK-008-08-01 | [ ] |
-| 22 | TASK-008-09-01 | Implement App.OnExit with ordered cleanup sequence | `src/OdooAutoCAD.App/App.xaml.cs` | M | — | [ ] |
-| 23 | TASK-008-09-02 | Register DispatcherUnhandledException handler | `src/OdooAutoCAD.App/App.xaml.cs` | S | — | [ ] |
-| 24 | TASK-008-09-03 | Register AppDomain.UnhandledException handler | `src/OdooAutoCAD.App/App.xaml.cs` | S | — | [ ] |
-| 25 | TASK-008-09-04 | Register TaskScheduler.UnobservedTaskException handler | `src/OdooAutoCAD.App/App.xaml.cs` | S | — | [ ] |
-| 26 | TASK-008-09-05 | Add try-catch around MCP server stop to prevent shutdown blocking | `src/OdooAutoCAD.App/App.xaml.cs` | S | TASK-008-09-01 | [ ] |
-| 27 | TASK-008-09-06 | Verify no port locks remain after shutdown via integration test | `` | M | TASK-008-09-01, TASK-008-09-05 | [ ] |
-| 28 | TASK-008-10-01 | Define AppFontFamily resource with fallback chain in ResourceDictio... | `src/OdooAutoCAD.App/App.xaml` | S | — | [ ] |
-| 29 | TASK-008-10-02 | Set FontFamily at the Window level referencing AppFontFamily | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | TASK-008-10-01 | [ ] |
-| 30 | TASK-008-10-03 | Merge font resources into App.xaml ResourceDictionary | `src/OdooAutoCAD.App/App.xaml` | S | TASK-008-10-01 | [ ] |
-| 31 | TASK-008-10-04 | Verify all named styles reference AppFontFamily | `src/OdooAutoCAD.App/App.xaml` | S | TASK-008-10-01 | [ ] |
-| 32 | TASK-008-10-05 | Test CJK rendering with sample Chinese strings across all UI areas | `` | M | TASK-008-10-02, TASK-008-10-04 | [ ] |
+| 1 | TASK-008-01-01 | Define sidebar XAML layout with title area, navigation buttons, and... | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | L | — | [x] |
+| 2 | TASK-008-01-02 | Implement NavButton style with transparent background, left-align, ... | `...ainWindow.xaml` (Window.Resources) or `App.xaml` | M | TASK-008-01-01 | [x] |
+| 3 | TASK-008-01-03 | Create INavigationService interface with NavigateTo, GoBack, CanGoB... | `src/OdooAutoCAD.App/Services/NavigationService.cs` | M | — | [x] |
+| 4 | TASK-008-01-04 | Implement NavigationService with reflection-based page resolution | `src/OdooAutoCAD.App/Services/NavigationService.cs` | M | TASK-008-01-03 | [x] |
+| 5 | TASK-008-01-05 | Add NavigateCommand and page title mapping to MainViewModel | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | M | TASK-008-01-03 | [x] |
+| 6 | TASK-008-01-06 | Wire MainWindow constructor to set Frame on NavigationService and n... | `src/OdooAutoCAD.App/Views/MainWindow.xaml.cs` | S | TASK-008-01-04, TASK-008-01-05 | [x] |
+| 7 | TASK-008-01-07 | Register INavigationService as singleton in DI container | `src/OdooAutoCAD.App/App.xaml.cs` | S | TASK-008-01-03 | [x] |
+| 8 | TASK-008-02-01 | Add ActiveNavButton observable property to MainViewModel | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | — | [x] |
+| 9 | TASK-008-02-02 | Implement NavButton style DataTriggers for active state highlighting | `` | M | TASK-008-02-01 | [x] |
+| 10 | TASK-008-02-03 | Update NavigateCommand handler to set ActiveNavButton alongside Cur... | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | TASK-008-02-01 | [x] |
+| 11 | TASK-008-02-04 | Assign Tag property to each sidebar button matching ActiveNavButton... | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | TASK-008-02-02 | [x] |
+| 12 | TASK-008-05-01 | Define MainWindow XAML root element with size, position, and backgr... | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | — | [x] |
+| 13 | TASK-008-05-02 | Define two-column Grid with fixed sidebar and star-sized content co... | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | TASK-008-05-01 | [x] |
+| 14 | TASK-008-05-03 | Define three-row content area Grid | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | TASK-008-05-01 | [x] |
+| 15 | TASK-008-05-04 | Define BackgroundBrush resource in application ResourceDictionary | `src/OdooAutoCAD.App/App.xaml` | S | — | [x] |
+| 16 | TASK-008-05-05 | Set window Title and Icon | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | — | [x] |
+| 17 | TASK-008-08-01 | Define header bar XAML with page title TextBlock and action buttons | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | M | — | [x] |
+| 18 | TASK-008-08-02 | Add CurrentPageTitle observable property to MainViewModel | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | — | [x] |
+| 19 | TASK-008-08-03 | Add RefreshCommand to MainViewModel | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | — | [x] |
+| 20 | TASK-008-08-04 | Define page title display name mapping | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | TASK-008-08-02 | [x] |
+| 21 | TASK-008-08-05 | Apply SurfaceBrush background and bottom border styling to header bar | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | TASK-008-08-01 | [x] |
+| 22 | TASK-008-09-01 | Implement App.OnExit with ordered cleanup sequence | `src/OdooAutoCAD.App/App.xaml.cs` | M | — | [x] |
+| 23 | TASK-008-09-02 | Register DispatcherUnhandledException handler | `src/OdooAutoCAD.App/App.xaml.cs` | S | — | [x] |
+| 24 | TASK-008-09-03 | Register AppDomain.UnhandledException handler | `src/OdooAutoCAD.App/App.xaml.cs` | S | — | [x] |
+| 25 | TASK-008-09-04 | Register TaskScheduler.UnobservedTaskException handler | `src/OdooAutoCAD.App/App.xaml.cs` | S | — | [x] |
+| 26 | TASK-008-09-05 | Add try-catch around MCP server stop to prevent shutdown blocking | `src/OdooAutoCAD.App/App.xaml.cs` | S | TASK-008-09-01 | [x] |
+| 27 | TASK-008-09-06 | Verify no port locks remain after shutdown via integration test | `` | M | TASK-008-09-01, TASK-008-09-05 | [x] |
+| 28 | TASK-008-10-01 | Define AppFontFamily resource with fallback chain in ResourceDictio... | `src/OdooAutoCAD.App/App.xaml` | S | — | [x] |
+| 29 | TASK-008-10-02 | Set FontFamily at the Window level referencing AppFontFamily | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | TASK-008-10-01 | [x] |
+| 30 | TASK-008-10-03 | Merge font resources into App.xaml ResourceDictionary | `src/OdooAutoCAD.App/App.xaml` | S | TASK-008-10-01 | [x] |
+| 31 | TASK-008-10-04 | Verify all named styles reference AppFontFamily | `src/OdooAutoCAD.App/App.xaml` | S | TASK-008-10-01 | [x] |
+| 32 | TASK-008-10-05 | Test CJK rendering with sample Chinese strings across all UI areas | `` | M | TASK-008-10-02, TASK-008-10-04 | [x] |
 
 ### Sprint 2: Status Bar, Log Panel & Dashboard
 > **Focus**: Connection status bar, system log panel, auto-start services, dashboard views
@@ -278,13 +287,13 @@ its parent User Story for full context and acceptance criteria.
 | 201 | TASK-005-04-05 | Update PR state in UI after successful submission | `ViewModels/PurchaseRequisitionViewModel.cs` | S | TASK-005-04-02 | [ ] |
 | 202 | TASK-005-04-06 | Implement error handling for submission failures | `ViewModels/PurchaseRequisitionViewModel.cs` | S | TASK-005-04-02 | [ ] |
 | 203 | TASK-005-04-07 | Add loading indicator on Submit button during submission | `Views/Pages/PurchaseRequisitionPage.xaml` | S | TASK-005-04-01 | [ ] |
-| 204 | TASK-007-01-01 | Create SettingsPage XAML with TabControl and Connection tab contain... | `Views/Pages/SettingsPage.xaml` | M | — | [ ] |
-| 205 | TASK-007-01-02 | Implement PasswordBox/TextBox toggle for API Token with show/hide b... | `Views/Pages/SettingsPage.xaml` | S | TASK-007-01-01 | [ ] |
-| 206 | TASK-007-01-03 | Add SettingsViewModel with Odoo connection properties | `ViewModels/SettingsViewModel.cs` | M | — | [ ] |
+| 204 | TASK-007-01-01 | Create SettingsPage XAML with TabControl and Connection tab contain... | `Views/Pages/SettingsPage.xaml` | M | — | [x] |
+| 205 | TASK-007-01-02 | Implement PasswordBox/TextBox toggle for API Token with show/hide b... | `Views/Pages/SettingsPage.xaml` | S | TASK-007-01-01 | [x] |
+| 206 | TASK-007-01-03 | Add SettingsViewModel with Odoo connection properties | `ViewModels/SettingsViewModel.cs` | M | — | [x] |
 | 207 | TASK-007-01-04 | Implement INotifyDataErrorInfo validation for Odoo connection fields | `ViewModels/SettingsViewModel.cs` | M | TASK-007-01-03 | [ ] |
-| 208 | TASK-007-01-05 | Implement SaveSettingsCommand persisting to appsettings.json and Se... | `ViewModels/SettingsViewModel.cs` | L | TASK-007-01-03, TASK-007-01-04 | [ ] |
-| 209 | TASK-007-01-06 | Extend ConfigurationLoader with SaveToJson method excluding sensiti... | `OdooAutoCAD.Configuration/ConfigurationLoader.cs` | M | — | [ ] |
-| 210 | TASK-007-01-07 | Implement HasUnsavedChanges tracking with original-values snapshot | `ViewModels/SettingsViewModel.cs` | L | TASK-007-01-03, TASK-007-01-01 | [ ] |
+| 208 | TASK-007-01-05 | Implement SaveSettingsCommand persisting to appsettings.json and Se... | `ViewModels/SettingsViewModel.cs` | L | TASK-007-01-03, TASK-007-01-04 | [x] |
+| 209 | TASK-007-01-06 | Extend ConfigurationLoader with SaveToJson method excluding sensiti... | `OdooAutoCAD.Configuration/ConfigurationLoader.cs` | M | — | [x] |
+| 210 | TASK-007-01-07 | Implement HasUnsavedChanges tracking with original-values snapshot | `ViewModels/SettingsViewModel.cs` | L | TASK-007-01-03, TASK-007-01-01 | [x] |
 | 211 | TASK-007-01-08 | Add SyncLog audit entry on settings save | `ViewModels/SettingsViewModel.cs` | S | TASK-007-01-05 | [ ] |
 | 212 | TASK-007-02-01 | Add environment selector dropdown to Connection tab in XAML | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
 | 213 | TASK-007-02-02 | Add SelectedEnvironment, AvailableEnvironments, and ChangeEnvironme... | `ViewModels/SettingsViewModel.cs` | M | — | [ ] |
@@ -453,22 +462,22 @@ its parent User Story for full context and acceptance criteria.
 
 | # | Task ID | Title | Target | Est | Depends On | Status |
 |---|---------|-------|--------|-----|------------|--------|
-| 351 | TASK-007-04-01 | Add AutoCAD tab with ProgId, Connection Timeout, and Retry Attempts... | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
-| 352 | TASK-007-04-02 | Add AutoCADProgId, AutoCADConnectionTimeout, and AutoCADRetryAttemp... | `ViewModels/SettingsViewModel.cs` | S | — | [ ] |
+| 351 | TASK-007-04-01 | Add AutoCAD tab with ProgId, Connection Timeout, and Retry Attempts... | `Views/Pages/SettingsPage.xaml` | S | — | [x] |
+| 352 | TASK-007-04-02 | Add AutoCADProgId, AutoCADConnectionTimeout, and AutoCADRetryAttemp... | `ViewModels/SettingsViewModel.cs` | S | — | [x] |
 | 353 | TASK-007-04-03 | Implement validation for timeout (5-120) and retry attempts (1-10) ... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-04-02 | [ ] |
 | 354 | TASK-007-04-04 | Add numeric input constraints to XAML fields (integer-only input) | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
-| 355 | TASK-007-04-05 | Persist AutoCAD settings to ServerConfigs table on Save | `ViewModels/SettingsViewModel.cs` | S | TASK-007-04-02 | [ ] |
-| 356 | TASK-007-04-06 | Load AutoCAD settings from ServerConfigs table on page initializati... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-04-05 | [ ] |
-| 357 | TASK-007-05-01 | Add MCP tab with SSE Server Port input field in XAML | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
-| 358 | TASK-007-05-02 | Add MCPPort property to ViewModel with default value 8084 | `ViewModels/SettingsViewModel.cs` | S | — | [ ] |
+| 355 | TASK-007-04-05 | Persist AutoCAD settings to ServerConfigs table on Save | `ViewModels/SettingsViewModel.cs` | S | TASK-007-04-02 | [x] |
+| 356 | TASK-007-04-06 | Load AutoCAD settings from ServerConfigs table on page initializati... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-04-05 | [x] |
+| 357 | TASK-007-05-01 | Add MCP tab with SSE Server Port input field in XAML | `Views/Pages/SettingsPage.xaml` | S | — | [x] |
+| 358 | TASK-007-05-02 | Add MCPPort property to ViewModel with default value 8084 | `ViewModels/SettingsViewModel.cs` | S | — | [x] |
 | 359 | TASK-007-05-03 | Implement validation for port range (1024-65535) with inline error ... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-05-02 | [ ] |
 | 360 | TASK-007-05-04 | Implement optional port-in-use detection and display non-blocking w... | `ViewModels/SettingsViewModel.cs` | M | TASK-007-05-02 | [ ] |
-| 361 | TASK-007-05-05 | Persist MCP port to ServerConfigs table and appsettings.json on Save | `ViewModels/SettingsViewModel.cs` | S | TASK-007-05-02 | [ ] |
-| 362 | TASK-007-05-06 | Load MCP port from ServerConfigs table on page initialization with ... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-05-05 | [ ] |
-| 363 | TASK-007-06-01 | Add MCP auto-start toggle/checkbox to MCP tab in XAML | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
-| 364 | TASK-007-06-02 | Add MCPAutoStart boolean property to ViewModel with default value f... | `ViewModels/SettingsViewModel.cs` | S | — | [ ] |
-| 365 | TASK-007-06-03 | Persist MCP auto-start to ServerConfigs table and appsettings.json ... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-06-02 | [ ] |
-| 366 | TASK-007-06-04 | Load MCP auto-start from ServerConfigs table on page initialization... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-06-02, TASK-007-06-03 | [ ] |
+| 361 | TASK-007-05-05 | Persist MCP port to ServerConfigs table and appsettings.json on Save | `ViewModels/SettingsViewModel.cs` | S | TASK-007-05-02 | [x] |
+| 362 | TASK-007-05-06 | Load MCP port from ServerConfigs table on page initialization with ... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-05-05 | [x] |
+| 363 | TASK-007-06-01 | Add MCP auto-start toggle/checkbox to MCP tab in XAML | `Views/Pages/SettingsPage.xaml` | S | — | [x] |
+| 364 | TASK-007-06-02 | Add MCPAutoStart boolean property to ViewModel with default value f... | `ViewModels/SettingsViewModel.cs` | S | — | [x] |
+| 365 | TASK-007-06-03 | Persist MCP auto-start to ServerConfigs table and appsettings.json ... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-06-02 | [x] |
+| 366 | TASK-007-06-04 | Load MCP auto-start from ServerConfigs table on page initialization... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-06-02, TASK-007-06-03 | [x] |
 | 367 | TASK-007-06-05 | Integrate auto-start check in application startup logic | `` | M | TASK-007-06-03 | [ ] |
 | 368 | TASK-007-07-01 | Add theme radio buttons (System, Light, Dark) to Appearance tab in ... | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
 | 369 | TASK-007-07-02 | Add SelectedTheme property to ViewModel that triggers live preview ... | `ViewModels/SettingsViewModel.cs` | S | — | [ ] |
@@ -512,13 +521,13 @@ its parent User Story for full context and acceptance criteria.
 | 407 | TASK-007-12-05 | Map imported JSON values to ViewModel properties and set HasUnsaved... | `ViewModels/SettingsViewModel.cs` | M | TASK-007-12-02, TASK-007-12-04 | [ ] |
 | 408 | TASK-007-12-06 | Display success, partial-import warning, or error feedback based on... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-12-04 | [ ] |
 | 409 | TASK-007-12-07 | Log import operation to SyncLog table | `ViewModels/SettingsViewModel.cs` | S | TASK-007-12-02 | [ ] |
-| 410 | TASK-007-13-01 | Add Application Info section to Advanced tab with read-only fields | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
-| 411 | TASK-007-13-02 | Add AppVersion, DatabasePath, ConfigFilePath, and DotNetRuntime rea... | `ViewModels/SettingsViewModel.cs` | S | — | [ ] |
-| 412 | TASK-007-13-03 | Populate AppVersion from assembly version or application metadata | `ViewModels/SettingsViewModel.cs` | S | TASK-007-13-02 | [ ] |
-| 413 | TASK-007-13-04 | Populate DatabasePath from AppDbContext connection string | `ViewModels/SettingsViewModel.cs` | S | TASK-007-13-02 | [ ] |
-| 414 | TASK-007-13-05 | Populate ConfigFilePath from ConfigurationLoader or AppDomain.Curre... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-13-02 | [ ] |
-| 415 | TASK-007-13-06 | Populate DotNetRuntime from RuntimeInformation.FrameworkDescription | `ViewModels/SettingsViewModel.cs` | S | TASK-007-13-02 | [ ] |
-| 416 | TASK-007-13-07 | Style Application Info fields as read-only with distinct visual tre... | `Views/Pages/SettingsPage.xaml` | S | TASK-007-13-01 | [ ] |
+| 410 | TASK-007-13-01 | Add Application Info section to Advanced tab with read-only fields | `Views/Pages/SettingsPage.xaml` | S | — | [x] |
+| 411 | TASK-007-13-02 | Add AppVersion, DatabasePath, ConfigFilePath, and DotNetRuntime rea... | `ViewModels/SettingsViewModel.cs` | S | — | [x] |
+| 412 | TASK-007-13-03 | Populate AppVersion from assembly version or application metadata | `ViewModels/SettingsViewModel.cs` | S | TASK-007-13-02 | [x] |
+| 413 | TASK-007-13-04 | Populate DatabasePath from AppDbContext connection string | `ViewModels/SettingsViewModel.cs` | S | TASK-007-13-02 | [x] |
+| 414 | TASK-007-13-05 | Populate ConfigFilePath from ConfigurationLoader or AppDomain.Curre... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-13-02 | [x] |
+| 415 | TASK-007-13-06 | Populate DotNetRuntime from RuntimeInformation.FrameworkDescription | `ViewModels/SettingsViewModel.cs` | S | TASK-007-13-02 | [x] |
+| 416 | TASK-007-13-07 | Style Application Info fields as read-only with distinct visual tre... | `Views/Pages/SettingsPage.xaml` | S | TASK-007-13-01 | [x] |
 | 417 | TASK-008-07-01 | Define InputBindings for Ctrl+1 through Ctrl+7 navigation shortcuts | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | M | — | [ ] |
 | 418 | TASK-008-07-02 | Define InputBinding for F5 Refresh shortcut | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | — | [ ] |
 | 419 | TASK-008-07-03 | Define InputBinding for Alt+Left GoBack shortcut | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | TASK-008-07-04 | [ ] |

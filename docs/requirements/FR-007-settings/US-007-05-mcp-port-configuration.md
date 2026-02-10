@@ -10,12 +10,12 @@
 - **Priority**: P2
 
 ## Acceptance Criteria
-- [ ] AC-01: Settings Page displays an input field for MCP SSE Server port number in the MCP tab with default value 8084
+- [x] AC-01: Settings Page displays an input field for MCP SSE Server port number in the MCP tab with default value 8084
 - [ ] AC-02: Port number validates as integer between 1024 and 65535 inclusive, with inline error for out-of-range values
 - [ ] AC-03: A warning is displayed (non-blocking) if the entered port appears to be in use, with message "Port {port} appears to be in use. MCP server may not start. Choose a different port."
-- [ ] AC-04: Saving persists the port number to `ServerConfigs` database table with key `mcp.port`
-- [ ] AC-05: The port value is also saved to the `appsettings.json` MCP section
-- [ ] AC-06: Port setting is loaded from database on page initialization with fallback to default 8084
+- [x] AC-04: Saving persists the port number to `ServerConfigs` database table with key `mcp.port`
+- [x] AC-05: The port value is also saved to the `appsettings.json` MCP section
+- [x] AC-06: Port setting is loaded from database on page initialization with fallback to default 8084
 - [ ] AC-07: Settings change is logged to the `SyncLog` table with SyncType "settings_change"
 
 ## Related Functional Requirements

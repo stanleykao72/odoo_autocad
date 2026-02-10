@@ -10,12 +10,12 @@
 - **Priority**: P1
 
 ## Acceptance Criteria
-- [ ] AC-01: The application uses Microsoft JhengHei UI as the primary font family for all UI elements.
-- [ ] AC-02: A font fallback chain is defined: Microsoft JhengHei UI, Microsoft JhengHei, SimHei, Arial Unicode MS.
-- [ ] AC-03: The font family is set at the Window or Application level so it applies globally without per-element configuration.
-- [ ] AC-04: All Chinese labels, status messages, log entries, and user-facing text render correctly without missing glyphs or tofu characters.
-- [ ] AC-05: The font family resource is defined as a named resource (`AppFontFamily`) in the resource dictionary for consistent reference.
-- [ ] AC-06: All styles and templates reference the `AppFontFamily` resource rather than hardcoding font names.
+- [x] AC-01: The application uses Microsoft JhengHei UI as the primary font family for all UI elements.
+- [x] AC-02: A font fallback chain is defined: Microsoft JhengHei UI, Microsoft JhengHei, SimHei, Arial Unicode MS.
+- [x] AC-03: The font family is set at the Window or Application level so it applies globally without per-element configuration.
+- [x] AC-04: All Chinese labels, status messages, log entries, and user-facing text render correctly without missing glyphs or tofu characters.
+- [x] AC-05: The font family resource is defined as a named resource (`AppFontFamily`) in the resource dictionary for consistent reference.
+- [x] AC-06: All styles and templates reference the `AppFontFamily` resource rather than hardcoding font names.
 
 ## Related Functional Requirements
 | ID | Description | Priority |

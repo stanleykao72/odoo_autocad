@@ -10,12 +10,12 @@
 - **Priority**: P1
 
 ## Acceptance Criteria
-- [ ] AC-01: The currently active navigation button has a visually distinct background color (e.g., `#E3F2FD`) differentiating it from inactive buttons.
-- [ ] AC-02: The currently active navigation button displays a left border accent in the primary color (`PrimaryBrush`).
-- [ ] AC-03: When navigating to a different page, the previously active button returns to its default (transparent) style.
-- [ ] AC-04: The active button highlighting updates atomically with the Frame navigation to prevent desynchronization.
-- [ ] AC-05: On application startup, the Dashboard button is highlighted as the active button.
-- [ ] AC-06: Active state is driven by `MainViewModel.ActiveNavButton` property via data binding, not code-behind UI manipulation.
+- [x] AC-01: The currently active navigation button has a visually distinct background color (e.g., `#E3F2FD`) differentiating it from inactive buttons.
+- [x] AC-02: The currently active navigation button displays a left border accent in the primary color (`PrimaryBrush`).
+- [x] AC-03: When navigating to a different page, the previously active button returns to its default (transparent) style.
+- [x] AC-04: The active button highlighting updates atomically with the Frame navigation to prevent desynchronization.
+- [x] AC-05: On application startup, the Dashboard button is highlighted as the active button.
+- [x] AC-06: Active state is driven by `MainViewModel.ActiveNavButton` property via data binding, not code-behind UI manipulation.
 
 ## Related Functional Requirements
 | ID | Description | Priority |

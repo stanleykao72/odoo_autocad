@@ -4,7 +4,7 @@
 > **Parent FR**: [FR-007](FR-007-settings.md)
 > **Priority**: P2
 > **Tasks**: 8 | **Effort**: 2S + 4M + 2L
-> **Status**: Not Started
+> **Status**: In Progress
 
 ## Prerequisites
 - [ ] FR-008 (UI Framework - WPF/MVVM infrastructure and CommunityToolkit.Mvvm must be in place)
@@ -12,16 +12,16 @@
 - [ ] `ConfigurationLoader` with `LoadFromJson()` available (already exists in `OdooAutoCAD.Configuration`)
 
 ## Acceptance Criteria
-- [ ] AC-01: Settings Page displays input fields for Odoo Server URL, Database Name, and Username
-- [ ] AC-02: Settings Page displays a secure input field for Odoo API Token with masked display by default
-- [ ] AC-03: API Token field has a show/hide toggle button that switches between PasswordBox and TextBox
-- [ ] AC-04: Settings Page displays a connection timeout field with default value of 30 seconds
+- [x] AC-01: Settings Page displays input fields for Odoo Server URL, Database Name, and Username
+- [x] AC-02: Settings Page displays a secure input field for Odoo API Token with masked display by default
+- [x] AC-03: API Token field has a show/hide toggle button that switches between PasswordBox and TextBox
+- [x] AC-04: Settings Page displays a connection timeout field with default value of 30 seconds
 - [ ] AC-05: Server URL field validates format (must start with `http://` or `https://`) and shows inline error for invalid input
 - [ ] AC-06: Database Name field validates non-empty, max 100 characters, alphanumeric/hyphens/underscores only
 - [ ] AC-07: API Token field validates UUID format or non-empty string
 - [ ] AC-08: Timeout field validates integer between 5 and 300 seconds inclusive
-- [ ] AC-09: Clicking Save persists all Odoo connection settings to both `appsettings.json` and the `ServerConfigs` database table
-- [ ] AC-10: API Token is persisted only to the `ServerConfigs` database table, never written to `appsettings.json` in plain text
+- [x] AC-09: Clicking Save persists all Odoo connection settings to both `appsettings.json` and the `ServerConfigs` database table
+- [x] AC-10: API Token is persisted only to the `ServerConfigs` database table, never written to `appsettings.json` in plain text
 - [ ] AC-11: Save button is disabled when any required field fails validation
 - [ ] AC-12: Settings change is logged to the `SyncLog` table with SyncType "settings_change"
 
@@ -47,10 +47,10 @@
 - Reference `StaticResource` styles from the application theme (BackgroundBrush, SurfaceBrush, TextPrimaryBrush)
 
 ### How to verify
-- [ ] Server URL, Database Name, Username text fields render in the Connection tab (AC-01)
-- [ ] API Token field renders with masked display (PasswordBox visible by default) (AC-02)
-- [ ] Connection Timeout field renders with default value 30 (AC-04)
-- [ ] Save button is present in the footer bar (AC-09)
+- [x] Server URL, Database Name, Username text fields render in the Connection tab (AC-01)
+- [x] API Token field renders with masked display (PasswordBox visible by default) (AC-02)
+- [x] Connection Timeout field renders with default value 30 (AC-04)
+- [x] Save button is present in the footer bar (AC-09)
 
 ---
 
@@ -70,8 +70,8 @@
 - Add an eye icon (or text "Show"/"Hide") to the toggle button that changes based on `IsTokenVisible` state
 
 ### How to verify
-- [ ] Clicking the toggle button switches between masked and plain-text display of the token (AC-03)
-- [ ] Token value is preserved when toggling visibility (AC-03)
+- [x] Clicking the toggle button switches between masked and plain-text display of the token (AC-03)
+- [x] Token value is preserved when toggling visibility (AC-03)
 
 ---
 
@@ -95,9 +95,9 @@
 - Store a snapshot of original values for unsaved-changes tracking
 
 ### How to verify
-- [ ] All six Odoo connection properties generate proper change notifications (AC-01, AC-02, AC-04)
-- [ ] ToggleTokenVisibilityCommand toggles `IsTokenVisible` (AC-03)
-- [ ] Properties load from `ServerConfigs` DB with fallback to `appsettings.json` defaults (AC-01)
+- [x] All six Odoo connection properties generate proper change notifications (AC-01, AC-02, AC-04)
+- [x] ToggleTokenVisibilityCommand toggles `IsTokenVisible` (AC-03)
+- [x] Properties load from `ServerConfigs` DB with fallback to `appsettings.json` defaults (AC-01)
 
 ---
 
@@ -151,9 +151,9 @@
 - On success, display a brief success notification
 
 ### How to verify
-- [ ] After Save, non-token values appear in `appsettings.json` (AC-09)
-- [ ] After Save, all values including token appear in `ServerConfigs` DB table (AC-09)
-- [ ] Token is NOT present in `appsettings.json` after Save (AC-10)
+- [x] After Save, non-token values appear in `appsettings.json` (AC-09)
+- [x] After Save, all values including token appear in `ServerConfigs` DB table (AC-09)
+- [x] Token is NOT present in `appsettings.json` after Save (AC-10)
 - [ ] Save button is disabled when validation errors exist (AC-11)
 
 ---
@@ -175,9 +175,9 @@
 - Add a complementary method `public AppSettings LoadFromJsonFile(string fileName)` that reads and deserializes without using `IConfigurationBuilder` (for use by import/export features)
 
 ### How to verify
-- [ ] `SaveToJson()` writes valid JSON to the target file (AC-09)
-- [ ] Output JSON does not contain API token or sensitive credential fields (AC-10)
-- [ ] `IOException` is thrown and catchable when the file is read-only or path is invalid (AC-09)
+- [x] `SaveToJson()` writes valid JSON to the target file (AC-09)
+- [x] Output JSON does not contain API token or sensitive credential fields (AC-10)
+- [x] `IOException` is thrown and catchable when the file is read-only or path is invalid (AC-09)
 
 ---
 
@@ -199,9 +199,9 @@
 - Reset `HasUnsavedChanges` to false after successful Save or explicit Discard
 
 ### How to verify
-- [ ] Modifying any field sets `HasUnsavedChanges` to true (AC-11 context)
-- [ ] Save button label changes to indicate unsaved state (AC-11 context)
-- [ ] Navigating away with unsaved changes shows a confirmation dialog (AC-11 context)
+- [x] Modifying any field sets `HasUnsavedChanges` to true (AC-11 context)
+- [x] Save button label changes to indicate unsaved state (AC-11 context)
+- [x] Navigating away with unsaved changes shows a confirmation dialog (AC-11 context)
 
 ---
 

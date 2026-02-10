@@ -10,16 +10,16 @@
 - **Priority**: P1
 
 ## Acceptance Criteria
-- [ ] AC-01: On exit, `App.OnExit` stops the GUI proxy DispatcherTimer.
-- [ ] AC-02: On exit, `App.OnExit` stops the MCP SSE server if it is running.
-- [ ] AC-03: On exit, `App.OnExit` stops the GUI proxy (`IGUIProxy.Stop()`).
-- [ ] AC-04: On exit, `App.OnExit` stops the DI host (`IHost.StopAsync()`).
-- [ ] AC-05: On exit, `App.OnExit` flushes and closes the Serilog logger (`Log.CloseAndFlush()`).
-- [ ] AC-06: The application registers a global exception handler for `DispatcherUnhandledException` that logs the error and marks it handled so the application can continue.
-- [ ] AC-07: The application registers a global exception handler for `AppDomain.UnhandledException` that logs the error as fatal.
-- [ ] AC-08: The application registers a global exception handler for `TaskScheduler.UnobservedTaskException` that logs the error and calls `SetObserved()`.
-- [ ] AC-09: If the MCP server fails to stop during shutdown, the error is logged and shutdown continues without blocking.
-- [ ] AC-10: No orphan processes or locked ports remain after the application exits.
+- [x] AC-01: On exit, `App.OnExit` stops the GUI proxy DispatcherTimer.
+- [x] AC-02: On exit, `App.OnExit` stops the MCP SSE server if it is running.
+- [x] AC-03: On exit, `App.OnExit` stops the GUI proxy (`IGUIProxy.Stop()`).
+- [x] AC-04: On exit, `App.OnExit` stops the DI host (`IHost.StopAsync()`).
+- [x] AC-05: On exit, `App.OnExit` flushes and closes the Serilog logger (`Log.CloseAndFlush()`).
+- [x] AC-06: The application registers a global exception handler for `DispatcherUnhandledException` that logs the error and marks it handled so the application can continue.
+- [x] AC-07: The application registers a global exception handler for `AppDomain.UnhandledException` that logs the error as fatal.
+- [x] AC-08: The application registers a global exception handler for `TaskScheduler.UnobservedTaskException` that logs the error and calls `SetObserved()`.
+- [x] AC-09: If the MCP server fails to stop during shutdown, the error is logged and shutdown continues without blocking.
+- [x] AC-10: No orphan processes or locked ports remain after the application exits.
 
 ## Related Functional Requirements
 | ID | Description | Priority |

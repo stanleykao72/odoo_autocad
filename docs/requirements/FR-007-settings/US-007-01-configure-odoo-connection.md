@@ -10,16 +10,16 @@
 - **Priority**: P2
 
 ## Acceptance Criteria
-- [ ] AC-01: Settings Page displays input fields for Odoo Server URL, Database Name, and Username
-- [ ] AC-02: Settings Page displays a secure input field for Odoo API Token with masked display by default
-- [ ] AC-03: API Token field has a show/hide toggle button that switches between PasswordBox and TextBox
-- [ ] AC-04: Settings Page displays a connection timeout field with default value of 30 seconds
+- [x] AC-01: Settings Page displays input fields for Odoo Server URL, Database Name, and Username
+- [x] AC-02: Settings Page displays a secure input field for Odoo API Token with masked display by default
+- [x] AC-03: API Token field has a show/hide toggle button that switches between PasswordBox and TextBox
+- [x] AC-04: Settings Page displays a connection timeout field with default value of 30 seconds
 - [ ] AC-05: Server URL field validates format (must start with `http://` or `https://`) and shows inline error for invalid input
 - [ ] AC-06: Database Name field validates non-empty, max 100 characters, alphanumeric/hyphens/underscores only
 - [ ] AC-07: API Token field validates UUID format or non-empty string
 - [ ] AC-08: Timeout field validates integer between 5 and 300 seconds inclusive
-- [ ] AC-09: Clicking Save persists all Odoo connection settings to both `appsettings.json` and the `ServerConfigs` database table
-- [ ] AC-10: API Token is persisted only to the `ServerConfigs` database table, never written to `appsettings.json` in plain text
+- [x] AC-09: Clicking Save persists all Odoo connection settings to both `appsettings.json` and the `ServerConfigs` database table
+- [x] AC-10: API Token is persisted only to the `ServerConfigs` database table, never written to `appsettings.json` in plain text
 - [ ] AC-11: Save button is disabled when any required field fails validation
 - [ ] AC-12: Settings change is logged to the `SyncLog` table with SyncType "settings_change"
 

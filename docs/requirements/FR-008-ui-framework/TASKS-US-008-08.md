@@ -4,19 +4,19 @@
 > **Parent FR**: [FR-008](FR-008-ui-framework.md)
 > **Priority**: P1
 > **Tasks**: 5 | **Effort**: 4S + 1M + 0L
-> **Status**: Not Started
+> **Status**: Done
 
 ## Prerequisites
-- [ ] US-008-01 completed (navigation must update CurrentPageTitle on page change)
+- [x] US-008-01 completed (navigation must update CurrentPageTitle on page change)
 
 ## Acceptance Criteria
-- [ ] AC-01: A header bar is displayed at the top of the content area (above the main Frame, to the right of the sidebar).
-- [ ] AC-02: The header bar displays `CurrentPageTitle` as a 20pt SemiBold TextBlock bound to the MainViewModel.
-- [ ] AC-03: The header bar includes a "Refresh" button on the right side bound to `RefreshCommand`.
-- [ ] AC-04: The header bar optionally includes a "Help" button on the right side.
-- [ ] AC-05: The header bar uses `SurfaceBrush` background with a bottom border separator.
-- [ ] AC-06: `CurrentPageTitle` updates automatically when navigation occurs, reflecting the display name of the active page.
-- [ ] AC-07: Page title mapping follows the defined convention: Dashboard, AutoCAD Integration, Odoo Connection, BOQ Manager, Purchase Requisition, AI Assistant (MCP), Settings.
+- [x] AC-01: A header bar is displayed at the top of the content area (above the main Frame, to the right of the sidebar).
+- [x] AC-02: The header bar displays `CurrentPageTitle` as a 20pt SemiBold TextBlock bound to the MainViewModel.
+- [x] AC-03: The header bar includes a "Refresh" button on the right side bound to `RefreshCommand`.
+- [x] AC-04: The header bar optionally includes a "Help" button on the right side.
+- [x] AC-05: The header bar uses `SurfaceBrush` background with a bottom border separator.
+- [x] AC-06: `CurrentPageTitle` updates automatically when navigation occurs, reflecting the display name of the active page.
+- [x] AC-07: Page title mapping follows the defined convention: Dashboard, AutoCAD Integration, Odoo Connection, BOQ Manager, Purchase Requisition, AI Assistant (MCP), Settings.
 
 ---
 
@@ -39,10 +39,10 @@
 - Verify the skeleton already defines this layout; confirm correctness
 
 ### How to verify
-- [ ] Header bar is at the top of the content area, right of sidebar (AC-01)
-- [ ] Page title is 20pt SemiBold bound to CurrentPageTitle (AC-02)
-- [ ] Refresh button is present and bound to RefreshCommand (AC-03)
-- [ ] Help button is present on the right side (AC-04)
+- [x] Header bar is at the top of the content area, right of sidebar (AC-01)
+- [x] Page title is 20pt SemiBold bound to CurrentPageTitle (AC-02)
+- [x] Refresh button is present and bound to RefreshCommand (AC-03)
+- [x] Help button is present on the right side (AC-04)
 
 ---
 
@@ -62,8 +62,8 @@
 - Already present in the skeleton; confirm it is correct
 
 ### How to verify
-- [ ] CurrentPageTitle property exists with default "Dashboard" (AC-02, AC-06)
-- [ ] Property raises PropertyChanged notification (AC-06)
+- [x] CurrentPageTitle property exists with default "Dashboard" (AC-02, AC-06)
+- [x] Property raises PropertyChanged notification (AC-06)
 
 ---
 
@@ -83,8 +83,8 @@
 - Already present in the skeleton; confirm correct implementation
 
 ### How to verify
-- [ ] RefreshCommand exists and can be bound from XAML (AC-03)
-- [ ] Clicking Refresh updates status message feedback (AC-03)
+- [x] RefreshCommand exists and can be bound from XAML (AC-03)
+- [x] Clicking Refresh updates status message feedback (AC-03)
 
 ---
 
@@ -112,8 +112,8 @@
 - Alternatively, define a static `Dictionary<string, string>` or use `NavigationService` to supply display titles
 
 ### How to verify
-- [ ] Page title updates to the correct display name on navigation (AC-06, AC-07)
-- [ ] All seven display names match the defined convention (AC-07)
+- [x] Page title updates to the correct display name on navigation (AC-06, AC-07)
+- [x] All seven display names match the defined convention (AC-07)
 
 ---
 
@@ -134,9 +134,9 @@
 - Already in the skeleton; confirm resource references are used correctly
 
 ### How to verify
-- [ ] Header uses SurfaceBrush background (AC-05)
-- [ ] Header has a bottom border separator using BorderBrush (AC-05)
-- [ ] All colors reference ResourceDictionary resources, not hardcoded values (AC-05)
+- [x] Header uses SurfaceBrush background (AC-05)
+- [x] Header has a bottom border separator using BorderBrush (AC-05)
+- [x] All colors reference ResourceDictionary resources, not hardcoded values (AC-05)
 
 ---
 

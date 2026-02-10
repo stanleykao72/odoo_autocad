@@ -10,13 +10,13 @@
 - **Priority**: P2
 
 ## Acceptance Criteria
-- [ ] AC-01: Settings Page displays a read-only field for AutoCAD COM ProgId showing "AutoCAD.Application" in the AutoCAD tab
-- [ ] AC-02: Settings Page displays a configurable connection timeout field with default value of 10 seconds
-- [ ] AC-03: Settings Page displays a configurable retry attempts field with default value of 3
+- [x] AC-01: Settings Page displays a read-only field for AutoCAD COM ProgId showing "AutoCAD.Application" in the AutoCAD tab
+- [x] AC-02: Settings Page displays a configurable connection timeout field with default value of 10 seconds
+- [x] AC-03: Settings Page displays a configurable retry attempts field with default value of 3
 - [ ] AC-04: Connection timeout validates as integer between 5 and 120 seconds inclusive, with inline error for out-of-range values
 - [ ] AC-05: Retry attempts validates as integer between 1 and 10 inclusive, with inline error for out-of-range values
-- [ ] AC-06: Saving persists AutoCAD settings to `ServerConfigs` database table with keys `autocad.prog_id`, `autocad.connection_timeout`, `autocad.retry_attempts`
-- [ ] AC-07: AutoCAD settings are loaded from database on page initialization with fallback to defaults
+- [x] AC-06: Saving persists AutoCAD settings to `ServerConfigs` database table with keys `autocad.prog_id`, `autocad.connection_timeout`, `autocad.retry_attempts`
+- [x] AC-07: AutoCAD settings are loaded from database on page initialization with fallback to defaults
 - [ ] AC-08: Settings change is logged to the `SyncLog` table with SyncType "settings_change"
 
 ## Related Functional Requirements

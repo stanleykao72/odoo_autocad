@@ -10,13 +10,13 @@
 - **Priority**: P2
 
 ## Acceptance Criteria
-- [ ] AC-01: Settings Page displays a toggle/checkbox for MCP server auto-start in the MCP tab
-- [ ] AC-02: The toggle defaults to off (disabled) for new installations
+- [x] AC-01: Settings Page displays a toggle/checkbox for MCP server auto-start in the MCP tab
+- [x] AC-02: The toggle defaults to off (disabled) for new installations
 - [ ] AC-03: When enabled, the MCP SSE server starts automatically on application launch
 - [ ] AC-04: When disabled, the MCP SSE server does not start on application launch (can still be started manually)
-- [ ] AC-05: Saving persists the auto-start setting to `ServerConfigs` database table with key `mcp.auto_start`
-- [ ] AC-06: The auto-start value is also saved to the `appsettings.json` MCP section
-- [ ] AC-07: Auto-start setting is loaded from database on page initialization with fallback to false
+- [x] AC-05: Saving persists the auto-start setting to `ServerConfigs` database table with key `mcp.auto_start`
+- [x] AC-06: The auto-start value is also saved to the `appsettings.json` MCP section
+- [x] AC-07: Auto-start setting is loaded from database on page initialization with fallback to false
 - [ ] AC-08: Settings change is logged to the `SyncLog` table with SyncType "settings_change"
 
 ## Related Functional Requirements

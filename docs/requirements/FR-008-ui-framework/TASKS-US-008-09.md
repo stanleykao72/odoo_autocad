@@ -4,22 +4,22 @@
 > **Parent FR**: [FR-008](FR-008-ui-framework.md)
 > **Priority**: P1
 > **Tasks**: 6 | **Effort**: 4S + 2M + 0L
-> **Status**: Not Started
+> **Status**: Done
 
 ## Prerequisites
-- [ ] None (shutdown logic can be implemented independently, though US-008-06 auto-start is the counterpart)
+- [x] None (shutdown logic can be implemented independently, though US-008-06 auto-start is the counterpart)
 
 ## Acceptance Criteria
-- [ ] AC-01: On exit, `App.OnExit` stops the GUI proxy DispatcherTimer.
-- [ ] AC-02: On exit, `App.OnExit` stops the MCP SSE server if it is running.
-- [ ] AC-03: On exit, `App.OnExit` stops the GUI proxy (`IGUIProxy.Stop()`).
-- [ ] AC-04: On exit, `App.OnExit` stops the DI host (`IHost.StopAsync()`).
-- [ ] AC-05: On exit, `App.OnExit` flushes and closes the Serilog logger (`Log.CloseAndFlush()`).
-- [ ] AC-06: The application registers a global exception handler for `DispatcherUnhandledException` that logs the error and marks it handled so the application can continue.
-- [ ] AC-07: The application registers a global exception handler for `AppDomain.UnhandledException` that logs the error as fatal.
-- [ ] AC-08: The application registers a global exception handler for `TaskScheduler.UnobservedTaskException` that logs the error and calls `SetObserved()`.
-- [ ] AC-09: If the MCP server fails to stop during shutdown, the error is logged and shutdown continues without blocking.
-- [ ] AC-10: No orphan processes or locked ports remain after the application exits.
+- [x] AC-01: On exit, `App.OnExit` stops the GUI proxy DispatcherTimer.
+- [x] AC-02: On exit, `App.OnExit` stops the MCP SSE server if it is running.
+- [x] AC-03: On exit, `App.OnExit` stops the GUI proxy (`IGUIProxy.Stop()`).
+- [x] AC-04: On exit, `App.OnExit` stops the DI host (`IHost.StopAsync()`).
+- [x] AC-05: On exit, `App.OnExit` flushes and closes the Serilog logger (`Log.CloseAndFlush()`).
+- [x] AC-06: The application registers a global exception handler for `DispatcherUnhandledException` that logs the error and marks it handled so the application can continue.
+- [x] AC-07: The application registers a global exception handler for `AppDomain.UnhandledException` that logs the error as fatal.
+- [x] AC-08: The application registers a global exception handler for `TaskScheduler.UnobservedTaskException` that logs the error and calls `SetObserved()`.
+- [x] AC-09: If the MCP server fails to stop during shutdown, the error is logged and shutdown continues without blocking.
+- [x] AC-10: No orphan processes or locked ports remain after the application exits.
 
 ---
 
@@ -45,11 +45,11 @@
 - The cleanup order is critical: timer first, then MCP (release ports), then proxy (stop processing), then host (dispose services), then logs (flush remaining)
 
 ### How to verify
-- [ ] Timer is stopped first (AC-01)
-- [ ] MCP server is stopped if running (AC-02)
-- [ ] GUI proxy is stopped (AC-03)
-- [ ] DI host is stopped and disposed (AC-04)
-- [ ] Serilog is flushed and closed (AC-05)
+- [x] Timer is stopped first (AC-01)
+- [x] MCP server is stopped if running (AC-02)
+- [x] GUI proxy is stopped (AC-03)
+- [x] DI host is stopped and disposed (AC-04)
+- [x] Serilog is flushed and closed (AC-05)
 
 ---
 
@@ -71,9 +71,9 @@
 - Verify the skeleton already implements this; confirm `e.Handled = true` is set
 
 ### How to verify
-- [ ] DispatcherUnhandledException handler is registered (AC-06)
-- [ ] Error is logged (AC-06)
-- [ ] Exception is marked handled so the application continues (AC-06)
+- [x] DispatcherUnhandledException handler is registered (AC-06)
+- [x] Error is logged (AC-06)
+- [x] Exception is marked handled so the application continues (AC-06)
 
 ---
 
@@ -95,8 +95,8 @@
 - Verify the skeleton already implements this; confirm logging level is `Fatal`
 
 ### How to verify
-- [ ] AppDomain.UnhandledException handler is registered (AC-07)
-- [ ] Error is logged as fatal (AC-07)
+- [x] AppDomain.UnhandledException handler is registered (AC-07)
+- [x] Error is logged as fatal (AC-07)
 
 ---
 
@@ -117,9 +117,9 @@
 - Verify the skeleton already implements this; confirm `SetObserved()` is called
 
 ### How to verify
-- [ ] TaskScheduler.UnobservedTaskException handler is registered (AC-08)
-- [ ] Error is logged (AC-08)
-- [ ] `SetObserved()` is called to prevent escalation (AC-08)
+- [x] TaskScheduler.UnobservedTaskException handler is registered (AC-08)
+- [x] Error is logged (AC-08)
+- [x] `SetObserved()` is called to prevent escalation (AC-08)
 
 ---
 
@@ -153,9 +153,9 @@
 - Verify the skeleton handles this; the current implementation lacks try-catch around the MCP stop
 
 ### How to verify
-- [ ] MCP stop failure is caught and logged (AC-09)
-- [ ] Shutdown continues without blocking when MCP stop fails (AC-09)
-- [ ] No orphan processes or ports remain (AC-10)
+- [x] MCP stop failure is caught and logged (AC-09)
+- [x] Shutdown continues without blocking when MCP stop fails (AC-09)
+- [x] No orphan processes or ports remain (AC-10)
 
 ---
 
@@ -177,8 +177,8 @@
 - This test may need to run as a separate process or use `AppDomain` isolation
 
 ### How to verify
-- [ ] No ports remain locked after application exit (AC-10)
-- [ ] No orphan processes remain after application exit (AC-10)
+- [x] No ports remain locked after application exit (AC-10)
+- [x] No orphan processes remain after application exit (AC-10)
 
 ---
 

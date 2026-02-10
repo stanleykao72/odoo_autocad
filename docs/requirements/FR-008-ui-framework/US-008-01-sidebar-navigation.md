@@ -10,17 +10,17 @@
 - **Priority**: P1
 
 ## Acceptance Criteria
-- [ ] AC-01: A fixed-width (250px) sidebar panel is displayed on the left side of the main window at all times.
-- [ ] AC-02: The sidebar displays a title area at the top with "Odoo AutoCAD" and "Integration System v6.0".
-- [ ] AC-03: The sidebar contains navigation buttons for all seven areas: Dashboard, AutoCAD, Odoo, BOQ Manager, Purchase Requisition, AI Assistant, Settings.
-- [ ] AC-04: Each navigation button displays an icon and a text label, left-aligned.
-- [ ] AC-05: Navigation buttons use the `NavButton` style with transparent background, left-aligned content, and a left-border accent on hover.
-- [ ] AC-06: Clicking a sidebar button loads the corresponding page into the main `Frame` via `INavigationService.NavigateTo()`.
-- [ ] AC-07: The application defaults to the Dashboard page on startup.
-- [ ] AC-08: The `Frame` element uses `NavigationUIVisibility="Hidden"` to suppress default WPF navigation chrome.
-- [ ] AC-09: `INavigationService.NavigateTo(pageName)` resolves pages by reflection from namespace `OdooAutoCAD.App.Views.Pages.{pageName}Page`.
-- [ ] AC-10: `INavigationService.GoBack()` navigates to the previous page when `CanGoBack` is true.
-- [ ] AC-11: If a resolved page type does not exist, navigation is silently skipped and a warning is logged.
+- [x] AC-01: A fixed-width (250px) sidebar panel is displayed on the left side of the main window at all times.
+- [x] AC-02: The sidebar displays a title area at the top with "Odoo AutoCAD" and "Integration System v6.0".
+- [x] AC-03: The sidebar contains navigation buttons for all seven areas: Dashboard, AutoCAD, Odoo, BOQ Manager, Purchase Requisition, AI Assistant, Settings.
+- [x] AC-04: Each navigation button displays an icon and a text label, left-aligned.
+- [x] AC-05: Navigation buttons use the `NavButton` style with transparent background, left-aligned content, and a left-border accent on hover.
+- [x] AC-06: Clicking a sidebar button loads the corresponding page into the main `Frame` via `INavigationService.NavigateTo()`.
+- [x] AC-07: The application defaults to the Dashboard page on startup.
+- [x] AC-08: The `Frame` element uses `NavigationUIVisibility="Hidden"` to suppress default WPF navigation chrome.
+- [x] AC-09: `INavigationService.NavigateTo(pageName)` resolves pages by reflection from namespace `OdooAutoCAD.App.Views.Pages.{pageName}Page`.
+- [x] AC-10: `INavigationService.GoBack()` navigates to the previous page when `CanGoBack` is true.
+- [x] AC-11: If a resolved page type does not exist, navigation is silently skipped and a warning is logged.
 
 ## Related Functional Requirements
 | ID | Description | Priority |

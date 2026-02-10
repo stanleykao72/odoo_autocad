@@ -4,18 +4,18 @@
 > **Parent FR**: [FR-008](FR-008-ui-framework.md)
 > **Priority**: P1
 > **Tasks**: 4 | **Effort**: 3S + 1M + 0L
-> **Status**: Not Started
+> **Status**: Done
 
 ## Prerequisites
-- [ ] US-008-01 completed (sidebar navigation buttons and NavButton style must exist)
+- [x] US-008-01 completed (sidebar navigation buttons and NavButton style must exist)
 
 ## Acceptance Criteria
-- [ ] AC-01: The currently active navigation button has a visually distinct background color (e.g., `#E3F2FD`) differentiating it from inactive buttons.
-- [ ] AC-02: The currently active navigation button displays a left border accent in the primary color (`PrimaryBrush`).
-- [ ] AC-03: When navigating to a different page, the previously active button returns to its default (transparent) style.
-- [ ] AC-04: The active button highlighting updates atomically with the Frame navigation to prevent desynchronization.
-- [ ] AC-05: On application startup, the Dashboard button is highlighted as the active button.
-- [ ] AC-06: Active state is driven by `MainViewModel.ActiveNavButton` property via data binding, not code-behind UI manipulation.
+- [x] AC-01: The currently active navigation button has a visually distinct background color (e.g., `#E3F2FD`) differentiating it from inactive buttons.
+- [x] AC-02: The currently active navigation button displays a left border accent in the primary color (`PrimaryBrush`).
+- [x] AC-03: When navigating to a different page, the previously active button returns to its default (transparent) style.
+- [x] AC-04: The active button highlighting updates atomically with the Frame navigation to prevent desynchronization.
+- [x] AC-05: On application startup, the Dashboard button is highlighted as the active button.
+- [x] AC-06: Active state is driven by `MainViewModel.ActiveNavButton` property via data binding, not code-behind UI manipulation.
 
 ---
 
@@ -35,8 +35,8 @@
 - Ensure the property type is `string` to match the `x:Name` values of sidebar buttons
 
 ### How to verify
-- [ ] `ActiveNavButton` property exists on `MainViewModel` with default "BtnDashboard" (AC-05, AC-06)
-- [ ] Property raises `PropertyChanged` notification when updated (AC-06)
+- [x] `ActiveNavButton` property exists on `MainViewModel` with default "BtnDashboard" (AC-05, AC-06)
+- [x] Property raises `PropertyChanged` notification when updated (AC-06)
 
 ---
 
@@ -58,9 +58,9 @@
 - Active state must revert to transparent when another button becomes active (handled by WPF DataTrigger removal)
 
 ### How to verify
-- [ ] Active button shows `#E3F2FD` background (AC-01)
-- [ ] Active button shows left border accent in primary color (AC-02)
-- [ ] Previously active button returns to transparent/default style (AC-03)
+- [x] Active button shows `#E3F2FD` background (AC-01)
+- [x] Active button shows left border accent in primary color (AC-02)
+- [x] Previously active button returns to transparent/default style (AC-03)
 
 ---
 
@@ -80,8 +80,8 @@
 - Both `CurrentPageTitle` and `ActiveNavButton` must update in the same method invocation to prevent desynchronization
 
 ### How to verify
-- [ ] `ActiveNavButton` updates atomically with `CurrentPageTitle` on navigation (AC-04)
-- [ ] Dashboard button is active on startup via default property value (AC-05)
+- [x] `ActiveNavButton` updates atomically with `CurrentPageTitle` on navigation (AC-04)
+- [x] Dashboard button is active on startup via default property value (AC-05)
 
 ---
 
@@ -101,8 +101,8 @@
 - Alternatively, the DataTrigger can use `{Binding RelativeSource={RelativeSource Self}, Path=Name}` to read the Name directly, avoiding the need for separate Tag values
 
 ### How to verify
-- [ ] Each button has a `Tag` (or `Name`) that matches the `ActiveNavButton` tracking values (AC-06)
-- [ ] Active state visual is driven entirely by data binding, not code-behind (AC-06)
+- [x] Each button has a `Tag` (or `Name`) that matches the `ActiveNavButton` tracking values (AC-06)
+- [x] Active state visual is driven entirely by data binding, not code-behind (AC-06)
 
 ---
 

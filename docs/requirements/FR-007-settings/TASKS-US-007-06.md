@@ -4,20 +4,20 @@
 > **Parent FR**: [FR-007](FR-007-settings.md)
 > **Priority**: P2
 > **Tasks**: 5 | **Effort**: 4S + 1M + 0L
-> **Status**: Not Started
+> **Status**: In Progress
 
 ## Prerequisites
 - [ ] US-007-01 (SettingsPage XAML and SettingsViewModel must exist with TabControl structure)
 - [ ] `AppDbContext` with `ServerConfigs` and `SyncLogs` DbSets available
 
 ## Acceptance Criteria
-- [ ] AC-01: Settings Page displays a toggle/checkbox for MCP server auto-start in the MCP tab
-- [ ] AC-02: The toggle defaults to off (disabled) for new installations
+- [x] AC-01: Settings Page displays a toggle/checkbox for MCP server auto-start in the MCP tab
+- [x] AC-02: The toggle defaults to off (disabled) for new installations
 - [ ] AC-03: When enabled, the MCP SSE server starts automatically on application launch
 - [ ] AC-04: When disabled, the MCP SSE server does not start on application launch (can still be started manually)
-- [ ] AC-05: Saving persists the auto-start setting to `ServerConfigs` database table with key `mcp.auto_start`
-- [ ] AC-06: The auto-start value is also saved to the `appsettings.json` MCP section
-- [ ] AC-07: Auto-start setting is loaded from database on page initialization with fallback to false
+- [x] AC-05: Saving persists the auto-start setting to `ServerConfigs` database table with key `mcp.auto_start`
+- [x] AC-06: The auto-start value is also saved to the `appsettings.json` MCP section
+- [x] AC-07: Auto-start setting is loaded from database on page initialization with fallback to false
 - [ ] AC-08: Settings change is logged to the `SyncLog` table with SyncType "settings_change"
 
 ---
@@ -37,8 +37,8 @@
 - Style the checkbox consistently with the MCP tab layout
 
 ### How to verify
-- [ ] Checkbox renders in the MCP tab with label "Enable auto-start on launch" (AC-01)
-- [ ] Checkbox is unchecked by default for new installations (AC-02)
+- [x] Checkbox renders in the MCP tab with label "Enable auto-start on launch" (AC-01)
+- [x] Checkbox is unchecked by default for new installations (AC-02)
 
 ---
 
@@ -57,8 +57,8 @@
 - No validation required for boolean fields
 
 ### How to verify
-- [ ] `MCPAutoStart` property generates change notifications and is bindable (AC-01)
-- [ ] Default value is false (AC-02)
+- [x] `MCPAutoStart` property generates change notifications and is bindable (AC-01)
+- [x] Default value is false (AC-02)
 
 ---
 
@@ -79,9 +79,9 @@
 - Update the original-values snapshot for `MCPAutoStart` after save
 
 ### How to verify
-- [ ] After Save, `ServerConfigs` contains row with `mcp.auto_start` and correct value (AC-05)
-- [ ] After Save, `appsettings.json` MCP section reflects the auto-start boolean (AC-06)
-- [ ] `SyncLog` entry includes the auto-start change (AC-08)
+- [x] After Save, `ServerConfigs` contains row with `mcp.auto_start` and correct value (AC-05)
+- [x] After Save, `appsettings.json` MCP section reflects the auto-start boolean (AC-06)
+- [x] `SyncLog` entry includes the auto-start change (AC-08)
 
 ---
 
@@ -101,8 +101,8 @@
 - Include the loaded value in the original-values snapshot
 
 ### How to verify
-- [ ] On page load, checkbox reflects the persisted value from DB (AC-07)
-- [ ] On first load (no DB entry), checkbox is unchecked (default false) (AC-07)
+- [x] On page load, checkbox reflects the persisted value from DB (AC-07)
+- [x] On first load (no DB entry), checkbox is unchecked (default false) (AC-07)
 
 ---
 
