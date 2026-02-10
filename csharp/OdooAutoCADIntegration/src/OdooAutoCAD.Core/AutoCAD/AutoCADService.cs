@@ -28,20 +28,43 @@ public class AutoCADService : IAutoCADService, IDisposable
 
     #region COM Interop for GetActiveObject (removed in .NET Core)
 
+    // P/Invoke declarations matching Autodesk recommended pattern:
+    // https://blog.autodesk.io/autocad-2025-marshalgetactiveobject-net-core/
+    // https://chuongmep.com/posts/2024-05-02-use-com-api-autocad-netcore.html
+
     [DllImport("oleaut32.dll", PreserveSig = false)]
-    private static extern void GetActiveObject(ref Guid rclsid, IntPtr pvReserved, [MarshalAs(UnmanagedType.IUnknown)] out object ppunk);
+    private static extern void GetActiveObject(
+        ref Guid rclsid,
+        IntPtr pvReserved,
+        [MarshalAs(UnmanagedType.IUnknown)] out object ppunk);
+
+    [DllImport("ole32.dll", PreserveSig = false)]
+    private static extern void CLSIDFromProgIDEx(
+        [MarshalAs(UnmanagedType.LPWStr)] string lpszProgID,
+        out Guid pclsid);
 
     [DllImport("ole32.dll")]
-    private static extern int CLSIDFromProgID([MarshalAs(UnmanagedType.LPWStr)] string lpszProgID, out Guid pclsid);
+    private static extern int CLSIDFromProgID(
+        [MarshalAs(UnmanagedType.LPWStr)] string lpszProgID,
+        out Guid pclsid);
 
     /// <summary>
-    /// Gets an active COM object by ProgID (replacement for Marshal.GetActiveObject in .NET Core)
+    /// Gets an active COM object by ProgID (replacement for Marshal.GetActiveObject in .NET Core).
+    /// Uses CLSIDFromProgIDEx with fallback to CLSIDFromProgID for broader compatibility.
     /// </summary>
     private static object GetActiveObject(string progId)
     {
-        int hr = CLSIDFromProgID(progId, out Guid clsid);
-        if (hr < 0)
-            Marshal.ThrowExceptionForHR(hr);
+        Guid clsid;
+        try
+        {
+            CLSIDFromProgIDEx(progId, out clsid);
+        }
+        catch (Exception)
+        {
+            int hr = CLSIDFromProgID(progId, out clsid);
+            if (hr < 0)
+                Marshal.ThrowExceptionForHR(hr);
+        }
 
         GetActiveObject(ref clsid, IntPtr.Zero, out object obj);
         return obj;
@@ -190,6 +213,12 @@ public class AutoCADService : IAutoCADService, IDisposable
     {
         try
         {
+            // Register COM message filter to handle rejected calls from AutoCAD.
+            // AutoCAD (2010+) rejects COM calls during WPF layout processing,
+            // which causes "Unhandled Access Violation" crashes without this filter.
+            // The filter auto-retries rejected calls after 1 second.
+            OleMessageFilter.Register();
+
             bool isNewInstance = false;
 
             // Try to get running instance first using GetActiveObject

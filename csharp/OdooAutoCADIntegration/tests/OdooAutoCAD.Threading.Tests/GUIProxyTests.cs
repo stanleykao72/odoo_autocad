@@ -53,7 +53,7 @@ public class GUIProxyTests
         using var proxy = new GUIProxy();
 
         // Act
-        proxy.RegisterHandler("test_action", async (p) => "result");
+        proxy.RegisterHandler("test_action", (p) => Task.FromResult<object?>("result"));
 
         // Assert
         proxy.GetRegisteredActions().Should().Contain("test_action");
@@ -64,7 +64,7 @@ public class GUIProxyTests
     {
         // Arrange
         using var proxy = new GUIProxy();
-        proxy.RegisterHandler("test_action", async (p) => "result");
+        proxy.RegisterHandler("test_action", (p) => Task.FromResult<object?>("result"));
 
         // Act
         var result = proxy.UnregisterHandler("test_action");
