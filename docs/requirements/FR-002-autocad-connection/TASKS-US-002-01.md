@@ -4,21 +4,21 @@
 > **Parent FR**: [FR-002](FR-002-autocad-connection.md)
 > **Priority**: P1
 > **Tasks**: 6 | **Effort**: 2S + 2M + 1L
-> **Status**: Not Started
+> **Status**: Done
 
 ## Prerequisites
-- [ ] US-008-01 (navigation framework) must be completed
+- [x] US-008-01 (navigation framework) must be completed
 
 ## Acceptance Criteria
-- [ ] AC-01: Clicking the Connect button initiates a COM connection to AutoCAD
-- [ ] AC-02: Connection first attempts GetActiveObject to attach to a running instance; if that fails, falls back to Dispatch to launch a new instance
-- [ ] AC-03: Connection retries up to 5 times (1-second intervals) to obtain ActiveDocument
-- [ ] AC-04: AutoCAD application is set to Visible upon successful connection
-- [ ] AC-05: Connection status indicator updates to "Connected" with a visual indicator (e.g., green icon) on success
-- [ ] AC-06: Connect button changes to "Disconnect" after a successful connection
-- [ ] AC-07: All COM operations execute on the GUI/STA thread via IGUIProxy
-- [ ] AC-08: If AutoCAD is not running and cannot be launched, an error message is displayed: "AutoCAD is not running. Please start AutoCAD and try again."
-- [ ] AC-09: If connection fails after retries, an error message is displayed: "Could not access the active document after 5 attempts."
+- [x] AC-01: Clicking the Connect button initiates a COM connection to AutoCAD
+- [x] AC-02: Connection first attempts GetActiveObject to attach to a running instance; if that fails, falls back to Dispatch to launch a new instance
+- [x] AC-03: Connection retries up to 5 times (1-second intervals) to obtain ActiveDocument
+- [x] AC-04: AutoCAD application is set to Visible upon successful connection
+- [x] AC-05: Connection status indicator updates to "Connected" with a visual indicator (e.g., green icon) on success
+- [x] AC-06: Connect button changes to "Disconnect" after a successful connection
+- [x] AC-07: All COM operations execute on the GUI/STA thread via IGUIProxy
+- [x] AC-08: If AutoCAD is not running and cannot be launched, an error message is displayed: "AutoCAD is not running. Please start AutoCAD and try again."
+- [x] AC-09: If connection fails after retries, an error message is displayed: "Could not access the active document after 5 attempts."
 
 ---
 
@@ -44,8 +44,8 @@
 - Include `xmlns:vm` namespace reference for design-time `d:DataContext`
 
 ### How to verify
-- [ ] Connect/Disconnect button is visible and toggles label based on connection state (AC-05, AC-06)
-- [ ] Status indicator displays green when connected, gray when disconnected (AC-05)
+- [x] Connect/Disconnect button is visible and toggles label based on connection state (AC-05, AC-06)
+- [x] Status indicator displays green when connected, gray when disconnected (AC-05)
 
 ---
 
@@ -72,9 +72,9 @@
 - Use `CanExecute` pattern: `ConnectCommand` enabled when `!IsConnected`, `DisconnectCommand` enabled when `IsConnected`
 
 ### How to verify
-- [ ] ConnectCommand calls IGUIProxy.ExecuteInGuiAsync for thread-safe COM operation (AC-07)
-- [ ] Error messages are set when connection fails (AC-08, AC-09)
-- [ ] Connect/Disconnect commands toggle correctly based on IsConnected state (AC-01, AC-06)
+- [x] ConnectCommand calls IGUIProxy.ExecuteInGuiAsync for thread-safe COM operation (AC-07)
+- [x] Error messages are set when connection fails (AC-08, AC-09)
+- [x] Connect/Disconnect commands toggle correctly based on IsConnected state (AC-01, AC-06)
 
 ---
 
@@ -101,9 +101,9 @@
 - Handle `COMException` specifically for COM-related failures vs general exceptions
 
 ### How to verify
-- [ ] Connection first tries GetActiveObject, then falls back to Dispatch (AC-02)
-- [ ] Retries up to 5 times with 1-second intervals for ActiveDocument (AC-03)
-- [ ] AutoCAD Visible is set to true on success (AC-04)
+- [x] Connection first tries GetActiveObject, then falls back to Dispatch (AC-02)
+- [x] Retries up to 5 times with 1-second intervals for ActiveDocument (AC-03)
+- [x] AutoCAD Visible is set to true on success (AC-04)
 
 ---
 
@@ -127,7 +127,7 @@
 - Add XML doc comments if missing, referencing FR-002-001 through FR-002-007
 
 ### How to verify
-- [ ] Interface declares ConnectAsync, DisconnectAsync, GetStatusAsync, IsConnected (AC-01, AC-02)
+- [x] Interface declares ConnectAsync, DisconnectAsync, GetStatusAsync, IsConnected (AC-01, AC-02)
 
 ---
 
@@ -153,8 +153,8 @@
 - All COM operations from ViewModel go through `_guiProxy.ExecuteInGuiAsync(actionName, params, timeout)`
 
 ### How to verify
-- [ ] All AutoCAD COM operations are routed through IGUIProxy.ExecuteInGuiAsync (AC-07)
-- [ ] connect_autocad, disconnect_autocad, get_autocad_status handlers are registered
+- [x] All AutoCAD COM operations are routed through IGUIProxy.ExecuteInGuiAsync (AC-07)
+- [x] connect_autocad, disconnect_autocad, get_autocad_status handlers are registered
 
 ---
 
@@ -183,8 +183,8 @@
 - Validation rule VR-002-002: All COM-dependent controls disabled when `IsConnected == false`
 
 ### How to verify
-- [ ] IsConnected, DocumentName, DocumentPath, Status are bindable observable properties (AC-05)
-- [ ] ConnectionStatusText updates to "Connected"/"Disconnected" (AC-05)
+- [x] IsConnected, DocumentName, DocumentPath, Status are bindable observable properties (AC-05)
+- [x] ConnectionStatusText updates to "Connected"/"Disconnected" (AC-05)
 
 ---
 

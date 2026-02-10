@@ -4,22 +4,22 @@
 > **Parent FR**: [FR-003](FR-003-odoo-connection.md)
 > **Priority**: P1
 > **Tasks**: 6 | **Effort**: 3S + 2M + 1L
-> **Status**: Not Started
+> **Status**: Done
 
 ## Prerequisites
-- [ ] US-003-10 (appsettings.json configuration) must be completed so defaults can be loaded
+- [x] US-003-10 (appsettings.json configuration) must be completed so defaults can be loaded
 
 ## Acceptance Criteria
-- [ ] AC-01: The page displays input fields for Server URL, Database Name, Username, and Password/API Key
-- [ ] AC-02: The Password field uses masked input (PasswordBox) so characters are not visible
-- [ ] AC-03: Server URL, Database, and Username fields are pre-populated from `appsettings.json` on launch
-- [ ] AC-04: Server URL validates as a valid HTTPS URL pattern (`^https?://[^\s/]+`); HTTP triggers a warning but is not blocked
-- [ ] AC-05: Server URL has trailing slashes stripped before use (matching `OdooService.ConnectAsync` behavior)
-- [ ] AC-06: Database Name field is not empty and contains only alphanumeric characters, hyphens, and underscores
-- [ ] AC-07: Username field is not empty when using session-based authentication
-- [ ] AC-08: Password field is not empty with a minimum length of 1 character
-- [ ] AC-09: "Connect" and "Test Connection" buttons are disabled when Server URL is empty
-- [ ] AC-10: The Password/API Key is never stored in `appsettings.json` in plaintext
+- [x] AC-01: The page displays input fields for Server URL, Database Name, Username, and Password/API Key
+- [x] AC-02: The Password field uses masked input (PasswordBox) so characters are not visible
+- [x] AC-03: Server URL, Database, and Username fields are pre-populated from `appsettings.json` on launch
+- [x] AC-04: Server URL validates as a valid HTTPS URL pattern (`^https?://[^\s/]+`); HTTP triggers a warning but is not blocked
+- [x] AC-05: Server URL has trailing slashes stripped before use (matching `OdooService.ConnectAsync` behavior)
+- [x] AC-06: Database Name field is not empty and contains only alphanumeric characters, hyphens, and underscores
+- [x] AC-07: Username field is not empty when using session-based authentication
+- [x] AC-08: Password field is not empty with a minimum length of 1 character
+- [x] AC-09: "Connect" and "Test Connection" buttons are disabled when Server URL is empty
+- [x] AC-10: The Password/API Key is never stored in `appsettings.json` in plaintext
 
 ---
 
@@ -45,8 +45,8 @@
 - Include `xmlns:vm` namespace reference for design-time `d:DataContext`
 
 ### How to verify
-- [ ] Four labeled input fields are visible: Server URL, Database, Username, Password (AC-01)
-- [ ] Password field uses `PasswordBox` with masked input (AC-02)
+- [x] Four labeled input fields are visible: Server URL, Database, Username, Password (AC-01)
+- [x] Password field uses `PasswordBox` with masked input (AC-02)
 
 ---
 
@@ -72,8 +72,8 @@
 - Store the password separately; do not include it in any serialization or configuration write-back
 
 ### How to verify
-- [ ] ServerUrl, Database, Username, Password properties exist with change notification (AC-01)
-- [ ] ServerUrl has trailing slashes stripped on change (AC-05)
+- [x] ServerUrl, Database, Username, Password properties exist with change notification (AC-01)
+- [x] ServerUrl has trailing slashes stripped on change (AC-05)
 
 ---
 
@@ -99,10 +99,10 @@
 - Provide `GetErrors(string propertyName)` returning `IEnumerable<ValidationResult>` for per-field error display
 
 ### How to verify
-- [ ] Server URL validates as HTTPS URL pattern; HTTP triggers warning but is not blocked (AC-04)
-- [ ] Database Name rejects empty or invalid characters (AC-06)
-- [ ] Username rejects empty value (AC-07)
-- [ ] Password rejects empty value (AC-08)
+- [x] Server URL validates as HTTPS URL pattern; HTTP triggers warning but is not blocked (AC-04)
+- [x] Database Name rejects empty or invalid characters (AC-06)
+- [x] Username rejects empty value (AC-07)
+- [x] Password rejects empty value (AC-08)
 
 ---
 
@@ -126,8 +126,8 @@
 - If the `Odoo` section is missing, all fields remain at defaults (empty strings, timeout 30)
 
 ### How to verify
-- [ ] Server URL, Database, Username are pre-populated from `appsettings.json` on launch (AC-03)
-- [ ] Password field remains empty regardless of configuration content (AC-10)
+- [x] Server URL, Database, Username are pre-populated from `appsettings.json` on launch (AC-03)
+- [x] Password field remains empty regardless of configuration content (AC-10)
 
 ---
 
@@ -151,8 +151,8 @@
 - Ensure the Password value is only held in memory and never serialized to config or logs
 
 ### How to verify
-- [ ] Password field uses PasswordBox with masked input and supports MVVM two-way binding (AC-02)
-- [ ] Password value is never written to appsettings.json (AC-10)
+- [x] Password field uses PasswordBox with masked input and supports MVVM two-way binding (AC-02)
+- [x] Password value is never written to appsettings.json (AC-10)
 
 ---
 
@@ -174,8 +174,8 @@
 - Ensure buttons re-evaluate enabled state when any credential field changes (via `NotifyCanExecuteChanged()` on each field's `OnChanged` partial method)
 
 ### How to verify
-- [ ] "Connect" and "Test Connection" buttons are disabled when Server URL is empty (AC-09)
-- [ ] Buttons are disabled when any required field fails validation (AC-04, AC-06, AC-07, AC-08)
+- [x] "Connect" and "Test Connection" buttons are disabled when Server URL is empty (AC-09)
+- [x] Buttons are disabled when any required field fails validation (AC-04, AC-06, AC-07, AC-08)
 
 ---
 

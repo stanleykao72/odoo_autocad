@@ -4,19 +4,19 @@
 > **Parent FR**: [FR-002](FR-002-autocad-connection.md)
 > **Priority**: P1
 > **Tasks**: 7 | **Effort**: 3S + 3M + 0L
-> **Status**: Not Started
+> **Status**: Done
 
 ## Prerequisites
-- [ ] US-002-01 (AutoCAD connection must be established first)
+- [x] US-002-01 (AutoCAD connection must be established first)
 
 ## Acceptance Criteria
-- [ ] AC-01: When connected to AutoCAD, the page displays a list of all layouts in the current drawing, excluding "Model"
-- [ ] AC-02: Each layout entry shows the layout name and tab order
-- [ ] AC-03: The currently active layout is visually highlighted in the list
-- [ ] AC-04: The user can select a layout from the list to view its details in the right panel
-- [ ] AC-05: The user can switch the active layout in AutoCAD by selecting a different layout
-- [ ] AC-06: The layout list is refreshed when the connection is first established and can be manually refreshed
-- [ ] AC-07: All layout-related COM operations execute on the GUI/STA thread via IGUIProxy
+- [x] AC-01: When connected to AutoCAD, the page displays a list of all layouts in the current drawing, excluding "Model"
+- [x] AC-02: Each layout entry shows the layout name and tab order
+- [x] AC-03: The currently active layout is visually highlighted in the list
+- [x] AC-04: The user can select a layout from the list to view its details in the right panel
+- [x] AC-05: The user can switch the active layout in AutoCAD by selecting a different layout
+- [x] AC-06: The layout list is refreshed when the connection is first established and can be manually refreshed
+- [x] AC-07: All layout-related COM operations execute on the GUI/STA thread via IGUIProxy
 
 ---
 
@@ -42,8 +42,8 @@
 - Add a "Refresh Layouts" button below the list bound to a refresh command
 
 ### How to verify
-- [ ] Layouts ListView is visible and shows layout name + tab order per entry (AC-01, AC-02)
-- [ ] ListView is disabled when AutoCAD is not connected (VR-002-002)
+- [x] Layouts ListView is visible and shows layout name + tab order per entry (AC-01, AC-02)
+- [x] ListView is disabled when AutoCAD is not connected (VR-002-002)
 
 ---
 
@@ -69,8 +69,8 @@
   - Sets `ActiveLayoutName` from `_guiProxy.ExecuteInGuiAsync("get_active_layout")`
 
 ### How to verify
-- [ ] Layouts collection is populated and excludes "Model" (AC-01)
-- [ ] SelectedLayout property triggers detail loading on change (AC-04)
+- [x] Layouts collection is populated and excludes "Model" (AC-01)
+- [x] SelectedLayout property triggers detail loading on change (AC-04)
 
 ---
 
@@ -94,8 +94,8 @@
 - Register handler with IGUIProxy: `"get_layouts"` action that calls `GetLayouts()` and returns result
 
 ### How to verify
-- [ ] GetLayouts returns all layouts including Model flag, ordered by TabOrder (AC-01, AC-02)
-- [ ] Returns empty list when no document is open
+- [x] GetLayouts returns all layouts including Model flag, ordered by TabOrder (AC-01, AC-02)
+- [x] Returns empty list when no document is open
 
 ---
 
@@ -118,8 +118,8 @@
 - Add validation: if `layoutName` is null/empty or doesn't exist in the drawing, return false with appropriate log message
 
 ### How to verify
-- [ ] GetCurrentLayoutName returns the active layout name (AC-03)
-- [ ] SwitchToLayout changes the active layout in AutoCAD (AC-05)
+- [x] GetCurrentLayoutName returns the active layout name (AC-03)
+- [x] SwitchToLayout changes the active layout in AutoCAD (AC-05)
 
 ---
 
@@ -142,7 +142,7 @@
 - Ensure `LayoutInfo` record includes all necessary fields: `Name`, `TabOrder`, `IsModelSpace`, `PlotConfigurationName` (already defined)
 
 ### How to verify
-- [ ] Interface declares GetLayouts, SwitchToLayout, GetCurrentLayoutName (AC-01, AC-05)
+- [x] Interface declares GetLayouts, SwitchToLayout, GetCurrentLayoutName (AC-01, AC-05)
 
 ---
 
@@ -169,8 +169,8 @@
 - Wire `OnSelectedLayoutChanged` partial method to invoke this command
 
 ### How to verify
-- [ ] Selecting a layout switches the active layout in AutoCAD (AC-04, AC-05)
-- [ ] Command is disabled when not connected
+- [x] Selecting a layout switches the active layout in AutoCAD (AC-04, AC-05)
+- [x] Command is disabled when not connected
 
 ---
 
@@ -193,8 +193,8 @@
 - The active layout should be visually distinct from the selected (clicked) item
 
 ### How to verify
-- [ ] The currently active layout is visually highlighted in the list (AC-03)
-- [ ] Highlight updates when the active layout changes (AC-06)
+- [x] The currently active layout is visually highlighted in the list (AC-03)
+- [x] Highlight updates when the active layout changes (AC-06)
 
 ---
 

@@ -4,23 +4,23 @@
 > **Parent FR**: [FR-002](FR-002-autocad-connection.md)
 > **Priority**: P1
 > **Tasks**: 9 | **Effort**: 2S + 4M + 3L
-> **Status**: Not Started
+> **Status**: Done
 
 ## Prerequisites
-- [ ] US-002-01 (AutoCAD connection must be established)
-- [ ] US-002-02 (layout selection must be available)
+- [x] US-002-01 (AutoCAD connection must be established)
+- [x] US-002-02 (layout selection must be available)
 
 ## Acceptance Criteria
-- [ ] AC-01: Clicking "Extract Parameters" retrieves block attributes from the selected layout (pr_no, project_name, job_working_plan_name, product_name, product_catelog, spec, surface_treatment, operation_flow, color_name, color_no)
-- [ ] AC-02: Extracted block attributes are displayed as key-value pairs in the Layout Details panel
-- [ ] AC-03: Table data from valid layout tables is displayed in a DataGrid with columns: Position, Product No, Width, Height, Length, Thickness, Qty, Description
-- [ ] AC-04: Table structure is validated to have exactly 9 columns and "HEADER_ID" in column 7 header; invalid tables are skipped with a warning logged
-- [ ] AC-05: Empty rows (where both qty and product_no are empty) are filtered out from the displayed table data
-- [ ] AC-06: AutoCAD MText formatting codes are stripped from all extracted values using an LM_UnFormat equivalent
-- [ ] AC-07: The Detail ID column (index 8) is stored internally but not displayed to the user
-- [ ] AC-08: Row 0 (header with header_id) and Row 1 (labels) are skipped; data extraction starts from Row 2
-- [ ] AC-09: Extract Parameters button is only enabled when AutoCAD is connected and a layout is selected
-- [ ] AC-10: All extraction COM operations execute on the GUI/STA thread via IGUIProxy
+- [x] AC-01: Clicking "Extract Parameters" retrieves block attributes from the selected layout (pr_no, project_name, job_working_plan_name, product_name, product_catelog, spec, surface_treatment, operation_flow, color_name, color_no)
+- [x] AC-02: Extracted block attributes are displayed as key-value pairs in the Layout Details panel
+- [x] AC-03: Table data from valid layout tables is displayed in a DataGrid with columns: Position, Product No, Width, Height, Length, Thickness, Qty, Description
+- [x] AC-04: Table structure is validated to have exactly 9 columns and "HEADER_ID" in column 7 header; invalid tables are skipped with a warning logged
+- [x] AC-05: Empty rows (where both qty and product_no are empty) are filtered out from the displayed table data
+- [x] AC-06: AutoCAD MText formatting codes are stripped from all extracted values using an LM_UnFormat equivalent
+- [x] AC-07: The Detail ID column (index 8) is stored internally but not displayed to the user
+- [x] AC-08: Row 0 (header with header_id) and Row 1 (labels) are skipped; data extraction starts from Row 2
+- [x] AC-09: Extract Parameters button is only enabled when AutoCAD is connected and a layout is selected
+- [x] AC-10: All extraction COM operations execute on the GUI/STA thread via IGUIProxy
 
 ---
 
@@ -46,9 +46,9 @@
   - Bind `IsEnabled` to a multi-condition: `IsConnected && SelectedLayout != null` (VR-002-007)
 
 ### How to verify
-- [ ] Layout Details panel shows key-value attribute pairs (AC-02)
-- [ ] DataGrid is present for table data display (AC-03)
-- [ ] Extract Parameters button is present and disabled when conditions not met (AC-09)
+- [x] Layout Details panel shows key-value attribute pairs (AC-02)
+- [x] DataGrid is present for table data display (AC-03)
+- [x] Extract Parameters button is present and disabled when conditions not met (AC-09)
 
 ---
 
@@ -75,9 +75,9 @@
 - Notify property changes for `LayoutAttributes` and `TableRows`
 
 ### How to verify
-- [ ] ExtractParametersCommand calls IGUIProxy for thread-safe extraction (AC-10)
-- [ ] Extracted attributes populate the LayoutAttributes dictionary (AC-01, AC-02)
-- [ ] Extract button only enabled when connected and layout selected (AC-09)
+- [x] ExtractParametersCommand calls IGUIProxy for thread-safe extraction (AC-10)
+- [x] Extracted attributes populate the LayoutAttributes dictionary (AC-01, AC-02)
+- [x] Extract button only enabled when connected and layout selected (AC-09)
 
 ---
 
@@ -106,8 +106,8 @@
 - Ensure `LayoutData.ExtractedAt` is set to `DateTime.UtcNow`
 
 ### How to verify
-- [ ] GetLayoutValues extracts both block attributes and table data from the layout (AC-01, AC-03)
-- [ ] Extraction works on PaperSpace entities for the specified layout
+- [x] GetLayoutValues extracts both block attributes and table data from the layout (AC-01, AC-03)
+- [x] Extraction works on PaperSpace entities for the specified layout
 
 ---
 
@@ -133,8 +133,8 @@
 - This method should be callable independently or as part of `GetLayoutValues`
 
 ### How to verify
-- [ ] Block attributes are extracted for the 10 standard tags (AC-01)
-- [ ] Values have MText formatting stripped (AC-06)
+- [x] Block attributes are extracted for the 10 standard tags (AC-01)
+- [x] Values have MText formatting stripped (AC-06)
 
 ---
 
@@ -162,10 +162,10 @@
 - Ensure structured logging for skipped tables and filtered rows
 
 ### How to verify
-- [ ] Tables with != 9 columns are skipped with warning (AC-04)
-- [ ] HEADER_ID validation in column 7 header (AC-04)
-- [ ] Data starts from row 2, skipping rows 0 and 1 (AC-08)
-- [ ] Empty rows are filtered out (AC-05)
+- [x] Tables with != 9 columns are skipped with warning (AC-04)
+- [x] HEADER_ID validation in column 7 header (AC-04)
+- [x] Data starts from row 2, skipping rows 0 and 1 (AC-08)
+- [x] Empty rows are filtered out (AC-05)
 
 ---
 
@@ -200,8 +200,8 @@
 - Add unit tests in `AutoCADServiceTests.cs` for each formatting code pattern
 
 ### How to verify
-- [ ] MText formatting codes are stripped from all values (AC-06)
-- [ ] Common patterns (\P, \C, \F, \H, \S) are correctly removed
+- [x] MText formatting codes are stripped from all values (AC-06)
+- [x] Common patterns (\P, \C, \F, \H, \S) are correctly removed
 
 ---
 
@@ -230,8 +230,8 @@
 - If only one is empty, the row should still be included
 
 ### How to verify
-- [ ] Rows where both qty and product_no are empty are excluded (AC-05)
-- [ ] Rows where only one is empty are retained
+- [x] Rows where both qty and product_no are empty are excluded (AC-05)
+- [x] Rows where only one is empty are retained
 
 ---
 
@@ -267,8 +267,8 @@
 - Ensure `TableRowData` is in a shared location accessible by both Core and App projects
 
 ### How to verify
-- [ ] TableRowData has all 9 properties matching table columns (AC-03, AC-07)
-- [ ] LayoutAttributes dictionary is available for key-value display (AC-02)
+- [x] TableRowData has all 9 properties matching table columns (AC-03, AC-07)
+- [x] LayoutAttributes dictionary is available for key-value display (AC-02)
 
 ---
 
@@ -301,9 +301,9 @@
 - Add a "No data" message overlay bound to `TableRows.Count == 0` visibility
 
 ### How to verify
-- [ ] DataGrid shows 8 visible columns matching the required fields (AC-03)
-- [ ] DetailId column is not displayed to the user (AC-07)
-- [ ] Column bindings correctly map to TableRowData properties
+- [x] DataGrid shows 8 visible columns matching the required fields (AC-03)
+- [x] DetailId column is not displayed to the user (AC-07)
+- [x] Column bindings correctly map to TableRowData properties
 
 ---
 

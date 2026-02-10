@@ -4,22 +4,22 @@
 > **Parent FR**: [FR-003](FR-003-odoo-connection.md)
 > **Priority**: P1
 > **Tasks**: 6 | **Effort**: 3S + 3M + 0L
-> **Status**: Not Started
+> **Status**: Done
 
 ## Prerequisites
-- [ ] US-003-01 (credential input form and validation) must be completed
+- [x] US-003-01 (credential input form and validation) must be completed
 
 ## Acceptance Criteria
-- [ ] AC-01: A "Test Connection" button is visible on the connection settings panel
-- [ ] AC-02: Clicking "Test Connection" calls `TestConnectionAsync()` without persisting the session
-- [ ] AC-03: On success, a green status message displays "Connection test successful" with server version info
-- [ ] AC-04: On authentication failure (uid = false), the message displays "Authentication failed. Please verify your database name, username, and password."
-- [ ] AC-05: On network failure (HttpRequestException), the message displays "Unable to reach Odoo server at {ServerUrl}. Please check your network connection and server URL."
-- [ ] AC-06: On timeout (TaskCanceledException), the message displays "Connection timed out after {TimeoutSeconds} seconds."
-- [ ] AC-07: On SSL/TLS error, the message displays "SSL certificate validation failed for {ServerUrl}."
-- [ ] AC-08: The button is disabled while the test is in progress (shows a progress indicator)
-- [ ] AC-09: The button is disabled when required credential fields are empty or invalid
-- [ ] AC-10: The test operation does not modify the IsConnected state or establish a persistent session
+- [x] AC-01: A "Test Connection" button is visible on the connection settings panel
+- [x] AC-02: Clicking "Test Connection" calls `TestConnectionAsync()` without persisting the session
+- [x] AC-03: On success, a green status message displays "Connection test successful" with server version info
+- [x] AC-04: On authentication failure (uid = false), the message displays "Authentication failed. Please verify your database name, username, and password."
+- [x] AC-05: On network failure (HttpRequestException), the message displays "Unable to reach Odoo server at {ServerUrl}. Please check your network connection and server URL."
+- [x] AC-06: On timeout (TaskCanceledException), the message displays "Connection timed out after {TimeoutSeconds} seconds."
+- [x] AC-07: On SSL/TLS error, the message displays "SSL certificate validation failed for {ServerUrl}."
+- [x] AC-08: The button is disabled while the test is in progress (shows a progress indicator)
+- [x] AC-09: The button is disabled when required credential fields are empty or invalid
+- [x] AC-10: The test operation does not modify the IsConnected state or establish a persistent session
 
 ---
 
@@ -40,8 +40,8 @@
 - Position the button before the "Connect" button in the button bar layout
 
 ### How to verify
-- [ ] "Test Connection" button is visible on the connection settings panel (AC-01)
-- [ ] Progress indicator appears while test is running (AC-08)
+- [x] "Test Connection" button is visible on the connection settings panel (AC-01)
+- [x] Progress indicator appears while test is running (AC-08)
 
 ---
 
@@ -69,9 +69,9 @@
 - Ensure the test does NOT set `IsConnected = true` or retain any session state after completion
 
 ### How to verify
-- [ ] Clicking "Test Connection" calls TestConnectionAsync without persisting session (AC-02)
-- [ ] Test operation does not modify IsConnected state (AC-10)
-- [ ] On success, green message with server version info is displayed (AC-03)
+- [x] Clicking "Test Connection" calls TestConnectionAsync without persisting session (AC-02)
+- [x] Test operation does not modify IsConnected state (AC-10)
+- [x] On success, green message with server version info is displayed (AC-03)
 
 ---
 
@@ -97,9 +97,9 @@
 - Dispose the temporary `HttpClient` after the test (or use `HttpClientFactory` pattern)
 
 ### How to verify
-- [ ] TestConnectionAsync validates credentials without retaining session (AC-02, AC-10)
-- [ ] Returns server version on success (AC-03)
-- [ ] Returns appropriate error type on failure (AC-04, AC-05, AC-06, AC-07)
+- [x] TestConnectionAsync validates credentials without retaining session (AC-02, AC-10)
+- [x] Returns server version on success (AC-03)
+- [x] Returns appropriate error type on failure (AC-04, AC-05, AC-06, AC-07)
 
 ---
 
@@ -141,8 +141,8 @@
 - Add XML doc comments explaining that the overload does not persist session state
 
 ### How to verify
-- [ ] Interface declares TestConnectionAsync overload with credential parameters (AC-02)
-- [ ] TestConnectionResult record includes Success, ServerVersion, ErrorMessage, ErrorType fields (AC-03, AC-04, AC-05, AC-06, AC-07)
+- [x] Interface declares TestConnectionAsync overload with credential parameters (AC-02)
+- [x] TestConnectionResult record includes Success, ServerVersion, ErrorMessage, ErrorType fields (AC-03, AC-04, AC-05, AC-06, AC-07)
 
 ---
 
@@ -166,10 +166,10 @@
 - Match error messages exactly to the Error Handling table in FR-003 Section 9
 
 ### How to verify
-- [ ] Auth failure displays correct message (AC-04)
-- [ ] Network failure displays correct message with ServerUrl (AC-05)
-- [ ] Timeout displays correct message with TimeoutSeconds (AC-06)
-- [ ] SSL error displays correct message (AC-07)
+- [x] Auth failure displays correct message (AC-04)
+- [x] Network failure displays correct message with ServerUrl (AC-05)
+- [x] Timeout displays correct message with TimeoutSeconds (AC-06)
+- [x] SSL error displays correct message (AC-07)
 
 ---
 
@@ -189,8 +189,8 @@
 - Ensure the button is disabled when required credential fields are empty or invalid (delegates to `IsFormValid` via `CanTestConnection`)
 
 ### How to verify
-- [ ] Button is disabled while test is in progress (AC-08)
-- [ ] Button is disabled when required credential fields are empty or invalid (AC-09)
+- [x] Button is disabled while test is in progress (AC-08)
+- [x] Button is disabled when required credential fields are empty or invalid (AC-09)
 
 ---
 

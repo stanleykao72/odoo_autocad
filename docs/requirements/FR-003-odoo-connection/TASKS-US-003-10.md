@@ -4,20 +4,20 @@
 > **Parent FR**: [FR-003](FR-003-odoo-connection.md)
 > **Priority**: P2
 > **Tasks**: 6 | **Effort**: 6S + 0M + 0L
-> **Status**: Not Started
+> **Status**: Done
 
 ## Prerequisites
-- [ ] None (this US is a prerequisite for US-003-01)
+- [x] None (this US is a prerequisite for US-003-01)
 
 ## Acceptance Criteria
-- [ ] AC-01: The `appsettings.json` file supports an `Odoo` section with keys: `ServerUrl`, `Database`, `Username`, `TimeoutSeconds`
-- [ ] AC-02: On application launch, the credential form fields are pre-populated with values from `appsettings.json`
-- [ ] AC-03: The `TimeoutSeconds` value configures the `HttpClient.Timeout` (default: 30 seconds if not specified)
-- [ ] AC-04: `TimeoutSeconds` is validated as a positive integer between 5 and 120 seconds
-- [ ] AC-05: If `appsettings.json` is missing the `Odoo` section, the application starts with empty fields and default timeout
-- [ ] AC-06: The Password field is intentionally excluded from `appsettings.json` for security
-- [ ] AC-07: Users can override pre-configured values by typing in the UI fields at runtime
-- [ ] AC-08: Configuration changes in the UI are not written back to `appsettings.json` (read-only configuration)
+- [x] AC-01: The `appsettings.json` file supports an `Odoo` section with keys: `ServerUrl`, `Database`, `Username`, `TimeoutSeconds`
+- [x] AC-02: On application launch, the credential form fields are pre-populated with values from `appsettings.json`
+- [x] AC-03: The `TimeoutSeconds` value configures the `HttpClient.Timeout` (default: 30 seconds if not specified)
+- [x] AC-04: `TimeoutSeconds` is validated as a positive integer between 5 and 120 seconds
+- [x] AC-05: If `appsettings.json` is missing the `Odoo` section, the application starts with empty fields and default timeout
+- [x] AC-06: The Password field is intentionally excluded from `appsettings.json` for security
+- [x] AC-07: Users can override pre-configured values by typing in the UI fields at runtime
+- [x] AC-08: Configuration changes in the UI are not written back to `appsettings.json` (read-only configuration)
 
 ---
 
@@ -47,8 +47,8 @@
 - Add `appsettings.Development.json` for development overrides (optional, with environment-specific URLs)
 
 ### How to verify
-- [ ] appsettings.json contains Odoo section with ServerUrl, Database, Username, TimeoutSeconds (AC-01)
-- [ ] Password is NOT present in appsettings.json (AC-06)
+- [x] appsettings.json contains Odoo section with ServerUrl, Database, Username, TimeoutSeconds (AC-01)
+- [x] Password is NOT present in appsettings.json (AC-06)
 
 ---
 
@@ -83,8 +83,8 @@
 - Verify `AppSettings.Odoo` property is of type `OdooSettings` (already present)
 
 ### How to verify
-- [ ] OdooSettings POCO has ServerUrl, Database, Username, TimeoutSeconds properties (AC-01)
-- [ ] No Password property exists in OdooSettings (AC-06)
+- [x] OdooSettings POCO has ServerUrl, Database, Username, TimeoutSeconds properties (AC-01)
+- [x] No Password property exists in OdooSettings (AC-06)
 
 ---
 
@@ -116,8 +116,8 @@
 - Store the original settings reference but do NOT write changes back (read-only per AC-08)
 
 ### How to verify
-- [ ] OdooSettings is injected via DI (AC-01)
-- [ ] Configuration is read-only from the ViewModel (AC-08)
+- [x] OdooSettings is injected via DI (AC-01)
+- [x] Configuration is read-only from the ViewModel (AC-08)
 
 ---
 
@@ -147,9 +147,9 @@
 - Do NOT attempt to write user changes back to `appsettings.json` -- UI values override config values only for the current session
 
 ### How to verify
-- [ ] Credential fields are pre-populated on launch (AC-02)
-- [ ] Users can override values by typing (AC-07)
-- [ ] Missing Odoo section results in empty fields and default timeout (AC-05)
+- [x] Credential fields are pre-populated on launch (AC-02)
+- [x] Users can override values by typing (AC-07)
+- [x] Missing Odoo section results in empty fields and default timeout (AC-05)
 
 ---
 
@@ -183,8 +183,8 @@
 - Log the configured timeout value at startup
 
 ### How to verify
-- [ ] HttpClient.Timeout is configured from TimeoutSeconds value (AC-03)
-- [ ] TimeoutSeconds is validated as 5-120 range with default 30 (AC-04)
+- [x] HttpClient.Timeout is configured from TimeoutSeconds value (AC-03)
+- [x] TimeoutSeconds is validated as 5-120 range with default 30 (AC-04)
 
 ---
 
@@ -219,8 +219,8 @@
 - Log a warning when the section is missing to help administrators troubleshoot
 
 ### How to verify
-- [ ] Application starts with empty fields when Odoo section is missing (AC-05)
-- [ ] Default timeout of 30 seconds is applied (AC-05)
+- [x] Application starts with empty fields when Odoo section is missing (AC-05)
+- [x] Default timeout of 30 seconds is applied (AC-05)
 
 ---
 
