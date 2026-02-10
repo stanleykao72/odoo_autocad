@@ -3,14 +3,19 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:converters="clr-namespace:OdooAutoCAD.App.Converters"
         mc:Ignorable="d"
         Title="Odoo AutoCAD Integration"
         Height="720" Width="1280"
         MinHeight="600" MinWidth="900"
         WindowStartupLocation="CenterScreen"
+        FontFamily="{StaticResource AppFontFamily}"
+        Icon="pack://application:,,,/Resources/odoo_autocad.ico"
         Background="{StaticResource BackgroundBrush}">
 
     <Window.Resources>
+        <converters:EqualityConverter x:Key="EqualityConverter"/>
+
         <!-- Navigation Button Style -->
         <Style x:Key="NavButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
@@ -30,6 +35,16 @@
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
                         </Border>
                         <ControlTemplate.Triggers>
+                            <DataTrigger Value="True">
+                                <DataTrigger.Binding>
+                                    <MultiBinding Converter="{StaticResource EqualityConverter}">
+                                        <Binding Path="Tag" RelativeSource="{RelativeSource TemplatedParent}"/>
+                                        <Binding Path="ActiveNavButton"/>
+                                    </MultiBinding>
+                                </DataTrigger.Binding>
+                                <Setter Property="Background" Value="#E3F2FD"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                            </DataTrigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter Property="Background" Value="#F0F0F0"/>
                                 <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
@@ -73,19 +88,19 @@
 
                 <!-- Navigation Items -->
                 <StackPanel Grid.Row="1" Margin="0,10">
-                    <Button x:Name="BtnDashboard" Content="📊 Dashboard"
+                    <Button x:Name="BtnDashboard" Tag="BtnDashboard" Content="📊 Dashboard"
                             Style="{StaticResource NavButton}" Click="NavButton_Click"/>
-                    <Button x:Name="BtnAutoCAD" Content="🔧 AutoCAD"
+                    <Button x:Name="BtnAutoCAD" Tag="BtnAutoCAD" Content="🔧 AutoCAD"
                             Style="{StaticResource NavButton}" Click="NavButton_Click"/>
-                    <Button x:Name="BtnOdoo" Content="🏢 Odoo"
+                    <Button x:Name="BtnOdoo" Tag="BtnOdoo" Content="🏢 Odoo"
                             Style="{StaticResource NavButton}" Click="NavButton_Click"/>
-                    <Button x:Name="BtnBOQ" Content="📋 BOQ Manager"
+                    <Button x:Name="BtnBOQ" Tag="BtnBOQ" Content="📋 BOQ Manager"
                             Style="{StaticResource NavButton}" Click="NavButton_Click"/>
-                    <Button x:Name="BtnPR" Content="🛒 Purchase Requisition"
+                    <Button x:Name="BtnPR" Tag="BtnPR" Content="🛒 Purchase Requisition"
                             Style="{StaticResource NavButton}" Click="NavButton_Click"/>
-                    <Button x:Name="BtnMCP" Content="🤖 AI Assistant"
+                    <Button x:Name="BtnMCP" Tag="BtnMCP" Content="🤖 AI Assistant"
                             Style="{StaticResource NavButton}" Click="NavButton_Click"/>
-                    <Button x:Name="BtnSettings" Content="⚙️ Settings"
+                    <Button x:Name="BtnSettings" Tag="BtnSettings" Content="⚙️ Settings"
                             Style="{StaticResource NavButton}" Click="NavButton_Click"/>
                 </StackPanel>
 

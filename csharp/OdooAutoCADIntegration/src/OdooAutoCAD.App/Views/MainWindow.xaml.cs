@@ -4,6 +4,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Extensions.DependencyInjection;
+using OdooAutoCAD.App.Services;
 using OdooAutoCAD.App.ViewModels;
 
 namespace OdooAutoCAD.App.Views;
@@ -14,16 +15,22 @@ namespace OdooAutoCAD.App.Views;
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
+    private readonly INavigationService _navigationService;
 
     public MainWindow()
     {
         InitializeComponent();
 
         _viewModel = App.Services.GetRequiredService<MainViewModel>();
+        _navigationService = App.Services.GetRequiredService<INavigationService>();
+
+        // Wire the Frame to the navigation service before first navigation
+        _navigationService.Frame = MainFrame;
+
         DataContext = _viewModel;
 
         // Navigate to dashboard by default
-        NavigateTo("Dashboard");
+        _viewModel.NavigateCommand.Execute("Dashboard");
     }
 
     private void NavButton_Click(object sender, RoutedEventArgs e)
@@ -31,25 +38,7 @@ public partial class MainWindow : Window
         if (sender is Button button)
         {
             var pageName = button.Name.Replace("Btn", "");
-            NavigateTo(pageName);
+            _viewModel.NavigateCommand.Execute(pageName);
         }
-    }
-
-    private void NavigateTo(string pageName)
-    {
-        _viewModel.CurrentPageTitle = pageName switch
-        {
-            "Dashboard" => "Dashboard",
-            "AutoCAD" => "AutoCAD Integration",
-            "Odoo" => "Odoo Connection",
-            "BOQ" => "BOQ Manager",
-            "PR" => "Purchase Requisition",
-            "MCP" => "AI Assistant (MCP)",
-            "Settings" => "Settings",
-            _ => pageName
-        };
-
-        // TODO: Navigate to actual pages
-        // MainFrame.Navigate(new Uri($"Views/Pages/{pageName}Page.xaml", UriKind.Relative));
     }
 }

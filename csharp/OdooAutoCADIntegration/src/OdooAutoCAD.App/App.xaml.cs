@@ -8,9 +8,11 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OdooAutoCAD.App.Services;
 using OdooAutoCAD.App.ViewModels;
+using OdooAutoCAD.Configuration;
 using OdooAutoCAD.Core.AutoCAD;
 using OdooAutoCAD.Core.BOQ;
 using OdooAutoCAD.Core.Odoo;
+using OdooAutoCAD.Data.Context;
 using OdooAutoCAD.MCP.Server;
 using OdooAutoCAD.MCP.Tools;
 using OdooAutoCAD.Core.Threading;
@@ -122,6 +124,18 @@ public partial class App : Application
         // Core services
         services.AddSingleton<IGUIProxy, GUIProxy>();
 
+        // Data layer
+        services.AddSingleton<AppDbContextFactory>(sp =>
+            new AppDbContextFactory("Data Source=database.db"));
+        services.AddTransient<AppDbContext>(sp =>
+            sp.GetRequiredService<AppDbContextFactory>().CreateDbContext());
+
+        // Configuration
+        services.AddSingleton<ConfigurationLoader>();
+
+        // Settings service
+        services.AddSingleton<ISettingsService, SettingsService>();
+
         // Note: IAutoCADService, IOdooService, IBOQProcessor are not registered yet.
         // They will be added when real implementations are available.
         // MCPToolRegistry accepts them as optional (nullable) parameters.
@@ -185,27 +199,64 @@ public partial class App : Application
     {
         Log.Information("Application shutting down");
 
-        _guiProxyTimer?.Stop();
-
-        // Stop MCP server if running
-        var mcpServer = Services.GetService<MCPSSEServer>();
-        if (mcpServer?.IsRunning == true)
+        // Step 1: Stop GUI proxy timer
+        try
         {
-            await mcpServer.StopAsync();
+            _guiProxyTimer?.Stop();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to stop GUI proxy timer");
         }
 
-        // Stop GUI proxy
-        var guiProxy = Services.GetService<IGUIProxy>();
-        guiProxy?.Stop();
-
-        // Stop host
-        if (_host != null)
+        // Step 2: Stop MCP server if running
+        try
         {
-            await _host.StopAsync();
-            _host.Dispose();
+            var mcpServer = Services.GetService<MCPSSEServer>();
+            if (mcpServer?.IsRunning == true)
+            {
+                await mcpServer.StopAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to stop MCP server");
         }
 
-        await Log.CloseAndFlushAsync();
+        // Step 3: Stop GUI proxy
+        try
+        {
+            var guiProxy = Services.GetService<IGUIProxy>();
+            guiProxy?.Stop();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to stop GUI proxy");
+        }
+
+        // Step 4: Stop host with timeout
+        try
+        {
+            if (_host != null)
+            {
+                await _host.StopAsync(TimeSpan.FromSeconds(5));
+                _host.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to stop host");
+        }
+
+        // Step 5: Flush logs
+        try
+        {
+            await Log.CloseAndFlushAsync();
+        }
+        catch
+        {
+            // Silently ignore log flush failures
+        }
 
         base.OnExit(e);
     }

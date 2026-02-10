@@ -2,6 +2,7 @@
 // Navigation service for page navigation
 
 using System.Windows.Controls;
+using Serilog;
 
 namespace OdooAutoCAD.App.Services;
 
@@ -18,6 +19,7 @@ public interface INavigationService
 
 /// <summary>
 /// Navigation service implementation.
+/// Uses assembly-qualified type names to resolve page types.
 /// </summary>
 public class NavigationService : INavigationService
 {
@@ -29,10 +31,16 @@ public class NavigationService : INavigationService
     {
         if (Frame == null) return;
 
-        var pageType = Type.GetType($"OdooAutoCAD.App.Views.Pages.{pageName}Page");
+        var typeName = $"OdooAutoCAD.App.Views.Pages.{pageName}Page";
+        var pageType = typeof(NavigationService).Assembly.GetType(typeName);
+
         if (pageType != null)
         {
             Frame.Navigate(Activator.CreateInstance(pageType));
+        }
+        else
+        {
+            Log.Warning("Page type not found: {TypeName}", typeName);
         }
     }
 

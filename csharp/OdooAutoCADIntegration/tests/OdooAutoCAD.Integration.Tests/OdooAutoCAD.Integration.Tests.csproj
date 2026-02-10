@@ -29,6 +29,11 @@
     <ProjectReference Include="..\..\src\OdooAutoCAD.MCP\OdooAutoCAD.MCP.csproj" />
     <ProjectReference Include="..\..\src\OdooAutoCAD.Data\OdooAutoCAD.Data.csproj" />
     <ProjectReference Include="..\..\src\OdooAutoCAD.Configuration\OdooAutoCAD.Configuration.csproj" />
+    <ProjectReference Include="..\..\src\OdooAutoCAD.App\OdooAutoCAD.App.csproj" />
   </ItemGroup>
+
+  <PropertyGroup>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
 
 </Project>

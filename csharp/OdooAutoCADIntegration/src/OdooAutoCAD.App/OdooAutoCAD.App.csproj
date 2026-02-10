@@ -13,7 +13,7 @@
     <Company>E-Smith</Company>
     <Product>Odoo AutoCAD Integration</Product>
     <Description>WPF desktop application for Odoo-AutoCAD integration</Description>
-    <!-- <ApplicationIcon>Resources\app.ico</ApplicationIcon> -->
+    <ApplicationIcon>Resources\odoo_autocad.ico</ApplicationIcon>
     <StartupObject>OdooAutoCAD.App.App</StartupObject>
   </PropertyGroup>
 
@@ -33,6 +33,10 @@
     <ProjectReference Include="..\OdooAutoCAD.MCP\OdooAutoCAD.MCP.csproj" />
     <ProjectReference Include="..\OdooAutoCAD.Data\OdooAutoCAD.Data.csproj" />
     <ProjectReference Include="..\OdooAutoCAD.Configuration\OdooAutoCAD.Configuration.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\odoo_autocad.ico" />
   </ItemGroup>
 
   <ItemGroup>

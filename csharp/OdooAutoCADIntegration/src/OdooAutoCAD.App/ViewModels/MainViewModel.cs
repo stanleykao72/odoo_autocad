@@ -6,6 +6,7 @@ using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using OdooAutoCAD.App.Services;
 using OdooAutoCAD.Core.AutoCAD;
 using OdooAutoCAD.Core.Odoo;
 using OdooAutoCAD.MCP.Server;
@@ -21,6 +22,7 @@ namespace OdooAutoCAD.App.ViewModels;
 public partial class MainViewModel : ObservableObject
 {
     private readonly ILogger<MainViewModel>? _logger;
+    private readonly INavigationService _navigationService;
     private readonly IGUIProxy _guiProxy;
     private readonly MCPSSEServer _mcpServer;
     private readonly DispatcherTimer _statusTimer;
@@ -33,6 +35,9 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private string _currentDateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
+    [ObservableProperty]
+    private string _activeNavButton = "BtnDashboard";
 
     // AutoCAD Status
     [ObservableProperty]
@@ -56,10 +61,12 @@ public partial class MainViewModel : ObservableObject
     private Brush _mcpStatusColor = Brushes.Gray;
 
     public MainViewModel(
+        INavigationService navigationService,
         IGUIProxy guiProxy,
         MCPSSEServer mcpServer,
         ILogger<MainViewModel>? logger = null)
     {
+        _navigationService = navigationService;
         _guiProxy = guiProxy;
         _mcpServer = mcpServer;
         _logger = logger;
@@ -87,6 +94,25 @@ public partial class MainViewModel : ObservableObject
         StatusMessage = "Refreshing...";
         await Task.Run(() => UpdateAllStatus());
         StatusMessage = "Ready";
+    }
+
+    [RelayCommand]
+    private void Navigate(string pageName)
+    {
+        CurrentPageTitle = pageName switch
+        {
+            "Dashboard" => "Dashboard",
+            "AutoCAD" => "AutoCAD Integration",
+            "Odoo" => "Odoo Connection",
+            "BOQ" => "BOQ Manager",
+            "PR" => "Purchase Requisition",
+            "MCP" => "AI Assistant (MCP)",
+            "Settings" => "Settings",
+            _ => pageName
+        };
+
+        ActiveNavButton = $"Btn{pageName}";
+        _navigationService.NavigateTo(pageName);
     }
 
     private void UpdateAllStatus()
@@ -191,23 +217,3 @@ public partial class BOQViewModel : ObservableObject
     private string _statusMessage = string.Empty;
 }
 
-/// <summary>
-/// ViewModel for settings page.
-/// </summary>
-public partial class SettingsViewModel : ObservableObject
-{
-    [ObservableProperty]
-    private string _odooServerUrl = string.Empty;
-
-    [ObservableProperty]
-    private string _odooDatabase = string.Empty;
-
-    [ObservableProperty]
-    private string _odooUsername = string.Empty;
-
-    [ObservableProperty]
-    private int _mcpPort = 8084;
-
-    [ObservableProperty]
-    private bool _autoStartMCP;
-}

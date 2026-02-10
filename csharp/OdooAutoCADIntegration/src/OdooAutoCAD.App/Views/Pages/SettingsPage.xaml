@@ -1,0 +1,275 @@
+<Page x:Class="OdooAutoCAD.App.Views.Pages.SettingsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:converters="clr-namespace:OdooAutoCAD.App.Converters"
+      Title="Settings"
+      FontFamily="{StaticResource AppFontFamily}">
+    <Page.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
+    </Page.Resources>
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="Settings"
+                       FontSize="24" FontWeight="Bold"
+                       Foreground="{StaticResource TextPrimaryBrush}"/>
+            <TextBlock Text="Application configuration and preferences"
+                       FontSize="13" Margin="0,4,0,0"
+                       Foreground="{StaticResource TextSecondaryBrush}"/>
+        </StackPanel>
+
+        <!-- TabControl -->
+        <TabControl Grid.Row="1"
+                    Style="{StaticResource SettingsTabControl}">
+
+            <!-- ===== Connection Tab ===== -->
+            <TabItem Header="Connection"
+                     Style="{StaticResource SettingsTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                    <Border Style="{StaticResource CardPanel}" MaxWidth="600" HorizontalAlignment="Left">
+                        <StackPanel>
+                            <TextBlock Text="Odoo Connection Settings"
+                                       FontSize="16" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       Margin="0,0,0,16"/>
+
+                            <!-- Server URL -->
+                            <TextBlock Text="Server URL" Style="{StaticResource SettingsLabel}"/>
+                            <TextBox Text="{Binding OdooServerUrl, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Margin="0,0,0,12"/>
+
+                            <!-- Database -->
+                            <TextBlock Text="Database" Style="{StaticResource SettingsLabel}"/>
+                            <TextBox Text="{Binding OdooDatabase, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Margin="0,0,0,12"/>
+
+                            <!-- Username -->
+                            <TextBlock Text="Username" Style="{StaticResource SettingsLabel}"/>
+                            <TextBox Text="{Binding OdooUsername, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Margin="0,0,0,12"/>
+
+                            <!-- API Token -->
+                            <Grid Margin="0,0,0,12">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
+                                           Text="API Token" Style="{StaticResource SettingsLabel}"/>
+
+                                <!-- PasswordBox (hidden mode) -->
+                                <PasswordBox x:Name="TokenPasswordBox"
+                                             Grid.Row="1" Grid.Column="0"
+                                             Padding="12,8"
+                                             FontFamily="{StaticResource AppFontFamily}"
+                                             BorderBrush="{StaticResource BorderBrush}"
+                                             BorderThickness="1"
+                                             Visibility="{Binding IsTokenVisible, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}"/>
+
+                                <!-- TextBox (visible mode) -->
+                                <TextBox x:Name="TokenTextBox"
+                                         Grid.Row="1" Grid.Column="0"
+                                         Text="{Binding OdooApiToken, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Visibility="{Binding IsTokenVisible, Converter={StaticResource BoolToVisibility}}"/>
+
+                                <Button x:Name="ToggleTokenButton"
+                                        Grid.Row="1" Grid.Column="1"
+                                        Content="Show"
+                                        Command="{Binding ToggleTokenVisibilityCommand}"
+                                        Margin="8,0,0,0"
+                                        Padding="12,8"
+                                        VerticalAlignment="Top"
+                                        Style="{StaticResource SecondaryButton}"/>
+                            </Grid>
+
+                            <!-- Timeout -->
+                            <TextBlock Text="Timeout (seconds)" Style="{StaticResource SettingsLabel}"/>
+                            <TextBox Text="{Binding OdooTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Width="120" HorizontalAlignment="Left"/>
+                        </StackPanel>
+                    </Border>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ===== AutoCAD Tab ===== -->
+            <TabItem Header="AutoCAD"
+                     Style="{StaticResource SettingsTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                    <Border Style="{StaticResource CardPanel}" MaxWidth="600" HorizontalAlignment="Left">
+                        <StackPanel>
+                            <TextBlock Text="AutoCAD Integration Settings"
+                                       FontSize="16" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       Margin="0,0,0,16"/>
+
+                            <!-- ProgId (read-only) -->
+                            <TextBlock Text="ProgId" Style="{StaticResource SettingsLabel}"/>
+                            <TextBox Text="{Binding AutoCADProgId, Mode=OneWay}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     IsReadOnly="True"
+                                     Background="#F5F5F5"
+                                     Margin="0,0,0,12"/>
+
+                            <!-- Connection Timeout -->
+                            <TextBlock Text="Connection Timeout (seconds)" Style="{StaticResource SettingsLabel}"/>
+                            <TextBox Text="{Binding AutoCADConnectionTimeout, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Width="120" HorizontalAlignment="Left"
+                                     Margin="0,0,0,12"/>
+
+                            <!-- Retry Attempts -->
+                            <TextBlock Text="Retry Attempts" Style="{StaticResource SettingsLabel}"/>
+                            <TextBox Text="{Binding AutoCADRetryAttempts, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Width="120" HorizontalAlignment="Left"/>
+                        </StackPanel>
+                    </Border>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ===== MCP Tab ===== -->
+            <TabItem Header="MCP Server"
+                     Style="{StaticResource SettingsTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                    <Border Style="{StaticResource CardPanel}" MaxWidth="600" HorizontalAlignment="Left">
+                        <StackPanel>
+                            <TextBlock Text="MCP Server Settings"
+                                       FontSize="16" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       Margin="0,0,0,16"/>
+
+                            <!-- Port -->
+                            <TextBlock Text="Port" Style="{StaticResource SettingsLabel}"/>
+                            <TextBox Text="{Binding McpPort, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Width="120" HorizontalAlignment="Left"
+                                     Margin="0,0,0,12"/>
+
+                            <!-- Auto-Start -->
+                            <CheckBox Content="Auto-start MCP server on application launch"
+                                      IsChecked="{Binding McpAutoStart}"
+                                      FontFamily="{StaticResource AppFontFamily}"
+                                      FontSize="13"
+                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Margin="0,0,0,12"/>
+
+                            <!-- Heartbeat Interval -->
+                            <TextBlock Text="Heartbeat Interval (seconds)" Style="{StaticResource SettingsLabel}"/>
+                            <TextBox Text="{Binding McpHeartbeatInterval, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Width="120" HorizontalAlignment="Left"/>
+                        </StackPanel>
+                    </Border>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ===== Appearance Tab ===== -->
+            <TabItem Header="Appearance"
+                     Style="{StaticResource SettingsTabItem}">
+                <Border Style="{StaticResource CardPanel}" MaxWidth="600"
+                        HorizontalAlignment="Left" Margin="0,16,0,0">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,32">
+                        <TextBlock Text="Theme and language settings"
+                                   FontSize="16" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="Coming in Sprint 3"
+                                   FontSize="13" Margin="0,8,0,0"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </TabItem>
+
+            <!-- ===== Advanced Tab ===== -->
+            <TabItem Header="Advanced"
+                     Style="{StaticResource SettingsTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                    <Border Style="{StaticResource CardPanel}" MaxWidth="600" HorizontalAlignment="Left">
+                        <StackPanel>
+                            <TextBlock Text="Application Information"
+                                       FontSize="16" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       Margin="0,0,0,16"/>
+
+                            <!-- App Version -->
+                            <TextBlock Text="Application Version" Style="{StaticResource SettingsLabel}"/>
+                            <TextBlock Text="{Binding AppVersion}" Style="{StaticResource SettingsValueText}"
+                                       Margin="0,0,0,12"/>
+
+                            <!-- Database Path -->
+                            <TextBlock Text="Database Path" Style="{StaticResource SettingsLabel}"/>
+                            <TextBlock Text="{Binding DatabasePath}" Style="{StaticResource SettingsValueText}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,12"/>
+
+                            <!-- Config File Path -->
+                            <TextBlock Text="Configuration File" Style="{StaticResource SettingsLabel}"/>
+                            <TextBlock Text="{Binding ConfigFilePath}" Style="{StaticResource SettingsValueText}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,12"/>
+
+                            <!-- .NET Runtime -->
+                            <TextBlock Text=".NET Runtime" Style="{StaticResource SettingsLabel}"/>
+                            <TextBlock Text="{Binding DotNetRuntime}" Style="{StaticResource SettingsValueText}"/>
+                        </StackPanel>
+                    </Border>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <!-- Footer: Save / Cancel + Status -->
+        <Border Grid.Row="2"
+                BorderThickness="0,1,0,0"
+                BorderBrush="{StaticResource BorderBrush}"
+                Padding="0,12,0,0"
+                Margin="0,8,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Status message -->
+                <TextBlock Grid.Column="0"
+                           Text="{Binding StatusMessage}"
+                           FontSize="12"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           VerticalAlignment="Center"/>
+
+                <!-- Cancel -->
+                <Button Grid.Column="1"
+                        Content="Cancel"
+                        Command="{Binding CancelChangesCommand}"
+                        IsEnabled="{Binding HasUnsavedChanges}"
+                        Style="{StaticResource SecondaryButton}"
+                        Margin="0,0,8,0"/>
+
+                <!-- Save -->
+                <Button Grid.Column="2"
+                        Content="Save"
+                        Command="{Binding SaveSettingsCommand}"
+                        IsEnabled="{Binding HasUnsavedChanges}"
+                        Style="{StaticResource PrimaryButton}"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>

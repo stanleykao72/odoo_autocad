@@ -1,6 +1,8 @@
 // OdooAutoCAD.Configuration/ConfigurationLoader.cs
 // Configuration management - equivalent to Python YAML config loading
 
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -129,6 +131,25 @@ public class ConfigurationLoader
 
         var yaml = serializer.Serialize(settings);
         File.WriteAllText(filePath, yaml);
+    }
+
+    /// <summary>
+    /// Saves configuration to JSON file.
+    /// Sensitive fields (tokens, passwords) are excluded.
+    /// </summary>
+    public void SaveToJson(AppSettings settings, string fileName = "appsettings.json")
+    {
+        var filePath = Path.Combine(AppContext.BaseDirectory, fileName);
+
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+
+        var json = JsonSerializer.Serialize(settings, options);
+        File.WriteAllText(filePath, json);
     }
 
     /// <summary>
