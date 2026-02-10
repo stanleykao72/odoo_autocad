@@ -51,6 +51,15 @@ public class AutoCADService : IAutoCADService, IDisposable
     /// <summary>
     /// Gets an active COM object by ProgID (replacement for Marshal.GetActiveObject in .NET Core).
     /// Uses CLSIDFromProgIDEx with fallback to CLSIDFromProgID for broader compatibility.
+    ///
+    /// Critically, performs an explicit QueryInterface for IDispatch immediately after
+    /// obtaining the IUnknown pointer — matching pywin32's GetActiveObject behavior:
+    ///   dispatch = pythoncom.GetActiveObject(clsid)
+    ///   dispatch = dispatch.QueryInterface(pythoncom.IID_IDispatch)
+    ///
+    /// Without this explicit QI, .NET's dynamic/DLR defers the IDispatch QI until the
+    /// first property access. This deferred QI inside a DispatcherTimer callback can
+    /// crash AutoCAD 2014 with "Unhandled Access Violation Reading 0x003f".
     /// </summary>
     private static object GetActiveObject(string progId)
     {
@@ -67,6 +76,13 @@ public class AutoCADService : IAutoCADService, IDisposable
         }
 
         GetActiveObject(ref clsid, IntPtr.Zero, out object obj);
+
+        // Explicit QI for IDispatch — matches pywin32's immediate QueryInterface.
+        // This "warms up" the COM proxy so that subsequent dynamic property access
+        // doesn't trigger a deferred cross-process QI inside a DispatcherTimer callback.
+        IntPtr pDispatch = Marshal.GetIDispatchForObject(obj);
+        Marshal.Release(pDispatch);
+
         return obj;
     }
 
