@@ -222,81 +222,28 @@ public class AutoCADService : IAutoCADService, IDisposable
 
     /// <summary>
     /// Internal connection method executed on GUI thread.
-    /// Implements retry logic for ActiveDocument (5 attempts, 1-second intervals).
     ///
-    /// Uses Activator.CreateInstance (CoCreateInstance) as the PRIMARY connection method.
-    /// AutoCAD is a singleton COM server, so CoCreateInstance returns the existing
-    /// running instance — no need for GetActiveObject (ROT lookup).
+    /// DIAGNOSTIC BUILD: Uses GetActiveObject (ROT lookup) but does NOT access
+    /// any AutoCAD properties (no ActiveDocument, no Visible, nothing).
+    /// This isolates whether the crash is in GetActiveObject itself or in
+    /// subsequent property access via IDispatch.
     ///
-    /// This approach avoids the P/Invoke GetActiveObject code path which triggers
-    /// "Unhandled Access Violation Reading 0x0050 Exception at 53ac1e63h" crashes
-    /// in AutoCAD 2014. The CoCreateInstance path uses COM's standard class factory
-    /// mechanism which is more compatible with older AutoCAD versions.
-    ///
-    /// All property access uses Type.InvokeMember instead of dynamic/DLR to give
-    /// explicit control over IDispatch calls and avoid DLR overhead.
+    /// If this does NOT crash → the problem is property access (IDispatch calls).
+    /// If this DOES crash → the problem is GetActiveObject/ROT itself.
     /// </summary>
     private bool ConnectInternal()
     {
         try
         {
-            // Register COM message filter to handle rejected calls from AutoCAD.
+            // Register COM message filter
             OleMessageFilter.Register();
 
-            // Use Activator.CreateInstance (CoCreateInstance) as primary method.
-            // For singleton COM servers like AutoCAD, this returns the existing
-            // running instance — equivalent to Python's client.Dispatch().
-            var acadType = Type.GetTypeFromProgID(DefaultProgId);
-            if (acadType == null)
-            {
-                _logger?.LogError("AutoCAD is not installed or ProgID '{ProgId}' not found", DefaultProgId);
-                return false;
-            }
+            // Step 1 ONLY: GetActiveObject from ROT — NO property access after this
+            _acadApp = GetActiveObject(DefaultProgId);
+            _logger?.LogInformation("GetActiveObject succeeded — COM proxy obtained (no properties accessed)");
 
-            _acadApp = Activator.CreateInstance(acadType);
-            if (_acadApp == null)
-            {
-                _logger?.LogError("Failed to create AutoCAD COM instance");
-                return false;
-            }
-
-            _logger?.LogInformation("Connected to AutoCAD via Activator.CreateInstance (CoCreateInstance)");
-
-            // Retry logic for ActiveDocument (5 attempts, 1-second intervals)
-            // Matches Python: retry_count = 5, time.sleep(1)
-            // Uses Type.InvokeMember instead of dynamic to avoid DLR overhead
-            // and give explicit control over IDispatch calls.
-            for (int attempt = 1; attempt <= MaxRetryAttempts; attempt++)
-            {
-                try
-                {
-                    _acadDoc = _acadApp.GetType().InvokeMember(
-                        "ActiveDocument",
-                        System.Reflection.BindingFlags.GetProperty,
-                        null, _acadApp, null);
-                    if (_acadDoc != null)
-                    {
-                        _logger?.LogInformation("ActiveDocument acquired on attempt {Attempt}", attempt);
-                        break;
-                    }
-                }
-                catch (Exception ex) when (ex is COMException || ex.InnerException is COMException
-                                           || ex is System.Reflection.TargetInvocationException)
-                {
-                    _logger?.LogDebug(ex, "ActiveDocument attempt {Attempt} failed", attempt);
-                }
-
-                if (attempt < MaxRetryAttempts)
-                {
-                    Thread.Sleep(RetryDelayMs);
-                }
-            }
-
-            if (_acadDoc == null)
-            {
-                _logger?.LogWarning("ActiveDocument is null after {Attempts} attempts", MaxRetryAttempts);
-            }
-
+            // DO NOT access any properties — just mark as connected
+            // to test if GetActiveObject alone causes the crash.
             _isConnected = true;
             return true;
         }
