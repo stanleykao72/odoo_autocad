@@ -274,6 +274,14 @@ public interface IOdooService
     Task<PREntry?> ConvertBOQToPRAsync(int projectId, IEnumerable<int>? boqEntryIds = null);
 
     /// <summary>
+    /// Converts BOQ to PR via the Swagger/BasicAuth boq2pr_v2 API.
+    /// Posts header_ids and returns created PRs with lines.
+    /// </summary>
+    Task<Boq2PrResponse> ConvertBOQToPRViaApiAsync(
+        List<string> headerIds, string baseUrl, string basePath,
+        string database, string userToken);
+
+    /// <summary>
     /// Gets Purchase Requisitions for a project.
     /// </summary>
     /// <param name="projectId">Project ID.</param>

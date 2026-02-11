@@ -1,18 +1,281 @@
 <Page x:Class="OdooAutoCAD.App.Views.Pages.PRPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:converters="clr-namespace:OdooAutoCAD.App.Converters"
       Title="Purchase Requisition"
       FontFamily="{StaticResource AppFontFamily}">
-    <Grid>
-        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+
+    <Page.Resources>
+        <converters:PRStateToColorConverter x:Key="StateToColor"/>
+        <converters:PRStateToIconConverter x:Key="StateToIcon"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+        <converters:StringToVisibilityConverter x:Key="StringToVisibility"/>
+    </Page.Resources>
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Row 0: Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
             <TextBlock Text="Purchase Requisition"
                        FontSize="28" FontWeight="Bold"
-                       Foreground="{StaticResource PrimaryBrush}"
-                       HorizontalAlignment="Center"/>
-            <TextBlock Text="PR generation and submission to Odoo purchasing"
+                       Foreground="{StaticResource PrimaryBrush}"/>
+            <TextBlock Text="Convert BOQ to Purchase Requisition, review, and submit for approval"
                        FontSize="14" Margin="0,8,0,0"
-                       Foreground="{StaticResource TextSecondaryBrush}"
-                       HorizontalAlignment="Center"/>
+                       Foreground="{StaticResource TextSecondaryBrush}"/>
         </StackPanel>
+
+        <!-- Row 1: Action Bar -->
+        <Border Grid.Row="1" Style="{StaticResource CardPanel}" Margin="0,0,0,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Convert Button -->
+                <Button Grid.Column="0"
+                        Command="{Binding ConvertBOQToPRCommand}"
+                        Style="{StaticResource PrimaryButton}"
+                        Padding="16,8"
+                        MinWidth="180">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Convert BOQ to PR" VerticalAlignment="Center"/>
+                        <TextBlock Text=" ..."
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding IsConverting, Converter={StaticResource BoolToVisibility}}"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Refresh List Button -->
+                <Button Grid.Column="1"
+                        Command="{Binding RefreshPRListCommand}"
+                        Style="{StaticResource SecondaryButton}"
+                        Content="Refresh List"
+                        Padding="12,6"
+                        Margin="8,0,0,0"/>
+
+                <!-- Status + Progress -->
+                <StackPanel Grid.Column="2" Margin="16,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding ConvertStatusText}"
+                               FontSize="12"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               TextTrimming="CharacterEllipsis"/>
+                    <ProgressBar IsIndeterminate="True"
+                                 Height="4"
+                                 Margin="0,4,0,0"
+                                 Foreground="{StaticResource PrimaryBrush}"
+                                 Visibility="{Binding IsConverting, Converter={StaticResource BoolToVisibility}}"/>
+                </StackPanel>
+
+                <!-- Refresh Status -->
+                <Button Grid.Column="3"
+                        Content="Refresh Status"
+                        Command="{Binding RefreshConnectionStatusCommand}"
+                        Style="{StaticResource SecondaryButton}"
+                        Padding="12,6"/>
+            </Grid>
+        </Border>
+
+        <!-- Row 2: DataGrid with empty-state overlay -->
+        <Grid Grid.Row="2" Margin="0,0,0,8">
+            <DataGrid ItemsSource="{Binding PrItems}"
+                      SelectedItem="{Binding SelectedPR, Mode=TwoWay}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      MinHeight="120"
+                      BorderThickness="1"
+                      BorderBrush="{StaticResource BorderBrush}"
+                      Background="White"
+                      GridLinesVisibility="Horizontal"
+                      HorizontalGridLinesBrush="{StaticResource BorderBrush}"
+                      RowHeaderWidth="0"
+                      FontFamily="{StaticResource AppFontFamily}"
+                      FontSize="12"
+                      VirtualizingStackPanel.IsVirtualizing="True"
+                      VirtualizingStackPanel.VirtualizationMode="Recycling"
+                      CanUserSortColumns="True"
+                      SelectionMode="Single">
+
+                <DataGrid.Columns>
+                    <!-- State Icon -->
+                    <DataGridTemplateColumn Header="" Width="30" CanUserSort="False">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding State, Converter={StaticResource StateToIcon}}"
+                                           Foreground="{Binding State, Converter={StaticResource StateToColor}}"
+                                           HorizontalAlignment="Center"
+                                           FontSize="14"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Reference -->
+                    <DataGridTextColumn Header="Reference" Binding="{Binding Reference}" Width="*"/>
+
+                    <!-- State Text -->
+                    <DataGridTemplateColumn Header="State" Width="100">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding State}"
+                                           Foreground="{Binding State, Converter={StaticResource StateToColor}}"
+                                           FontWeight="SemiBold"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Line Count -->
+                    <DataGridTextColumn Header="Lines" Binding="{Binding LineCount}" Width="60"/>
+
+                    <!-- Created Date -->
+                    <DataGridTextColumn Header="Created" Binding="{Binding CreatedAt, StringFormat=yyyy-MM-dd HH:mm}" Width="140"/>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <!-- Empty-state overlay -->
+            <TextBlock Text="No Purchase Requisitions. Click 'Convert BOQ to PR' to begin."
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       FontSize="14"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       IsHitTestVisible="False"
+                       Visibility="{Binding HasNoData, Converter={StaticResource BoolToVisibility}}"/>
+        </Grid>
+
+        <!-- Row 3: Submit Controls -->
+        <Border Grid.Row="3" Style="{StaticResource CardPanel}" Margin="0,0,0,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Submit Button -->
+                <Button Grid.Column="0"
+                        Command="{Binding SubmitPRCommand}"
+                        Style="{StaticResource PrimaryButton}"
+                        Padding="16,8"
+                        MinWidth="180">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Submit for Approval" VerticalAlignment="Center"/>
+                        <TextBlock Text=" ..."
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding IsSubmitting, Converter={StaticResource BoolToVisibility}}"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Submit Status -->
+                <StackPanel Grid.Column="1" Margin="16,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding SubmitStatusText}"
+                               FontSize="12"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               TextTrimming="CharacterEllipsis"/>
+                    <ProgressBar IsIndeterminate="True"
+                                 Height="4"
+                                 Margin="0,4,0,0"
+                                 Foreground="{StaticResource PrimaryBrush}"
+                                 Visibility="{Binding IsSubmitting, Converter={StaticResource BoolToVisibility}}"/>
+                </StackPanel>
+
+                <!-- Selected PR Info -->
+                <TextBlock Grid.Column="2"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           Foreground="{StaticResource TextSecondaryBrush}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Text" Value="Select a draft PR to submit"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedPR}" Value="{x:Null}">
+                                    <Setter Property="Text" Value="Select a draft PR to submit"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </Border>
+
+        <!-- Row 4: Summary Panel -->
+        <Border Grid.Row="4"
+                Style="{StaticResource CardPanel}"
+                Margin="0,0,0,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Total -->
+                <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                    <TextBlock Text="{Binding TotalPRs}"
+                               FontSize="24" FontWeight="Bold"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="Total"
+                               FontSize="11"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Draft -->
+                <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                    <TextBlock Text="{Binding DraftCount}"
+                               FontSize="24" FontWeight="Bold"
+                               Foreground="#757575"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="Draft"
+                               FontSize="11"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Submitted -->
+                <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                    <TextBlock Text="{Binding SubmittedCount}"
+                               FontSize="24" FontWeight="Bold"
+                               Foreground="#1A73E8"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="Submitted"
+                               FontSize="11"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Approved -->
+                <StackPanel Grid.Column="3" HorizontalAlignment="Center">
+                    <TextBlock Text="{Binding ApprovedCount}"
+                               FontSize="24" FontWeight="Bold"
+                               Foreground="#388E3C"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="Approved"
+                               FontSize="11"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Row 5: Convert Result -->
+        <Border Grid.Row="5"
+                Style="{StaticResource CardPanel}"
+                Visibility="{Binding LastConvertResult, Converter={StaticResource StringToVisibility}}">
+            <TextBlock Text="{Binding LastConvertResult}"
+                       FontSize="13"
+                       Foreground="{StaticResource TextPrimaryBrush}"
+                       TextWrapping="Wrap"/>
+        </Border>
     </Grid>
 </Page>

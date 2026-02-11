@@ -198,6 +198,7 @@ public partial class App : Application
         services.AddTransient<BOQViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<OdooConnectionViewModel>();
+        services.AddTransient<PurchaseRequisitionViewModel>();
 
         // Application services
         services.AddSingleton<INavigationService, NavigationService>();

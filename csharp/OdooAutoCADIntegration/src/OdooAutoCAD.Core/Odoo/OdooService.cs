@@ -775,6 +775,113 @@ public class OdooService : IOdooService, IDisposable
         }
     }
 
+    public async Task<Boq2PrResponse> ConvertBOQToPRViaApiAsync(
+        List<string> headerIds, string baseUrl, string basePath,
+        string database, string userToken)
+    {
+        try
+        {
+            var credentials = Convert.ToBase64String(
+                Encoding.UTF8.GetBytes($"{database}:{userToken}"));
+
+            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{basePath}/callMethodForJobWorkingPlanBoqModel";
+
+            var body = new
+            {
+                method_name = "boq2pr_v2",
+                args = new object[] { new { all = headerIds } },
+                kwargs = new { user_token = userToken },
+                context = new { }
+            };
+
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, apiEndpoint);
+            httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+            httpRequest.Content = new StringContent(
+                JsonSerializer.Serialize(body),
+                Encoding.UTF8,
+                "application/json");
+
+            var response = await _httpClient.SendAsync(httpRequest);
+            response.EnsureSuccessStatusCode();
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            var jsonDoc = JsonSerializer.Deserialize<JsonElement>(responseJson);
+
+            // Check for error response
+            if (jsonDoc.TryGetProperty("error_code", out var errorCode))
+            {
+                return new Boq2PrResponse
+                {
+                    Success = false,
+                    ErrorCode = errorCode.GetString(),
+                    ErrorMessage = jsonDoc.TryGetProperty("error_message", out var errMsg)
+                        ? errMsg.GetString() : "Unknown error"
+                };
+            }
+
+            // Parse success response: { "all": [ { pr_id, reference, state, lines } ] }
+            var results = new List<Boq2PrResult>();
+
+            if (jsonDoc.TryGetProperty("all", out var allElement) &&
+                allElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var prEl in allElement.EnumerateArray())
+                {
+                    var prResult = new Boq2PrResult
+                    {
+                        PrId = prEl.TryGetProperty("pr_id", out var pid) && pid.ValueKind == JsonValueKind.Number
+                            ? pid.GetInt32() : null,
+                        Reference = prEl.TryGetProperty("reference", out var refVal)
+                            ? refVal.GetString() ?? "" : "",
+                        State = prEl.TryGetProperty("state", out var stateVal)
+                            ? stateVal.GetString() ?? "draft" : "draft"
+                    };
+
+                    if (prEl.TryGetProperty("lines", out var linesArr) &&
+                        linesArr.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var lineEl in linesArr.EnumerateArray())
+                        {
+                            prResult.Lines.Add(new Boq2PrLine
+                            {
+                                ProductId = lineEl.TryGetProperty("product_id", out var prodId) && prodId.ValueKind == JsonValueKind.Number
+                                    ? prodId.GetInt32() : 0,
+                                ProductName = lineEl.TryGetProperty("product_name", out var pn)
+                                    ? pn.GetString() ?? "" : "",
+                                Quantity = lineEl.TryGetProperty("quantity", out var qty) && qty.ValueKind == JsonValueKind.Number
+                                    ? qty.GetDecimal() : 0,
+                                UnitOfMeasure = lineEl.TryGetProperty("uom", out var uom)
+                                    ? uom.GetString() ?? "" : "",
+                                UnitPrice = lineEl.TryGetProperty("unit_price", out var price) && price.ValueKind == JsonValueKind.Number
+                                    ? price.GetDecimal() : null
+                            });
+                        }
+                    }
+
+                    results.Add(prResult);
+                }
+            }
+
+            _logger?.LogInformation("boq2pr_v2 succeeded: {PrCount} PRs created", results.Count);
+
+            return new Boq2PrResponse
+            {
+                Success = true,
+                All = results
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "boq2pr_v2 API call failed");
+            return new Boq2PrResponse
+            {
+                Success = false,
+                ErrorCode = "HTTP_ERROR",
+                ErrorMessage = ex.Message
+            };
+        }
+    }
+
     #endregion
 
     #region Synchronization

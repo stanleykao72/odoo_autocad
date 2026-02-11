@@ -214,6 +214,65 @@ public class AutoCADService : IAutoCADService, IDisposable
             }
         });
 
+        _guiProxy.RegisterHandler("autocad_get_header_ids", (parameters) =>
+        {
+            if (_acadDoc == null)
+                return Task.FromResult<object?>(new List<string>());
+
+            var headerIds = new List<string>();
+
+            try
+            {
+                foreach (dynamic layout in _acadDoc.Layouts)
+                {
+                    string layoutName = layout.Name;
+                    if (layoutName == "Model") continue;
+
+                    try
+                    {
+                        dynamic space = layout.Block;
+                        foreach (dynamic entity in space)
+                        {
+                            try
+                            {
+                                string entityType = entity.EntityName;
+                                if (entityType != "AcDbTable") continue;
+
+                                int colCount = entity.Columns;
+                                if (colCount != 9) continue;
+
+                                string headerCell = entity.GetText(0, 6) ?? "";
+                                if (!headerCell.Contains("HEADER_ID")) continue;
+
+                                string headerId = LM_UnFormat(entity.GetText(0, 8) ?? "");
+                                if (!string.IsNullOrWhiteSpace(headerId))
+                                {
+                                    headerIds.Add(headerId);
+                                }
+
+                                // Only process first valid table per layout
+                                break;
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger?.LogWarning(ex, "Error reading entity for header_id in {Layout}", layoutName);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Error accessing layout {Layout} for header_id extraction", layoutName);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to extract header IDs from layouts");
+            }
+
+            return Task.FromResult<object?>(headerIds);
+        });
+
         _guiProxy.RegisterHandler("autocad_write_table_ids", (parameters) =>
         {
             if (_acadDoc == null)
