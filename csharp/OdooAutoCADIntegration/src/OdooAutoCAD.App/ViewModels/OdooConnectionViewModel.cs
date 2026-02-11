@@ -250,6 +250,9 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
 
             if (status.IsConnected)
             {
+                // Mark the service as API-authenticated so sidebar/dashboard timers see it
+                _odooService.MarkApiAuthenticated(baseUrl, database);
+
                 StatusMessage = $"Connected successfully! API: {status.Version ?? "available"}";
                 StatusIsSuccess = true;
                 OdooVersion = status.Version ?? "API Available";

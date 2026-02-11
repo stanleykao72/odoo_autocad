@@ -266,6 +266,9 @@ public partial class DashboardViewModel : ObservableObject
 
             if (status.IsConnected)
             {
+                // Mark the service as API-authenticated so timers in all VMs see it
+                _odooService.MarkApiAuthenticated(baseUrl, database);
+
                 IsOdooConnected = true;
                 OdooServerUrl = baseUrl;
                 OdooErrorMessage = string.Empty;

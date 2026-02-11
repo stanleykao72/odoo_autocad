@@ -102,9 +102,21 @@ public interface IOdooService
     #region Connection Management
 
     /// <summary>
-    /// Gets whether Odoo is currently connected.
+    /// Gets whether Odoo is currently connected (via JSON-RPC session or API token).
     /// </summary>
     bool IsConnected { get; }
+
+    /// <summary>
+    /// Gets whether Odoo has been authenticated via Swagger/OpenAPI (Basic Auth).
+    /// This is separate from the JSON-RPC session-based connection.
+    /// </summary>
+    bool IsApiAuthenticated { get; }
+
+    /// <summary>
+    /// Marks Odoo as authenticated via Swagger/OpenAPI Basic Auth.
+    /// Used by Dashboard and Odoo page after successful Swagger + Basic Auth test.
+    /// </summary>
+    void MarkApiAuthenticated(string serverUrl, string database);
 
     /// <summary>
     /// Connects to Odoo server with the specified credentials.

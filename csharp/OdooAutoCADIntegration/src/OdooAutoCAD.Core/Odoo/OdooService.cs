@@ -24,6 +24,7 @@ public class OdooService : IOdooService, IDisposable
     private int? _userId;
     private DateTime? _lastSyncTime;
     private bool _isConnected;
+    private volatile bool _isApiAuthenticated;
 
     public OdooService(ILogger<OdooService>? logger = null, int timeoutSeconds = 30)
     {
@@ -35,7 +36,18 @@ public class OdooService : IOdooService, IDisposable
         _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
     }
 
-    public bool IsConnected => _isConnected && !string.IsNullOrEmpty(_sessionId);
+    public bool IsConnected => (_isConnected && !string.IsNullOrEmpty(_sessionId)) || _isApiAuthenticated;
+
+    public bool IsApiAuthenticated => _isApiAuthenticated;
+
+    public void MarkApiAuthenticated(string serverUrl, string database)
+    {
+        _serverUrl = serverUrl;
+        _database = database;
+        _isApiAuthenticated = true;
+        _logger?.LogInformation("Odoo API authenticated via Swagger: {ServerUrl}, Database: {Database}",
+            serverUrl, database);
+    }
 
     #region Connection Management
 
@@ -91,6 +103,7 @@ public class OdooService : IOdooService, IDisposable
         _sessionId = null;
         _userId = null;
         _isConnected = false;
+        _isApiAuthenticated = false;
         _logger?.LogInformation("Disconnected from Odoo");
         await Task.CompletedTask;
     }
