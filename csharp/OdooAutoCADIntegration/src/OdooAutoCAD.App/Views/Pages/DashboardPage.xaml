@@ -3,16 +3,184 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       Title="Dashboard"
       FontFamily="{StaticResource AppFontFamily}">
-    <Grid>
-        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="24">
+        <StackPanel MaxWidth="900">
+
+            <!-- Header -->
             <TextBlock Text="Dashboard"
                        FontSize="28" FontWeight="Bold"
-                       Foreground="{StaticResource PrimaryBrush}"
-                       HorizontalAlignment="Center"/>
+                       Foreground="{StaticResource PrimaryBrush}"/>
             <TextBlock Text="System overview and status monitoring"
-                       FontSize="14" Margin="0,8,0,0"
-                       Foreground="{StaticResource TextSecondaryBrush}"
-                       HorizontalAlignment="Center"/>
+                       FontSize="14" Margin="0,4,0,24"
+                       Foreground="{StaticResource TextSecondaryBrush}"/>
+
+            <!-- Connection Status Cards -->
+            <UniformGrid Columns="2" Margin="0,0,0,24">
+
+                <!-- AutoCAD Card -->
+                <Border Style="{StaticResource CardPanel}" Margin="0,0,8,0">
+                    <StackPanel>
+                        <!-- Title row -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <Ellipse Width="12" Height="12"
+                                     Fill="{Binding AutoCADStatusColor}"
+                                     VerticalAlignment="Center"
+                                     Margin="0,0,8,0"/>
+                            <TextBlock Text="AutoCAD"
+                                       FontSize="18" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}"/>
+                        </StackPanel>
+
+                        <!-- Status -->
+                        <TextBlock Text="{Binding AutoCADStatusText}"
+                                   FontSize="14"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Margin="0,0,0,4"/>
+
+                        <!-- Document name (visible when connected) -->
+                        <TextBlock Text="{Binding AutoCADDocumentName}"
+                                   FontSize="13"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Visibility="{Binding AutoCADDocumentName, Converter={StaticResource StringToVisibilityConverter}}"
+                                   Margin="0,0,0,4"/>
+
+                        <!-- Error message -->
+                        <TextBlock Text="{Binding AutoCADErrorMessage}"
+                                   FontSize="13"
+                                   Foreground="{StaticResource ErrorBrush}"
+                                   TextWrapping="Wrap"
+                                   Visibility="{Binding AutoCADErrorMessage, Converter={StaticResource StringToVisibilityConverter}}"
+                                   Margin="0,0,0,8"/>
+
+                        <!-- Connect button -->
+                        <Button Content="{Binding ConnectAutoCADButtonText}"
+                                Command="{Binding ConnectAutoCADCommand}"
+                                Style="{StaticResource PrimaryButton}"
+                                HorizontalAlignment="Left"
+                                Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Odoo Card -->
+                <Border Style="{StaticResource CardPanel}" Margin="8,0,0,0">
+                    <StackPanel>
+                        <!-- Title row -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <Ellipse Width="12" Height="12"
+                                     Fill="{Binding OdooStatusColor}"
+                                     VerticalAlignment="Center"
+                                     Margin="0,0,8,0"/>
+                            <TextBlock Text="Odoo"
+                                       FontSize="18" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}"/>
+                        </StackPanel>
+
+                        <!-- Status -->
+                        <TextBlock Text="{Binding OdooStatusText}"
+                                   FontSize="14"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Margin="0,0,0,4"/>
+
+                        <!-- Server URL (visible when connected) -->
+                        <TextBlock Text="{Binding OdooServerUrl}"
+                                   FontSize="13"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Visibility="{Binding OdooServerUrl, Converter={StaticResource StringToVisibilityConverter}}"
+                                   Margin="0,0,0,4"/>
+
+                        <!-- Error message -->
+                        <TextBlock Text="{Binding OdooErrorMessage}"
+                                   FontSize="13"
+                                   Foreground="{StaticResource ErrorBrush}"
+                                   TextWrapping="Wrap"
+                                   Visibility="{Binding OdooErrorMessage, Converter={StaticResource StringToVisibilityConverter}}"
+                                   Margin="0,0,0,8"/>
+
+                        <!-- Connect button -->
+                        <Button Content="{Binding ConnectOdooButtonText}"
+                                Command="{Binding ConnectOdooCommand}"
+                                Style="{StaticResource PrimaryButton}"
+                                HorizontalAlignment="Left"
+                                Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+
+            </UniformGrid>
+
+            <!-- Quick Actions -->
+            <TextBlock Text="Quick Actions"
+                       FontSize="20" FontWeight="SemiBold"
+                       Foreground="{StaticResource TextPrimaryBrush}"
+                       Margin="0,0,0,12"/>
+
+            <UniformGrid Columns="3">
+                <!-- AutoCAD -->
+                <Border Style="{StaticResource CardPanel}" Margin="0,0,8,0">
+                    <StackPanel HorizontalAlignment="Center">
+                        <TextBlock Text="AutoCAD"
+                                   FontSize="16" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock Text="Manage drawings and parameters"
+                                   FontSize="12"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   Margin="0,0,0,12"/>
+                        <Button Content="Open"
+                                Command="{Binding NavigateToAutoCADCommand}"
+                                Style="{StaticResource SecondaryButton}"
+                                HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- BOQ Manager -->
+                <Border Style="{StaticResource CardPanel}" Margin="4,0,4,0">
+                    <StackPanel HorizontalAlignment="Center">
+                        <TextBlock Text="BOQ Manager"
+                                   FontSize="16" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock Text="Bill of Quantities management"
+                                   FontSize="12"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   Margin="0,0,0,12"/>
+                        <Button Content="Open"
+                                Command="{Binding NavigateToBOQCommand}"
+                                Style="{StaticResource SecondaryButton}"
+                                HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Purchase Requisition -->
+                <Border Style="{StaticResource CardPanel}" Margin="8,0,0,0">
+                    <StackPanel HorizontalAlignment="Center">
+                        <TextBlock Text="Purchase Requisition"
+                                   FontSize="16" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock Text="Create and manage purchase requests"
+                                   FontSize="12"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   Margin="0,0,0,12"/>
+                        <Button Content="Open"
+                                Command="{Binding NavigateToPRCommand}"
+                                Style="{StaticResource SecondaryButton}"
+                                HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
         </StackPanel>
-    </Grid>
+    </ScrollViewer>
 </Page>

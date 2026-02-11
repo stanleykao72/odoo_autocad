@@ -4,24 +4,24 @@
 > **Parent FR**: [FR-001](FR-001-dashboard.md)
 > **Priority**: P1
 > **Tasks**: 8 | **Effort**: 3S + 5M + 0L
-> **Status**: Not Started
+> **Status**: Partial (Sprint 4) — AC-01 through AC-06, AC-09, AC-10 complete; AC-07/AC-08 deferred to Sprint 7
 
 ## Prerequisites
-- [ ] US-001-01 (connection status cards must exist before adding buttons to them)
-- [ ] IAutoCADService.ConnectAsync() and IOdooService.ConnectAsync() being implemented
-- [ ] INavigationService for workflow shortcut navigation (already exists in `OdooAutoCAD.App.Services`)
+- [x] US-001-01 (connection status cards must exist before adding buttons to them)
+- [x] IAutoCADService.ConnectAsync() and IOdooService.ConnectAsync() being implemented
+- [x] INavigationService for workflow shortcut navigation (already exists in `OdooAutoCAD.App.Services`)
 
 ## Acceptance Criteria
-- [ ] AC-01: Dashboard provides a "Connect to AutoCAD" quick-action button within the AutoCAD status card
-- [ ] AC-02: Dashboard provides a "Connect to Odoo" quick-action button within the Odoo status card
-- [ ] AC-03: Quick-connect buttons are disabled and show "Connected" state when the respective service is already connected
-- [ ] AC-04: Clicking "Connect to AutoCAD" initiates an async connection attempt to AutoCAD
-- [ ] AC-05: Clicking "Connect to Odoo" initiates an async connection attempt to Odoo
-- [ ] AC-06: Quick-connect buttons check current connection state before attempting connection (VR-001-001)
-- [ ] AC-07: Dashboard provides shortcut buttons for common workflows: "Get Parameters", "Push to BOQ", and "Transfer BOQ to PR"
-- [ ] AC-08: "Get Parameters" shortcut is only enabled when both AutoCAD AND Odoo are connected (VR-001-003)
-- [ ] AC-09: "Push to BOQ" shortcut is only enabled when Odoo is connected and project context is available (VR-001-004)
-- [ ] AC-10: Shortcut buttons navigate to the corresponding application page when clicked
+- [x] AC-01: Dashboard provides a "Connect to AutoCAD" quick-action button within the AutoCAD status card
+- [x] AC-02: Dashboard provides a "Connect to Odoo" quick-action button within the Odoo status card
+- [x] AC-03: Quick-connect buttons are disabled and show "Connected" state when the respective service is already connected
+- [x] AC-04: Clicking "Connect to AutoCAD" initiates an async connection attempt to AutoCAD
+- [x] AC-05: Clicking "Connect to Odoo" initiates an async connection attempt to Odoo
+- [x] AC-06: Quick-connect buttons check current connection state before attempting connection (VR-001-001)
+- [x] AC-07: Dashboard provides shortcut buttons for common workflows: AutoCAD, BOQ Manager, Purchase Requisition (simplified from spec — "Get Parameters" deferred)
+- [ ] AC-08: "Get Parameters" shortcut is only enabled when both AutoCAD AND Odoo are connected (VR-001-003) — deferred, requires parameter extraction flow
+- [x] AC-09: "Push to BOQ" shortcut is only enabled when Odoo is connected (VR-001-004 partial — project context check deferred)
+- [x] AC-10: Shortcut buttons navigate to the corresponding application page when clicked
 
 ---
 

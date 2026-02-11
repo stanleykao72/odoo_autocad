@@ -164,37 +164,37 @@ its parent User Story for full context and acceptance criteria.
 
 | # | Task ID | Title | Target | Est | Depends On | Status |
 |---|---------|-------|--------|-----|------------|--------|
-| 105 | TASK-008-03-01 | Add connection status observable properties to MainViewModel | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | M | — | [ ] |
-| 106 | TASK-008-03-02 | Define connection status XAML section in sidebar with Ellipse indic... | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | M | TASK-008-03-01 | [ ] |
-| 107 | TASK-008-03-03 | Implement status update methods in MainViewModel | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | M | TASK-008-03-01 | [ ] |
-| 108 | TASK-008-03-04 | Define connected/disconnected/error color resources | `src/OdooAutoCAD.App/App.xaml` | S | — | [ ] |
-| 109 | TASK-008-03-05 | Wire MCP server status to display port number when running | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | TASK-008-03-01, TASK-008-03-03 | [ ] |
+| 105 | TASK-008-03-01 | Add connection status observable properties to MainViewModel | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | M | — | [x] |
+| 106 | TASK-008-03-02 | Define connection status XAML section in sidebar with Ellipse indic... | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | M | TASK-008-03-01 | [x] |
+| 107 | TASK-008-03-03 | Implement status update methods in MainViewModel | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | M | TASK-008-03-01 | [x] |
+| 108 | TASK-008-03-04 | Define connected/disconnected/error color resources | `src/OdooAutoCAD.App/App.xaml` | S | — | [x] |
+| 109 | TASK-008-03-05 | Wire MCP server status to display port number when running | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | TASK-008-03-01, TASK-008-03-03 | [x] |
 | 110 | TASK-008-04-01 | Define status bar XAML with three-column layout | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | — | [x] |
 | 111 | TASK-008-04-02 | Add StatusMessage, CurrentDateTime, and version observable properti... | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | — | [x] |
 | 112 | TASK-008-04-03 | Create IAppLogService + LogPanelControl + collapsible panel in MainWindow | `Services/IAppLogService.cs`, `Services/AppLogService.cs`, `Views/Controls/LogPanelControl.xaml/.cs` | M | TASK-008-04-01 | [x] |
 | 113 | TASK-008-04-04 | Create LogsPage full-page viewer + "Logs" nav button | `Views/Pages/LogsPage.xaml/.cs`, `Views/MainWindow.xaml` | M | TASK-008-04-03 | [x] |
 | 114 | TASK-008-04-05 | Implement auto-scroll + source/level filtering in LogPanelControl | `Views/Controls/LogPanelControl.xaml.cs` | S | TASK-008-04-03 | [x] |
 | 115 | TASK-008-04-06 | Add DispatcherTimer to update CurrentDateTime every second | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | TASK-008-04-02 | [x] |
-| 116 | TASK-008-06-01 | Implement App.OnStartup with Serilog configuration, DI host build, ... | `src/OdooAutoCAD.App/App.xaml.cs` | L | — | [ ] |
-| 117 | TASK-008-06-02 | Configure DI services registration in correct order | `src/OdooAutoCAD.App/App.xaml.cs` | M | TASK-008-06-01 | [ ] |
-| 118 | TASK-008-06-03 | Implement --enable-mcp flag parsing with case-insensitive check | `src/OdooAutoCAD.App/App.xaml.cs` | S | TASK-008-06-01 | [ ] |
-| 119 | TASK-008-06-04 | Initialize DispatcherTimer for GUI proxy polling after DI host start | `src/OdooAutoCAD.App/App.xaml.cs` | M | TASK-008-06-01 | [ ] |
-| 120 | TASK-008-06-05 | Implement error handling for MCP server startup failure | `src/OdooAutoCAD.App/App.xaml.cs` | S | TASK-008-06-03 | [ ] |
-| 121 | TASK-008-06-06 | Implement IGUIProxy interface with Start, Stop, ProcessRequests met... | `src/Threading/IGUIProxy.cs` | M | — | [ ] |
-| 122 | TASK-001-01-01 | Create DashboardPage XAML layout with connection status cards (Auto... | `Views/Pages/DashboardPage.xaml` | M | — | [ ] |
-| 123 | TASK-001-01-02 | Add DashboardViewModel properties for connection status | `ViewModels/DashboardViewModel.cs` | M | — | [ ] |
-| 124 | TASK-001-01-03 | Implement BoolToColorConverter for green/red-gray status indicator ... | `Views/Pages/DashboardPage.xaml` | S | TASK-001-01-01 | [ ] |
-| 125 | TASK-001-01-04 | Subscribe DashboardViewModel to IAutoCADService and IOdooService st... | `ViewModels/DashboardViewModel.cs` | M | TASK-001-01-02 | [ ] |
-| 126 | TASK-001-01-05 | Register DashboardViewModel as singleton in DI container to maintai... | `ViewModels/DashboardViewModel.cs` | S | TASK-001-01-02 | [ ] |
-| 127 | TASK-001-01-06 | Implement error message display in status cards when connection att... | `ViewModels/DashboardViewModel.cs` | S | TASK-001-01-02 | [ ] |
-| 128 | TASK-001-02-01 | Add connect buttons inside status cards in XAML | `Views/Pages/DashboardPage.xaml` | S | — | [ ] |
-| 129 | TASK-001-02-02 | Implement ConnectAutoCADCommand with async execution | `ViewModels/DashboardViewModel.cs` | M | — | [ ] |
-| 130 | TASK-001-02-03 | Implement ConnectOdooCommand with async execution | `ViewModels/DashboardViewModel.cs` | M | — | [ ] |
-| 131 | TASK-001-02-04 | Add CanExecute logic to connect commands | `ViewModels/DashboardViewModel.cs` | S | TASK-001-02-02, TASK-001-02-03 | [ ] |
-| 132 | TASK-001-02-05 | Create Quick Actions section in XAML with workflow shortcut buttons | `Views/Pages/DashboardPage.xaml` | M | TASK-001-02-01 | [ ] |
-| 133 | TASK-001-02-06 | Implement navigation commands using INavigationService | `ViewModels/DashboardViewModel.cs` | M | — | [ ] |
-| 134 | TASK-001-02-07 | Add CanExecute validation for workflow shortcuts | `ViewModels/DashboardViewModel.cs` | S | TASK-001-02-06 | [ ] |
-| 135 | TASK-001-02-08 | Re-evaluate command CanExecute states when connection status changes | `ViewModels/DashboardViewModel.cs` | S | TASK-001-02-04, TASK-001-02-07 | [ ] |
+| 116 | TASK-008-06-01 | Implement App.OnStartup with Serilog configuration, DI host build, ... | `src/OdooAutoCAD.App/App.xaml.cs` | L | — | [x] |
+| 117 | TASK-008-06-02 | Configure DI services registration in correct order | `src/OdooAutoCAD.App/App.xaml.cs` | M | TASK-008-06-01 | [x] |
+| 118 | TASK-008-06-03 | Implement --enable-mcp flag parsing with case-insensitive check | `src/OdooAutoCAD.App/App.xaml.cs` | S | TASK-008-06-01 | [x] |
+| 119 | TASK-008-06-04 | Initialize DispatcherTimer for GUI proxy polling after DI host start | `src/OdooAutoCAD.App/App.xaml.cs` | M | TASK-008-06-01 | [x] |
+| 120 | TASK-008-06-05 | Implement error handling for MCP server startup failure | `src/OdooAutoCAD.App/App.xaml.cs` | S | TASK-008-06-03 | [x] |
+| 121 | TASK-008-06-06 | Implement IGUIProxy interface with Start, Stop, ProcessRequests met... | `src/Threading/IGUIProxy.cs` | M | — | [x] |
+| 122 | TASK-001-01-01 | Create DashboardPage XAML layout with connection status cards (Auto... | `Views/Pages/DashboardPage.xaml` | M | — | [x] |
+| 123 | TASK-001-01-02 | Add DashboardViewModel properties for connection status | `ViewModels/DashboardViewModel.cs` | M | — | [x] |
+| 124 | TASK-001-01-03 | Implement BoolToColorConverter for green/red-gray status indicator ... | `Views/Pages/DashboardPage.xaml` | S | TASK-001-01-01 | [x] (skipped — ViewModel provides Brush directly) |
+| 125 | TASK-001-01-04 | Subscribe DashboardViewModel to IAutoCADService and IOdooService st... | `ViewModels/DashboardViewModel.cs` | M | TASK-001-01-02 | [x] |
+| 126 | TASK-001-01-05 | Register DashboardViewModel as singleton in DI container to maintai... | `ViewModels/DashboardViewModel.cs` | S | TASK-001-01-02 | [x] |
+| 127 | TASK-001-01-06 | Implement error message display in status cards when connection att... | `ViewModels/DashboardViewModel.cs` | S | TASK-001-01-02 | [x] |
+| 128 | TASK-001-02-01 | Add connect buttons inside status cards in XAML | `Views/Pages/DashboardPage.xaml` | S | — | [x] |
+| 129 | TASK-001-02-02 | Implement ConnectAutoCADCommand with async execution | `ViewModels/DashboardViewModel.cs` | M | — | [x] |
+| 130 | TASK-001-02-03 | Implement ConnectOdooCommand with async execution | `ViewModels/DashboardViewModel.cs` | M | — | [x] |
+| 131 | TASK-001-02-04 | Add CanExecute logic to connect commands | `ViewModels/DashboardViewModel.cs` | S | TASK-001-02-02, TASK-001-02-03 | [x] |
+| 132 | TASK-001-02-05 | Create Quick Actions section in XAML with workflow shortcut buttons | `Views/Pages/DashboardPage.xaml` | M | TASK-001-02-01 | [x] |
+| 133 | TASK-001-02-06 | Implement navigation commands using INavigationService | `ViewModels/DashboardViewModel.cs` | M | — | [x] |
+| 134 | TASK-001-02-07 | Add CanExecute validation for workflow shortcuts | `ViewModels/DashboardViewModel.cs` | S | TASK-001-02-06 | [x] |
+| 135 | TASK-001-02-08 | Re-evaluate command CanExecute states when connection status changes | `ViewModels/DashboardViewModel.cs` | S | TASK-001-02-04, TASK-001-02-07 | [x] |
 
 ### Sprint 5: Odoo Advanced & BOQ Foundation
 > **Focus**: Odoo connection status/disconnect/sync product catalog/persist credentials, BOQ extract/review

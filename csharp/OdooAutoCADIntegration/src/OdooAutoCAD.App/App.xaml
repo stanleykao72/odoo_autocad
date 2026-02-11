@@ -7,6 +7,7 @@
             <!-- Value Converters -->
             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
             <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
+            <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
             
             <!-- CJK Font Chain -->
             <FontFamily x:Key="AppFontFamily">Microsoft JhengHei UI, Microsoft JhengHei, SimHei, Arial Unicode MS</FontFamily>

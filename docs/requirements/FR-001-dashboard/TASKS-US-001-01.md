@@ -4,21 +4,21 @@
 > **Parent FR**: [FR-001](FR-001-dashboard.md)
 > **Priority**: P1
 > **Tasks**: 6 | **Effort**: 3S + 3M + 0L
-> **Status**: Not Started
+> **Status**: Complete (Sprint 4)
 
 ## Prerequisites
-- [ ] FR-008 (UI Framework - WPF/MVVM infrastructure and CommunityToolkit.Mvvm must be in place)
-- [ ] IAutoCADService and IOdooService interfaces being defined (already exist in `OdooAutoCAD.Core`)
+- [x] FR-008 (UI Framework - WPF/MVVM infrastructure and CommunityToolkit.Mvvm must be in place)
+- [x] IAutoCADService and IOdooService interfaces being defined (already exist in `OdooAutoCAD.Core`)
 
 ## Acceptance Criteria
-- [ ] AC-01: Dashboard displays an AutoCAD connection status card with icon, label, and connected/disconnected state
-- [ ] AC-02: Dashboard displays an Odoo connection status card with icon, label, and connected/disconnected state
-- [ ] AC-03: Connected state displays with a green indicator; disconnected state displays with a red/gray indicator
-- [ ] AC-04: Connection status cards update in real-time when the connection state changes (no manual refresh required)
-- [ ] AC-05: AutoCAD status card shows the current document name when connected
-- [ ] AC-06: Odoo status card shows the server URL when connected
-- [ ] AC-07: When AutoCAD connection fails, the status card displays "Unable to connect to AutoCAD. Please ensure AutoCAD is running."
-- [ ] AC-08: When Odoo connection fails, the status card displays "Unable to connect to Odoo server. Check connection settings."
+- [x] AC-01: Dashboard displays an AutoCAD connection status card with icon, label, and connected/disconnected state
+- [x] AC-02: Dashboard displays an Odoo connection status card with icon, label, and connected/disconnected state
+- [x] AC-03: Connected state displays with a green indicator; disconnected state displays with a red/gray indicator
+- [x] AC-04: Connection status cards update in real-time when the connection state changes (no manual refresh required)
+- [x] AC-05: AutoCAD status card shows the current document name when connected
+- [x] AC-06: Odoo status card shows the server URL when connected
+- [x] AC-07: When AutoCAD connection fails, the status card displays "Unable to connect to AutoCAD. Please ensure AutoCAD is running."
+- [x] AC-08: When Odoo connection fails, the status card displays "Unable to connect to Odoo server. Check connection settings."
 
 ---
 

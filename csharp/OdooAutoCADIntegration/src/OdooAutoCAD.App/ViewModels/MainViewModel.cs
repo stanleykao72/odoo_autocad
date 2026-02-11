@@ -25,6 +25,8 @@ public partial class MainViewModel : ObservableObject
     private readonly INavigationService _navigationService;
     private readonly IGUIProxy _guiProxy;
     private readonly MCPSSEServer _mcpServer;
+    private readonly IAutoCADService _autoCADService;
+    private readonly IOdooService _odooService;
     private readonly DispatcherTimer _statusTimer;
 
     [ObservableProperty]
@@ -64,11 +66,15 @@ public partial class MainViewModel : ObservableObject
         INavigationService navigationService,
         IGUIProxy guiProxy,
         MCPSSEServer mcpServer,
+        IAutoCADService autoCADService,
+        IOdooService odooService,
         ILogger<MainViewModel>? logger = null)
     {
         _navigationService = navigationService;
         _guiProxy = guiProxy;
         _mcpServer = mcpServer;
+        _autoCADService = autoCADService;
+        _odooService = odooService;
         _logger = logger;
 
         // Setup status update timer
@@ -85,15 +91,16 @@ public partial class MainViewModel : ObservableObject
     private void OnStatusTimerTick(object? sender, EventArgs e)
     {
         CurrentDateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-        UpdateMCPStatus();
+        UpdateAllStatus();
     }
 
     [RelayCommand]
-    private async Task RefreshAsync()
+    private Task RefreshAsync()
     {
         StatusMessage = "Refreshing...";
-        await Task.Run(() => UpdateAllStatus());
+        UpdateAllStatus();
         StatusMessage = "Ready";
+        return Task.CompletedTask;
     }
 
     [RelayCommand]
@@ -124,18 +131,30 @@ public partial class MainViewModel : ObservableObject
 
     private void UpdateAutoCADStatus()
     {
-        // TODO: Check actual AutoCAD connection via GUI proxy
-        // For now, show disconnected
-        AutoCADStatusText = "Disconnected";
-        AutoCADStatusColor = Brushes.Gray;
+        if (_autoCADService.IsConnected)
+        {
+            AutoCADStatusText = "Connected";
+            AutoCADStatusColor = Brushes.Green;
+        }
+        else
+        {
+            AutoCADStatusText = "Disconnected";
+            AutoCADStatusColor = Brushes.Gray;
+        }
     }
 
     private void UpdateOdooStatus()
     {
-        // TODO: Check actual Odoo connection
-        // For now, show disconnected
-        OdooStatusText = "Disconnected";
-        OdooStatusColor = Brushes.Gray;
+        if (_odooService.IsConnected)
+        {
+            OdooStatusText = "Connected";
+            OdooStatusColor = Brushes.Green;
+        }
+        else
+        {
+            OdooStatusText = "Disconnected";
+            OdooStatusColor = Brushes.Gray;
+        }
     }
 
     private void UpdateMCPStatus()
@@ -185,21 +204,6 @@ public partial class MainViewModel : ObservableObject
             StatusMessage = $"Failed to stop MCP Server: {ex.Message}";
         }
     }
-}
-
-/// <summary>
-/// ViewModel for connection status panel.
-/// </summary>
-public partial class ConnectionStatusViewModel : ObservableObject
-{
-    [ObservableProperty]
-    private bool _isAutoCADConnected;
-
-    [ObservableProperty]
-    private bool _isOdooConnected;
-
-    [ObservableProperty]
-    private bool _isMCPRunning;
 }
 
 /// <summary>

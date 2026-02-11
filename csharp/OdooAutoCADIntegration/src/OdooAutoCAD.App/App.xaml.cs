@@ -182,7 +182,7 @@ public partial class App : Application
 
         // ViewModels
         services.AddTransient<MainViewModel>();
-        services.AddTransient<ConnectionStatusViewModel>();
+        services.AddSingleton<DashboardViewModel>();
         services.AddTransient<AutoCADViewModel>();
         services.AddTransient<BOQViewModel>();
         services.AddTransient<SettingsViewModel>();

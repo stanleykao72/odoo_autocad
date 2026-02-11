@@ -4,20 +4,20 @@
 > **Parent FR**: [FR-008](FR-008-ui-framework.md)
 > **Priority**: P1
 > **Tasks**: 5 | **Effort**: 2S + 3M + 0L
-> **Status**: Not Started
+> **Status**: Complete (Sprint 4)
 
 ## Prerequisites
-- [ ] US-008-01 completed (sidebar layout must exist to host the connection status section)
+- [x] US-008-01 completed (sidebar layout must exist to host the connection status section)
 
 ## Acceptance Criteria
-- [ ] AC-01: The sidebar displays a "Connection Status" section at the bottom with status indicators for AutoCAD, Odoo, and MCP Server.
-- [ ] AC-02: Each connection indicator displays a colored `Ellipse` (green = connected/running, gray = disconnected/stopped) and descriptive status text.
-- [ ] AC-03: AutoCAD status shows "Connected" (green) or "Disconnected" (gray) based on `IAutoCADService` connection state.
-- [ ] AC-04: Odoo status shows "Connected" (green) or "Disconnected" (gray) based on `IOdooService` connection state.
-- [ ] AC-05: MCP status shows "Port XXXX" (green) when the server is running, or "Stopped" (gray) when it is not.
-- [ ] AC-06: Connection indicators update in real-time via data binding to `MainViewModel` observable properties (`AutoCADStatusColor`, `OdooStatusColor`, `MCPStatusColor`).
-- [ ] AC-07: Connection status colors only transition between defined states: Gray (disconnected/stopped), Green (connected/running), and Red (error).
-- [ ] AC-08: The connection status section is visible on all pages without requiring user interaction.
+- [x] AC-01: The sidebar displays a "Connection Status" section at the bottom with status indicators for AutoCAD, Odoo, and MCP Server.
+- [x] AC-02: Each connection indicator displays a colored `Ellipse` (green = connected/running, gray = disconnected/stopped) and descriptive status text.
+- [x] AC-03: AutoCAD status shows "Connected" (green) or "Disconnected" (gray) based on `IAutoCADService` connection state.
+- [x] AC-04: Odoo status shows "Connected" (green) or "Disconnected" (gray) based on `IOdooService` connection state.
+- [x] AC-05: MCP status shows "Port XXXX" (green) when the server is running, or "Stopped" (gray) when it is not.
+- [x] AC-06: Connection indicators update in real-time via data binding to `MainViewModel` observable properties (`AutoCADStatusColor`, `OdooStatusColor`, `MCPStatusColor`).
+- [x] AC-07: Connection status colors only transition between defined states: Gray (disconnected/stopped), Green (connected/running), and Red (error).
+- [x] AC-08: The connection status section is visible on all pages without requiring user interaction.
 
 ---
 
