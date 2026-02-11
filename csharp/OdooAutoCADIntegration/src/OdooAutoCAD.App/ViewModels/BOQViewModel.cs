@@ -155,26 +155,36 @@ public partial class BOQViewModel : ObservableObject
             _logService.Log("BOQ: Getting AutoCAD layouts...", "BOQ");
             var layoutResponse = await _guiProxy.ExecuteInGuiAsync("autocad_get_layouts", null, timeout: 10000);
 
-            if (!layoutResponse.Success || layoutResponse.Result is not List<string> layouts || layouts.Count == 0)
+            // Handler returns List<LayoutInfo> — extract layout names
+            List<string> layoutNames;
+            if (layoutResponse.Success && layoutResponse.Result is IList<LayoutInfo> layoutInfos && layoutInfos.Count > 0)
+            {
+                layoutNames = layoutInfos.Select(l => l.Name).ToList();
+            }
+            else if (layoutResponse.Success && layoutResponse.Result is IList<string> stringLayouts && stringLayouts.Count > 0)
+            {
+                layoutNames = stringLayouts.ToList();
+            }
+            else
             {
                 ExtractionStatus = "No layouts found in current drawing";
                 _logService.Log("BOQ: No layouts found", "BOQ", AppLogLevel.Warning);
                 return;
             }
 
-            TotalLayouts = layouts.Count;
-            LayoutCount = layouts.Count;
-            _logService.Log($"BOQ: Found {layouts.Count} layouts", "BOQ");
+            TotalLayouts = layoutNames.Count;
+            LayoutCount = layoutNames.Count;
+            _logService.Log($"BOQ: Found {layoutNames.Count} layouts", "BOQ");
 
             var allItems = new List<BOQDisplayItem>();
 
             // Step 2: For each layout, extract parameters
-            for (var i = 0; i < layouts.Count; i++)
+            for (var i = 0; i < layoutNames.Count; i++)
             {
-                var layoutName = layouts[i];
+                var layoutName = layoutNames[i];
                 CurrentLayoutIndex = i + 1;
                 ExtractionStatus = $"Extracting layout {CurrentLayoutIndex}/{TotalLayouts}: {layoutName}";
-                ExtractionProgress = (double)i / layouts.Count;
+                ExtractionProgress = (double)i / layoutNames.Count;
 
                 _logService.Log($"BOQ: Extracting layout '{layoutName}'...", "BOQ");
 

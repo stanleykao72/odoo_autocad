@@ -74,7 +74,7 @@ public class BOQViewModelTests
         _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
         _mockGuiProxy
             .Setup(p => p.ExecuteInGuiAsync("autocad_get_layouts", null, 10000))
-            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", new List<string>()));
+            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", new List<LayoutInfo>()));
 
         var sut = CreateSUT();
         await sut.ExtractBOQCommand.ExecuteAsync(null);
@@ -89,7 +89,11 @@ public class BOQViewModelTests
     {
         _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
 
-        var layouts = new List<string> { "Layout1", "Layout2" };
+        var layouts = new List<LayoutInfo>
+        {
+            new("Layout1", 1, false, ""),
+            new("Layout2", 2, false, "")
+        };
         _mockGuiProxy
             .Setup(p => p.ExecuteInGuiAsync("autocad_get_layouts", null, 10000))
             .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", layouts));

@@ -242,17 +242,56 @@ public class BOQProcessor : IBOQProcessor
     {
         var items = new List<ExtractedItem>();
 
-        // Extract from parameters
-        foreach (var kvp in layoutData.Parameters)
+        // Extract from parameters — AutoCAD block attributes have paired keys:
+        // "product_name" + "quantity", or keys containing qty/quantity/count
+        var parameters = layoutData.Parameters;
+        string? productName = null;
+        string? unit = null;
+
+        // Look for explicit product_name + quantity pair first
+        if (parameters.TryGetValue("product_name", out var pn))
+            productName = pn?.ToString();
+        if (parameters.TryGetValue("unit", out var u))
+            unit = u?.ToString();
+
+        if (!string.IsNullOrWhiteSpace(productName))
         {
-            if (IsQuantityParameter(kvp.Key))
+            // Find paired quantity
+            decimal qty = 0;
+            if (parameters.TryGetValue("quantity", out var qv))
+                qty = ParseQuantity(qv);
+            else if (parameters.TryGetValue("qty", out var qv2))
+                qty = ParseQuantity(qv2);
+
+            if (qty > 0)
             {
                 items.Add(new ExtractedItem
                 {
-                    Name = ExtractProductName(kvp.Key),
-                    Quantity = ParseQuantity(kvp.Value),
+                    Name = productName,
+                    Quantity = qty,
+                    Unit = unit,
                     Source = "Parameter"
                 });
+            }
+        }
+        else
+        {
+            // Fallback: scan for keys with quantity-like names
+            foreach (var kvp in parameters)
+            {
+                if (IsQuantityParameter(kvp.Key))
+                {
+                    var name = ExtractProductName(kvp.Key);
+                    if (!string.IsNullOrWhiteSpace(name))
+                    {
+                        items.Add(new ExtractedItem
+                        {
+                            Name = name,
+                            Quantity = ParseQuantity(kvp.Value),
+                            Source = "Parameter"
+                        });
+                    }
+                }
             }
         }
 
@@ -269,23 +308,48 @@ public class BOQProcessor : IBOQProcessor
     private List<ExtractedItem> ExtractItemsFromTable(TableData table)
     {
         var items = new List<ExtractedItem>();
+        if (table.Cells.Count < 2) return items; // need header + at least one data row
 
-        // Skip header row, assume first column is name, second is quantity
+        // Detect column indices from header row
+        var headers = table.Cells[0];
+        int nameCol = -1, qtyCol = -1, descCol = -1, unitCol = -1;
+
+        for (int c = 0; c < headers.Count; c++)
+        {
+            var h = headers[c].Trim().ToLowerInvariant();
+            if (nameCol < 0 && (h.Contains("product") || h == "name" || h == "item"))
+                nameCol = c;
+            else if (qtyCol < 0 && (h == "qty" || h.Contains("quantity") || h.Contains("count")))
+                qtyCol = c;
+            else if (descCol < 0 && (h.Contains("description") || h.Contains("desc")))
+                descCol = c;
+            else if (unitCol < 0 && (h.Contains("unit") || h == "uom"))
+                unitCol = c;
+        }
+
+        // Fallback: if no header match, assume col 0 = name, col 1 = quantity
+        if (nameCol < 0) nameCol = 0;
+        if (qtyCol < 0) qtyCol = Math.Min(1, headers.Count - 1);
+
+        // Extract data rows (skip header)
         for (int row = 1; row < table.Cells.Count; row++)
         {
-            if (table.Cells[row].Count < 2) continue;
+            var cells = table.Cells[row];
+            if (cells.Count <= Math.Max(nameCol, qtyCol)) continue;
 
-            var name = table.Cells[row][0];
-            var quantityStr = table.Cells[row][1];
+            var name = cells[nameCol];
+            var quantityStr = cells[qtyCol];
 
-            if (!string.IsNullOrWhiteSpace(name) && decimal.TryParse(quantityStr, out var quantity))
+            if (!string.IsNullOrWhiteSpace(name) && decimal.TryParse(quantityStr, out var quantity) && quantity > 0)
             {
                 items.Add(new ExtractedItem
                 {
                     Name = name,
                     Quantity = quantity,
                     Source = "Table",
-                    Unit = table.Cells[row].Count > 2 ? table.Cells[row][2] : "pcs"
+                    Unit = unitCol >= 0 && unitCol < cells.Count && !string.IsNullOrWhiteSpace(cells[unitCol])
+                        ? cells[unitCol]
+                        : "pcs"
                 });
             }
         }
