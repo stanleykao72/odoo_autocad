@@ -102,6 +102,12 @@ public partial class DashboardViewModel : ObservableObject
         _statusTimer.Tick += OnStatusTimerTick;
         _statusTimer.Start();
 
+        // Subscribe to Odoo connection state changes for immediate UI updates
+        _odooService.ConnectionStateChanged += (_, _) =>
+        {
+            System.Windows.Application.Current?.Dispatcher.InvokeAsync(UpdateStatusFromServices);
+        };
+
         // Initial status check
         UpdateStatusFromServices();
     }

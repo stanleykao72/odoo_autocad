@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -19,6 +20,7 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
 {
     private readonly IOdooService _odooService;
     private readonly ISettingsService _settingsService;
+    private readonly ICredentialService _credentialService;
     private readonly IConfiguration _configuration;
     private readonly IAppLogService _logService;
     private readonly ILogger<OdooConnectionViewModel>? _logger;
@@ -48,15 +50,31 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
     [ObservableProperty]
     private string _odooVersion = string.Empty;
 
+    [ObservableProperty]
+    private bool _rememberMe;
+
+    [ObservableProperty]
+    private int _productCount;
+
+    [ObservableProperty]
+    private string _syncStatusMessage = string.Empty;
+
+    [ObservableProperty]
+    private bool _isSyncingProducts;
+
+    public ObservableCollection<OdooProduct> Products { get; } = new();
+
     public OdooConnectionViewModel(
         IOdooService odooService,
         ISettingsService settingsService,
+        ICredentialService credentialService,
         IConfiguration configuration,
         IAppLogService logService,
         ILogger<OdooConnectionViewModel>? logger = null)
     {
         _odooService = odooService;
         _settingsService = settingsService;
+        _credentialService = credentialService;
         _configuration = configuration;
         _logService = logService;
         _logger = logger;
@@ -289,6 +307,101 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
         return !IsTesting;
     }
 
+    [RelayCommand(CanExecute = nameof(CanDisconnect))]
+    private async Task DisconnectAsync()
+    {
+        try
+        {
+            _odooService.ClearApiAuthentication();
+            IsConnected = false;
+            OdooVersion = string.Empty;
+            StatusMessage = "Disconnected from Odoo";
+            StatusIsSuccess = false;
+            _logService.Log("Disconnected from Odoo", "Odoo");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error during Odoo disconnect");
+            StatusMessage = $"Disconnect error: {ex.Message}";
+        }
+        await Task.CompletedTask;
+    }
+
+    private bool CanDisconnect() => IsConnected && !IsTesting;
+
+    partial void OnIsConnectedChanged(bool value)
+    {
+        DisconnectCommand.NotifyCanExecuteChanged();
+        SyncProductsCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanSyncProducts))]
+    private async Task SyncProductsAsync()
+    {
+        IsSyncingProducts = true;
+        SyncStatusMessage = "Syncing products...";
+
+        try
+        {
+            var parsed = ParseSwaggerUrl(SwaggerUrl);
+            if (parsed == null)
+            {
+                SyncStatusMessage = "Invalid Swagger URL";
+                return;
+            }
+
+            var (baseUrl, database, apiToken) = parsed.Value;
+
+            // Get basePath from swagger spec (best-effort, fallback to default)
+            var basePath = "/api/v1/boq_import_api";
+            try
+            {
+                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                var swaggerResponse = await httpClient.GetAsync(SwaggerUrl);
+                if (swaggerResponse.IsSuccessStatusCode)
+                {
+                    var json = await swaggerResponse.Content.ReadAsStringAsync();
+                    var doc = System.Text.Json.JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("basePath", out var bp))
+                        basePath = bp.GetString() ?? basePath;
+                }
+            }
+            catch
+            {
+                // Use default basePath
+            }
+
+            var products = await _odooService.GetProductsViaApiAsync(baseUrl, basePath, database, UserToken);
+
+            Products.Clear();
+            foreach (var product in products)
+            {
+                Products.Add(product);
+            }
+            ProductCount = Products.Count;
+
+            SyncStatusMessage = $"Synced {ProductCount} products";
+            _logService.Log($"Product sync complete: {ProductCount} products", "Odoo");
+        }
+        catch (Exception ex)
+        {
+            SyncStatusMessage = $"Sync failed: {ex.Message}";
+            _logService.Log($"Product sync failed: {ex.Message}", "Odoo", AppLogLevel.Error);
+            _logger?.LogError(ex, "Product sync error");
+        }
+        finally
+        {
+            IsSyncingProducts = false;
+        }
+    }
+
+    private bool CanSyncProducts() => IsConnected && !IsSyncingProducts;
+
+    partial void OnIsSyncingProductsChanged(bool value)
+    {
+        SyncProductsCommand.NotifyCanExecuteChanged();
+    }
+
     [RelayCommand]
     private async Task SaveSettingsAsync()
     {
@@ -312,6 +425,16 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
             var appSettings = _settingsService.GetAppSettings();
             appSettings.Odoo.SwaggerUrl = SwaggerUrl;
             await _settingsService.SaveAppSettingsAsync(appSettings);
+
+            // Handle DPAPI credential persistence
+            if (RememberMe)
+            {
+                await _credentialService.SaveCredentialsAsync(SwaggerUrl, UserToken);
+            }
+            else
+            {
+                await _credentialService.ClearCredentialsAsync();
+            }
 
             StatusMessage = "Settings saved successfully";
             StatusIsSuccess = true;
@@ -346,6 +469,17 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
                 SwaggerUrl = url;
             if (configs.TryGetValue("odoo_user_token", out var token) && !string.IsNullOrEmpty(token))
                 UserToken = token;
+
+            // Try loading DPAPI-encrypted credentials (overrides if present)
+            if (_credentialService.HasSavedCredentials)
+            {
+                var (savedUrl, savedToken) = await _credentialService.LoadCredentialsAsync();
+                if (!string.IsNullOrEmpty(savedUrl))
+                    SwaggerUrl = savedUrl;
+                if (!string.IsNullOrEmpty(savedToken))
+                    UserToken = savedToken;
+                RememberMe = true;
+            }
 
             if (string.IsNullOrEmpty(SwaggerUrl))
             {

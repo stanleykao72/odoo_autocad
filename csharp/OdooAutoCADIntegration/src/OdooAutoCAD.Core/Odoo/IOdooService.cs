@@ -102,6 +102,11 @@ public interface IOdooService
     #region Connection Management
 
     /// <summary>
+    /// Raised when the connection state changes (true = connected, false = disconnected).
+    /// </summary>
+    event EventHandler<bool>? ConnectionStateChanged;
+
+    /// <summary>
     /// Gets whether Odoo is currently connected (via JSON-RPC session or API token).
     /// </summary>
     bool IsConnected { get; }
@@ -117,6 +122,11 @@ public interface IOdooService
     /// Used by Dashboard and Odoo page after successful Swagger + Basic Auth test.
     /// </summary>
     void MarkApiAuthenticated(string serverUrl, string database);
+
+    /// <summary>
+    /// Clears API authentication state and fires ConnectionStateChanged(false).
+    /// </summary>
+    void ClearApiAuthentication();
 
     /// <summary>
     /// Connects to Odoo server with the specified credentials.
@@ -184,6 +194,12 @@ public interface IOdooService
     /// Gets all products.
     /// </summary>
     Task<IReadOnlyList<OdooProduct>> GetProductsAsync();
+
+    /// <summary>
+    /// Gets products via Swagger API with Basic Auth (no JSON-RPC session required).
+    /// </summary>
+    Task<IReadOnlyList<OdooProduct>> GetProductsViaApiAsync(
+        string baseUrl, string basePath, string database, string userToken);
 
     /// <summary>
     /// Gets a product by ID.

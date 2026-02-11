@@ -154,6 +154,9 @@ public partial class App : Application
         // App log service (shared UI log)
         services.AddSingleton<IAppLogService, AppLogService>();
 
+        // Credential service (DPAPI-encrypted persistence)
+        services.AddSingleton<ICredentialService, DpapiCredentialService>();
+
         // AutoCAD service (singleton for maintaining connection state)
         services.AddSingleton<IAutoCADService, AutoCADService>();
 
@@ -169,9 +172,12 @@ public partial class App : Application
             return new OdooService(logger, timeoutSeconds);
         });
 
-        // Note: IBOQProcessor is not registered yet.
-        // It will be added when real implementation is available.
-        // MCPToolRegistry accepts it as optional (nullable) parameter.
+        // BOQ processor
+        services.AddSingleton<IBOQProcessor, BOQProcessor>(sp => new BOQProcessor(
+            sp.GetRequiredService<IGUIProxy>(),
+            sp.GetRequiredService<IAutoCADService>(),
+            sp.GetRequiredService<IOdooService>(),
+            sp.GetService<ILogger<BOQProcessor>>()));
 
         // MCP services - use factory to control construction
         services.AddSingleton<MCPToolRegistry>(sp => new MCPToolRegistry(

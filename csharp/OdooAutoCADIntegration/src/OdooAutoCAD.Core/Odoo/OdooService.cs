@@ -1,6 +1,7 @@
 // OdooAutoCAD.Core/Odoo/OdooService.cs
 // Odoo REST API Service Implementation - equivalent to Python util_odoo.py
 
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
@@ -36,6 +37,8 @@ public class OdooService : IOdooService, IDisposable
         _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
     }
 
+    public event EventHandler<bool>? ConnectionStateChanged;
+
     public bool IsConnected => (_isConnected && !string.IsNullOrEmpty(_sessionId)) || _isApiAuthenticated;
 
     public bool IsApiAuthenticated => _isApiAuthenticated;
@@ -47,6 +50,14 @@ public class OdooService : IOdooService, IDisposable
         _isApiAuthenticated = true;
         _logger?.LogInformation("Odoo API authenticated via Swagger: {ServerUrl}, Database: {Database}",
             serverUrl, database);
+        ConnectionStateChanged?.Invoke(this, true);
+    }
+
+    public void ClearApiAuthentication()
+    {
+        _isApiAuthenticated = false;
+        _logger?.LogInformation("Odoo API authentication cleared");
+        ConnectionStateChanged?.Invoke(this, false);
     }
 
     #region Connection Management
@@ -83,6 +94,7 @@ public class OdooService : IOdooService, IDisposable
                     _isConnected = true;
                     _logger?.LogInformation("Connected to Odoo: {ServerUrl}, Database: {Database}, User: {Username}",
                         _serverUrl, _database, _username);
+                    ConnectionStateChanged?.Invoke(this, true);
                     return true;
                 }
             }
@@ -105,6 +117,7 @@ public class OdooService : IOdooService, IDisposable
         _isConnected = false;
         _isApiAuthenticated = false;
         _logger?.LogInformation("Disconnected from Odoo");
+        ConnectionStateChanged?.Invoke(this, false);
         await Task.CompletedTask;
     }
 
@@ -377,6 +390,80 @@ public class OdooService : IOdooService, IDisposable
             new[] { "id", "name", "default_code", "description", "list_price", "uom_id", "categ_id" });
 
         return result.Select(r => MapToOdooProduct(r)).ToList();
+    }
+
+    public async Task<IReadOnlyList<OdooProduct>> GetProductsViaApiAsync(
+        string baseUrl, string basePath, string database, string userToken)
+    {
+        try
+        {
+            var credentials = Convert.ToBase64String(
+                Encoding.UTF8.GetBytes($"{database}:{userToken}"));
+
+            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{basePath}/callMethodForJobWorkingPlanBoqModel";
+
+            var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+            request.Content = new StringContent(
+                JsonSerializer.Serialize(new { method_name = "get_product_list" }),
+                Encoding.UTF8,
+                "application/json");
+
+            var response = await _httpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            var jsonDoc = JsonSerializer.Deserialize<JsonElement>(responseJson);
+
+            var products = new List<OdooProduct>();
+
+            // Parse response — expect array of product objects
+            if (jsonDoc.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in jsonDoc.EnumerateArray())
+                {
+                    products.Add(ParseApiProduct(item));
+                }
+            }
+            else if (jsonDoc.TryGetProperty("result", out var resultArray) &&
+                     resultArray.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in resultArray.EnumerateArray())
+                {
+                    products.Add(ParseApiProduct(item));
+                }
+            }
+
+            _logger?.LogInformation("Fetched {Count} products via API", products.Count);
+            return products;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to fetch products via API");
+            throw;
+        }
+    }
+
+    private static OdooProduct ParseApiProduct(JsonElement item)
+    {
+        return new OdooProduct(
+            Id: item.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.Number
+                ? id.GetInt32() : 0,
+            Name: item.TryGetProperty("name", out var name) ? name.GetString() ?? "" : "",
+            Code: item.TryGetProperty("default_code", out var code) && code.ValueKind == JsonValueKind.String
+                ? code.GetString() : null,
+            Description: item.TryGetProperty("description", out var desc) && desc.ValueKind == JsonValueKind.String
+                ? desc.GetString() : null,
+            ListPrice: item.TryGetProperty("list_price", out var price) && price.ValueKind == JsonValueKind.Number
+                ? price.GetDecimal() : null,
+            UnitOfMeasure: item.TryGetProperty("uom_id", out var uom)
+                ? (uom.ValueKind == JsonValueKind.Array ? uom[1].GetString()
+                    : uom.ValueKind == JsonValueKind.String ? uom.GetString() : null)
+                : null,
+            Category: item.TryGetProperty("categ_id", out var cat)
+                ? (cat.ValueKind == JsonValueKind.Array ? cat[1].GetString()
+                    : cat.ValueKind == JsonValueKind.String ? cat.GetString() : null)
+                : null);
     }
 
     #endregion

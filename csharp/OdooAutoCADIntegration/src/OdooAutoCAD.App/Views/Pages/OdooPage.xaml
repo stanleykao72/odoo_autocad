@@ -8,6 +8,8 @@
     <Page.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
         <converters:StringToVisibilityConverter x:Key="StringToVisibility"/>
+        <converters:BoolToColorConverter x:Key="BoolToColor"/>
+        <converters:CountToVisibilityConverter x:Key="CountToVisibility"/>
     </Page.Resources>
 
     <Grid Margin="24">
@@ -29,6 +31,55 @@
         <!-- Main Content -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel MaxWidth="700" HorizontalAlignment="Left">
+                <!-- Connection Status -->
+                <Border Style="{StaticResource CardPanel}" Margin="0,0,0,16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Status Indicator -->
+                        <Ellipse Grid.Column="0"
+                                 Width="16" Height="16"
+                                 VerticalAlignment="Center"
+                                 Fill="{Binding IsConnected, Converter={StaticResource BoolToColor}}"
+                                 Margin="0,0,12,0"/>
+
+                        <!-- Status Text -->
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock FontSize="16" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="Disconnected"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                                <Setter Property="Text" Value="Connected"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Text="{Binding OdooVersion}"
+                                       FontSize="12"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}"
+                                       Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <!-- Disconnect Button -->
+                        <Button Grid.Column="2"
+                                Content="Disconnect"
+                                Command="{Binding DisconnectCommand}"
+                                Style="{StaticResource SecondaryButton}"
+                                Padding="16,6"
+                                VerticalAlignment="Center"
+                                Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}"/>
+                    </Grid>
+                </Border>
+
                 <!-- Connection Settings GroupBox -->
                 <Border Style="{StaticResource CardPanel}" Margin="0,0,0,16">
                     <StackPanel>
@@ -109,6 +160,14 @@
                                        FontStyle="Italic"
                                        Margin="0,4,0,0"/>
                         </Grid>
+
+                        <!-- Remember Me -->
+                        <CheckBox Content="Remember credentials"
+                                  IsChecked="{Binding RememberMe}"
+                                  FontFamily="{StaticResource AppFontFamily}"
+                                  FontSize="13"
+                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                  Margin="0,8,0,0"/>
 
                         <TextBlock Text="* Required fields"
                                    FontSize="11"
@@ -210,7 +269,7 @@
                 </Border>
 
                 <!-- Actions -->
-                <Border Style="{StaticResource CardPanel}">
+                <Border Style="{StaticResource CardPanel}" Margin="0,0,0,16">
                     <StackPanel>
                         <TextBlock Text="Save Settings"
                                    FontSize="18" FontWeight="SemiBold"
@@ -228,6 +287,63 @@
                                 Style="{StaticResource PrimaryButton}"
                                 HorizontalAlignment="Left"
                                 MinWidth="150"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Product Catalog -->
+                <Border Style="{StaticResource CardPanel}">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Product Catalog"
+                                           FontSize="18" FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextPrimaryBrush}"/>
+                                <TextBlock Text="{Binding SyncStatusMessage}"
+                                           FontSize="12"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Visibility="{Binding SyncStatusMessage, Converter={StaticResource StringToVisibility}}"
+                                           Margin="0,4,0,0"/>
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                    Command="{Binding SyncProductsCommand}"
+                                    Style="{StaticResource PrimaryButton}"
+                                    Padding="16,6"
+                                    VerticalAlignment="Top">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Sync Products" VerticalAlignment="Center"/>
+                                    <TextBlock Text=" ..."
+                                               VerticalAlignment="Center"
+                                               Visibility="{Binding IsSyncingProducts, Converter={StaticResource BoolToVisibility}}"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <!-- Product DataGrid -->
+                        <DataGrid ItemsSource="{Binding Products}"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  MaxHeight="300"
+                                  BorderThickness="1"
+                                  BorderBrush="{StaticResource BorderBrush}"
+                                  GridLinesVisibility="Horizontal"
+                                  HorizontalGridLinesBrush="{StaticResource BorderBrush}"
+                                  RowHeaderWidth="0"
+                                  FontFamily="{StaticResource AppFontFamily}"
+                                  FontSize="12"
+                                  VirtualizingStackPanel.IsVirtualizing="True"
+                                  Visibility="{Binding ProductCount, Converter={StaticResource CountToVisibility}}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Code" Binding="{Binding Code}" Width="100"/>
+                                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                                <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="120"/>
+                                <DataGridTextColumn Header="UoM" Binding="{Binding UnitOfMeasure}" Width="70"/>
+                                <DataGridTextColumn Header="Price" Binding="{Binding ListPrice, StringFormat=N2}" Width="80"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
                     </StackPanel>
                 </Border>
             </StackPanel>
