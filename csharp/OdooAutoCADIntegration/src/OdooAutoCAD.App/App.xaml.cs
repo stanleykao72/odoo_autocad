@@ -85,6 +85,11 @@ public partial class App : Application
             mainWindow.Show();
 
             Log.Information("Application started successfully with main window");
+
+            // Auto-connect services after UI is ready (non-blocking, background priority)
+            _ = Dispatcher.InvokeAsync(
+                async () => await AutoConnectServicesAsync(),
+                DispatcherPriority.Background);
         }
         catch (Exception ex)
         {
@@ -209,6 +214,57 @@ public partial class App : Application
         _guiProxyTimer.Start();
 
         Log.Information("GUI Proxy timer initialized with 100ms interval");
+    }
+
+    /// <summary>
+    /// Attempts to auto-connect AutoCAD and Odoo after startup.
+    /// Uses DashboardViewModel's existing connect commands.
+    /// Failures are logged but do not affect application operation.
+    /// </summary>
+    private async Task AutoConnectServicesAsync()
+    {
+        var logService = Services.GetRequiredService<IAppLogService>();
+
+        // Small delay to let UI render and DispatcherTimer start polling
+        await Task.Delay(1000);
+
+        // Auto-connect AutoCAD
+        try
+        {
+            var dashboard = Services.GetRequiredService<DashboardViewModel>();
+
+            Log.Information("Auto-connecting to AutoCAD...");
+            logService.Log("Auto-connecting to AutoCAD...", "Startup");
+
+            if (dashboard.ConnectAutoCADCommand.CanExecute(null))
+            {
+                await dashboard.ConnectAutoCADCommand.ExecuteAsync(null);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "AutoCAD auto-connect failed (non-fatal)");
+            logService.Log($"AutoCAD auto-connect skipped: {ex.Message}", "Startup", AppLogLevel.Warning);
+        }
+
+        // Auto-connect Odoo
+        try
+        {
+            var dashboard = Services.GetRequiredService<DashboardViewModel>();
+
+            Log.Information("Auto-connecting to Odoo...");
+            logService.Log("Auto-connecting to Odoo...", "Startup");
+
+            if (dashboard.ConnectOdooCommand.CanExecute(null))
+            {
+                await dashboard.ConnectOdooCommand.ExecuteAsync(null);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Odoo auto-connect failed (non-fatal)");
+            logService.Log($"Odoo auto-connect skipped: {ex.Message}", "Startup", AppLogLevel.Warning);
+        }
     }
 
     private async Task StartMCPServerAsync()
