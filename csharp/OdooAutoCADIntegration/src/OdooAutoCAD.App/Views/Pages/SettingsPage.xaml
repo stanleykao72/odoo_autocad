@@ -40,25 +40,18 @@
                                        Foreground="{StaticResource TextPrimaryBrush}"
                                        Margin="0,0,0,16"/>
 
-                            <!-- Server URL -->
-                            <TextBlock Text="Server URL" Style="{StaticResource SettingsLabel}"/>
-                            <TextBox Text="{Binding OdooServerUrl, UpdateSourceTrigger=PropertyChanged}"
+                            <!-- Swagger URL -->
+                            <TextBlock Text="Swagger URL" Style="{StaticResource SettingsLabel}"/>
+                            <TextBox Text="{Binding OdooSwaggerUrl, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource ModernTextBox}"
-                                     Margin="0,0,0,12"/>
+                                     Margin="0,0,0,4"/>
+                            <TextBlock Text="Full endpoint URL with token and db parameters"
+                                       FontSize="11"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontStyle="Italic"
+                                       Margin="0,0,0,12"/>
 
-                            <!-- Database -->
-                            <TextBlock Text="Database" Style="{StaticResource SettingsLabel}"/>
-                            <TextBox Text="{Binding OdooDatabase, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}"
-                                     Margin="0,0,0,12"/>
-
-                            <!-- Username -->
-                            <TextBlock Text="Username" Style="{StaticResource SettingsLabel}"/>
-                            <TextBox Text="{Binding OdooUsername, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}"
-                                     Margin="0,0,0,12"/>
-
-                            <!-- API Token -->
+                            <!-- User Token -->
                             <Grid Margin="0,0,0,12">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -70,7 +63,7 @@
                                 </Grid.ColumnDefinitions>
 
                                 <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
-                                           Text="API Token" Style="{StaticResource SettingsLabel}"/>
+                                           Text="User Token" Style="{StaticResource SettingsLabel}"/>
 
                                 <!-- PasswordBox (hidden mode) -->
                                 <PasswordBox x:Name="TokenPasswordBox"

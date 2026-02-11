@@ -196,4 +196,72 @@ public class GUIProxyTests
         // Assert
         proxy.IsRunning.Should().BeFalse();
     }
+
+    [Fact]
+    public async Task ProcessRequests_SyncHandler_ShouldCompleteViaFastPath()
+    {
+        // Arrange
+        using var proxy = new GUIProxy();
+        proxy.Start();
+        proxy.RegisterHandler("fast_action", (p) => Task.FromResult<object?>("fast_result"));
+
+        // Enqueue a request
+        var responseTask = proxy.ExecuteInGuiAsync("fast_action");
+
+        // Act — process the queue (simulates DispatcherTimer tick)
+        var processed = proxy.ProcessRequests();
+
+        // Assert
+        processed.Should().Be(1);
+
+        var response = await responseTask;
+        response.Success.Should().BeTrue();
+        response.Result.Should().Be("fast_result");
+        response.Status.Should().Be(ProxyRequestStatus.Completed);
+    }
+
+    [Fact]
+    public async Task ProcessRequests_FailingHandler_ShouldReturnError()
+    {
+        // Arrange
+        using var proxy = new GUIProxy();
+        proxy.Start();
+        proxy.RegisterHandler("fail_action", (p) =>
+            throw new InvalidOperationException("handler failed"));
+
+        // Enqueue a request
+        var responseTask = proxy.ExecuteInGuiAsync("fail_action");
+
+        // Act
+        proxy.ProcessRequests();
+
+        // Assert
+        var response = await responseTask;
+        response.Success.Should().BeFalse();
+        response.ErrorMessage.Should().Contain("handler failed");
+    }
+
+    [Fact]
+    public async Task ProcessRequests_SlowPathHandler_ShouldCompleteAsynchronously()
+    {
+        // Arrange
+        using var proxy = new GUIProxy();
+        proxy.Start();
+        proxy.RegisterHandler("slow_action", async (p) =>
+        {
+            await Task.Delay(50);
+            return (object?)"slow_result";
+        });
+
+        // Enqueue a request
+        var responseTask = proxy.ExecuteInGuiAsync("slow_action", timeout: 5000);
+
+        // Act — process to start the slow task
+        proxy.ProcessRequests();
+
+        // Assert — the response completes eventually via ContinueWith
+        var response = await responseTask;
+        response.Success.Should().BeTrue();
+        response.Result.Should().Be("slow_result");
+    }
 }

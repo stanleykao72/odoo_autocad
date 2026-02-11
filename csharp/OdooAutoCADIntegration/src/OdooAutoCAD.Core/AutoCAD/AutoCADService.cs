@@ -11,11 +11,11 @@ namespace OdooAutoCAD.Core.AutoCAD;
 /// AutoCAD COM Service implementation.
 /// Uses late binding (dynamic) for AutoCAD LT compatibility.
 ///
-/// All COM operations run on thread pool threads (MTA) via Task.Run, NOT on
-/// the WPF STA thread. AutoCAD 2014 crashes with "Unhandled Access Violation"
-/// when GetActiveObject is called from WPF's DispatcherTimer callback (STA).
-/// Running on MTA avoids this — for out-of-process COM servers like AutoCAD,
-/// COM handles cross-apartment marshaling transparently.
+/// All COM operations run directly on the WPF STA thread via GUIProxy handlers.
+/// The IDispatch QueryInterface warmup in GetActiveObject (lines 83-87) ensures
+/// the COM proxy is fully initialized before any dynamic property access, preventing
+/// deferred cross-process QI crashes. OleMessageFilter handles RPC_E_CALL_REJECTED
+/// when AutoCAD is busy with WPF layout processing.
 /// </summary>
 public class AutoCADService : IAutoCADService, IDisposable
 {
@@ -23,7 +23,7 @@ public class AutoCADService : IAutoCADService, IDisposable
     private readonly IGUIProxy _guiProxy;
     private dynamic? _acadApp;
     private dynamic? _acadDoc;
-    private bool _isConnected;
+    private volatile bool _isConnected;
 
     private const string DefaultProgId = "AutoCAD.Application";
     private const int MaxRetryAttempts = 5;
@@ -102,119 +102,115 @@ public class AutoCADService : IAutoCADService, IDisposable
 
     /// <summary>
     /// Registers handlers for AutoCAD operations in the GUI proxy.
-    /// All handlers use Task.Run to execute COM operations on MTA thread pool
-    /// threads, avoiding the WPF STA thread which crashes AutoCAD 2014.
+    /// All handlers execute COM operations directly on the STA/GUI thread.
+    /// OleMessageFilter handles RPC_E_CALL_REJECTED retries automatically.
     /// </summary>
     private void RegisterGUIProxyHandlers()
     {
         _guiProxy.RegisterHandler("autocad_connect", async (parameters) =>
         {
-            return await Task.Run(() => ConnectInternal());
+            return await ConnectInternalAsync();
         });
 
-        _guiProxy.RegisterHandler("autocad_disconnect", async (parameters) =>
+        _guiProxy.RegisterHandler("autocad_disconnect", (parameters) =>
         {
-            return await Task.Run(() => { DisconnectInternal(); return (object?)null; });
+            DisconnectInternal();
+            return Task.FromResult<object?>(null);
         });
 
-        _guiProxy.RegisterHandler("autocad_get_status", async (parameters) =>
+        _guiProxy.RegisterHandler("autocad_get_status", (parameters) =>
         {
-            return await Task.Run(() => GetStatusInternal());
+            return Task.FromResult<object?>(GetStatusInternal());
         });
 
-        _guiProxy.RegisterHandler("autocad_get_layouts", async (parameters) =>
+        _guiProxy.RegisterHandler("autocad_get_layouts", (parameters) =>
         {
-            return await Task.Run(() => GetLayoutsInternal());
+            return Task.FromResult<object?>(GetLayoutsInternal());
         });
 
-        _guiProxy.RegisterHandler("autocad_get_active_layout", async (parameters) =>
+        _guiProxy.RegisterHandler("autocad_get_active_layout", (parameters) =>
         {
-            return await Task.Run(() => (object?)GetCurrentLayoutName());
+            return Task.FromResult<object?>(GetCurrentLayoutName());
         });
 
-        _guiProxy.RegisterHandler("autocad_set_active_layout", async (parameters) =>
-        {
-            parameters.TryGetValue("layoutName", out var val);
-            var layoutName = val as string;
-            if (layoutName != null)
-            {
-                return await Task.Run(() => SwitchToLayout(layoutName));
-            }
-            return false;
-        });
-
-        _guiProxy.RegisterHandler("autocad_extract_parameters", async (parameters) =>
+        _guiProxy.RegisterHandler("autocad_set_active_layout", (parameters) =>
         {
             parameters.TryGetValue("layoutName", out var val);
             var layoutName = val as string;
             if (layoutName != null)
             {
-                return await Task.Run(() => GetLayoutValuesInternal(layoutName));
+                return Task.FromResult<object?>(SwitchToLayout(layoutName));
             }
-            return new LayoutData();
+            return Task.FromResult<object?>(false);
         });
 
-        _guiProxy.RegisterHandler("autocad_open_document", async (parameters) =>
+        _guiProxy.RegisterHandler("autocad_extract_parameters", (parameters) =>
+        {
+            parameters.TryGetValue("layoutName", out var val);
+            var layoutName = val as string;
+            if (layoutName != null)
+            {
+                return Task.FromResult<object?>(GetLayoutValuesInternal(layoutName));
+            }
+            return Task.FromResult<object?>(new LayoutData());
+        });
+
+        _guiProxy.RegisterHandler("autocad_open_document", (parameters) =>
         {
             parameters.TryGetValue("filePath", out var val);
             var filePath = val as string;
-            if (string.IsNullOrEmpty(filePath) || !_isConnected) return false;
-            return await Task.Run(() =>
+            if (string.IsNullOrEmpty(filePath) || !_isConnected)
+                return Task.FromResult<object?>(false);
+
+            try
             {
-                try
-                {
-                    _acadDoc = _acadApp!.Documents.Open(filePath);
-                    _logger?.LogInformation("Opened document: {FilePath}", filePath);
-                    return (object)true;
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Failed to open document: {FilePath}", filePath);
-                    return (object)false;
-                }
-            });
+                _acadDoc = _acadApp!.Documents.Open(filePath);
+                _logger?.LogInformation("Opened document: {FilePath}", filePath);
+                return Task.FromResult<object?>(true);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to open document: {FilePath}", filePath);
+                return Task.FromResult<object?>(false);
+            }
         });
 
-        _guiProxy.RegisterHandler("autocad_save_document", async (parameters) =>
+        _guiProxy.RegisterHandler("autocad_save_document", (parameters) =>
         {
-            if (_acadDoc == null) return false;
-            return await Task.Run(() =>
+            if (_acadDoc == null) return Task.FromResult<object?>(false);
+
+            try
             {
-                try
-                {
-                    _acadDoc.Save();
-                    _logger?.LogInformation("Document saved");
-                    return (object)true;
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Failed to save document");
-                    return (object)false;
-                }
-            });
+                _acadDoc.Save();
+                _logger?.LogInformation("Document saved");
+                return Task.FromResult<object?>(true);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to save document");
+                return Task.FromResult<object?>(false);
+            }
         });
 
-        _guiProxy.RegisterHandler("autocad_close_document", async (parameters) =>
+        _guiProxy.RegisterHandler("autocad_close_document", (parameters) =>
         {
-            if (_acadDoc == null) return false;
-            return await Task.Run(() =>
+            if (_acadDoc == null) return Task.FromResult<object?>(false);
+
+            try
             {
-                try
-                {
-                    var save = true;
-                    if (parameters.TryGetValue("save", out var saveProp) && saveProp is bool s)
-                        save = s;
-                    _acadDoc.Close(save);
-                    _acadDoc = _acadApp?.ActiveDocument;
-                    _logger?.LogInformation("Document closed");
-                    return (object)true;
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Failed to close document");
-                    return (object)false;
-                }
-            });
+                var save = true;
+                if (parameters.TryGetValue("save", out var saveProp) && saveProp is bool s)
+                    save = s;
+                _acadDoc.Close(save);
+                _acadDoc = _acadApp?.ActiveDocument;
+                _logger?.LogInformation("Document closed");
+                return Task.FromResult<object?>(true);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to close document");
+                return Task.FromResult<object?>(false);
+            }
         });
 
         _logger?.LogDebug("AutoCAD GUI proxy handlers registered");
@@ -233,12 +229,13 @@ public class AutoCADService : IAutoCADService, IDisposable
     }
 
     /// <summary>
-    /// Internal connection method — runs on MTA thread pool thread via Task.Run.
+    /// Internal connection method — runs on the STA/GUI thread.
+    /// Uses async Task.Delay for retries so the WPF message pump stays responsive.
     /// Matches the Python util_autocad.py connect_autocad() logic:
     ///   1. GetActiveObject to get running AutoCAD instance
     ///   2. Retry up to 5 times for ActiveDocument
     /// </summary>
-    private bool ConnectInternal()
+    private async Task<bool> ConnectInternalAsync()
     {
         try
         {
@@ -262,7 +259,7 @@ public class AutoCADService : IAutoCADService, IDisposable
                 {
                     _logger?.LogWarning("Retry {Attempt}/{Max}: ActiveDocument not ready — {Error}",
                         attempt, MaxRetryAttempts, ex.Message);
-                    Thread.Sleep(RetryDelayMs);
+                    await Task.Delay(RetryDelayMs);
                 }
             }
 
@@ -302,12 +299,22 @@ public class AutoCADService : IAutoCADService, IDisposable
     {
         if (_acadDoc != null)
         {
-            try { Marshal.ReleaseComObject(_acadDoc); } catch { /* ignore release errors */ }
+            try
+            {
+                if (Marshal.IsComObject(_acadDoc))
+                    Marshal.ReleaseComObject(_acadDoc);
+            }
+            catch { /* ignore release errors */ }
             _acadDoc = null;
         }
         if (_acadApp != null)
         {
-            try { Marshal.ReleaseComObject(_acadApp); } catch { /* ignore release errors */ }
+            try
+            {
+                if (Marshal.IsComObject(_acadApp))
+                    Marshal.ReleaseComObject(_acadApp);
+            }
+            catch { /* ignore release errors */ }
             _acadApp = null;
         }
     }

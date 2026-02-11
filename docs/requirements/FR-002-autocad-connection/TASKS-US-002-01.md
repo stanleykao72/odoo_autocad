@@ -96,9 +96,16 @@
   - Step 5: If `ActiveDocument` is null after 5 retries, throw with message "Could not access the active document after 5 attempts."
   - If no AutoCAD ProgID found, throw with message "AutoCAD is not running. Please start AutoCAD and try again."
 - Extract `DocumentName` from `_acadDoc.Name` and `DocumentPath` from `_acadDoc.FullName` after successful connection
-- Ensure `ConnectAsync()` wraps `Connect()` properly with `await Task.Run()`
+- ~~Ensure `ConnectAsync()` wraps `Connect()` properly with `await Task.Run()`~~ **Updated**: `ConnectInternalAsync()` runs directly on STA thread (no `Task.Run`), using `await Task.Delay(1000)` for retries to keep UI responsive
 - Add structured logging at each step for troubleshooting
 - Handle `COMException` specifically for COM-related failures vs general exceptions
+
+### Implementation Notes (2026-02-11)
+- `ConnectInternal()` renamed to `ConnectInternalAsync()` — now `async Task<bool>` with `await Task.Delay(RetryDelayMs)` instead of `Thread.Sleep`
+- All 10 GUIProxy handlers converted from `Task.Run(() => ...)` to direct STA execution via `Task.FromResult` (sync ops) or `async`/`await` (connect)
+- `OleMessageFilter.Register()` called in `App.xaml.cs` OnStartup — handles `RPC_E_CALL_REJECTED` from AutoCAD during WPF layout
+- `GUIProxy.ProcessSingleRequest` now supports fast-path (sync, `IsCompletedSuccessfully`) and slow-path (`ContinueWith` on STA `SynchronizationContext`) to avoid blocking STA
+- `_isConnected` marked `volatile`; `ReleaseCOMObjects` uses `Marshal.IsComObject()` guard
 
 ### How to verify
 - [x] Connection first tries GetActiveObject, then falls back to Dispatch (AC-02)
@@ -151,6 +158,13 @@
   - The `"connect_autocad"` handler should return an `AutoCADStatus` as the `Result` in `GUIProxyResponse`
 - Ensure `ProcessRequests()` is called by the WPF `DispatcherTimer` at 100ms intervals (wiring done in App startup)
 - All COM operations from ViewModel go through `_guiProxy.ExecuteInGuiAsync(actionName, params, timeout)`
+
+### Implementation Notes (2026-02-11)
+- Handlers registered directly in `AutoCADService` constructor (no separate `AutoCADProxyRegistration` class)
+- 10 handlers registered: `autocad_connect`, `autocad_disconnect`, `autocad_get_status`, `autocad_get_layouts`, `autocad_get_active_layout`, `autocad_set_active_layout`, `autocad_extract_parameters`, `autocad_open_document`, `autocad_save_document`, `autocad_close_document`
+- All handlers execute COM operations directly on STA thread (no `Task.Run`)
+- `GUIProxy.ProcessSingleRequest` supports fast-path (sync `Task.FromResult`) and slow-path (async `ContinueWith` on STA `SynchronizationContext`)
+- `OleMessageFilter` registered on STA thread in `App.xaml.cs` OnStartup, revoked in OnExit
 
 ### How to verify
 - [x] All AutoCAD COM operations are routed through IGUIProxy.ExecuteInGuiAsync (AC-07)

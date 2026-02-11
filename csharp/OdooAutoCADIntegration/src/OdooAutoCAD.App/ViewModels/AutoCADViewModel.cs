@@ -3,11 +3,13 @@
 
 using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using Microsoft.Win32;
 using OdooAutoCAD.App.Services;
 using OdooAutoCAD.Core.AutoCAD;
 using OdooAutoCAD.Core.Threading;
@@ -22,6 +24,7 @@ namespace OdooAutoCAD.App.ViewModels;
 public partial class AutoCADViewModel : ObservableObject
 {
     private readonly IAutoCADService _autoCADService;
+    private readonly IDwgReaderService _dwgReader;
     private readonly IGUIProxy _guiProxy;
     private readonly IAppLogService _logService;
     private readonly ILogger<AutoCADViewModel>? _logger;
@@ -67,13 +70,41 @@ public partial class AutoCADViewModel : ObservableObject
     [ObservableProperty]
     private bool _isExtracting;
 
+    // DWG file-based extraction (ACadSharp, no COM)
+    [ObservableProperty]
+    private string _dwgFilePath = string.Empty;
+
+    [ObservableProperty]
+    private bool _isDwgFileLoaded;
+
+    /// <summary>
+    /// True when either COM is connected OR a DWG file is loaded.
+    /// Used by the XAML to show/hide the layouts panel.
+    /// </summary>
+    public bool HasDataSource => IsConnected || IsDwgFileLoaded;
+
+    partial void OnIsConnectedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(HasDataSource));
+        ExtractParametersCommand.NotifyCanExecuteChanged();
+        OpenDwgFileCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsDwgFileLoadedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(HasDataSource));
+        ExtractParametersCommand.NotifyCanExecuteChanged();
+    }
+
     public AutoCADViewModel(
         IAutoCADService autoCADService,
+        IDwgReaderService dwgReader,
         IGUIProxy guiProxy,
         IAppLogService logService,
         ILogger<AutoCADViewModel>? logger = null)
     {
         _autoCADService = autoCADService ?? throw new ArgumentNullException(nameof(autoCADService));
+        _dwgReader = dwgReader ?? throw new ArgumentNullException(nameof(dwgReader));
         _guiProxy = guiProxy ?? throw new ArgumentNullException(nameof(guiProxy));
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         _logger = logger;
@@ -274,6 +305,66 @@ public partial class AutoCADViewModel : ObservableObject
         }
     }
 
+    #region DWG File-Based Extraction
+
+    /// <summary>
+    /// Opens a DWG file and loads its layouts via ACadSharp (no COM needed).
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanOpenDwgFile))]
+    private void OpenDwgFile()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Open DWG File",
+            Filter = "AutoCAD Drawing (*.dwg)|*.dwg|All Files (*.*)|*.*",
+            DefaultExt = ".dwg"
+        };
+
+        if (dialog.ShowDialog() != true)
+            return;
+
+        var filePath = dialog.FileName;
+
+        try
+        {
+            _logger?.LogInformation("Opening DWG file: {FilePath}", filePath);
+
+            if (!_dwgReader.IsValidDwgFile(filePath))
+            {
+                StatusMessage = "Selected file is not a valid DWG file.";
+                _logService.Log($"Invalid DWG file: {filePath}", "AutoCAD", AppLogLevel.Warning);
+                return;
+            }
+
+            var layouts = _dwgReader.GetLayouts(filePath);
+
+            Layouts.Clear();
+            foreach (var layout in layouts)
+            {
+                Layouts.Add(layout);
+            }
+
+            DwgFilePath = filePath;
+            IsDwgFileLoaded = true;
+            SelectedLayout = null;
+            CurrentDocument = Path.GetFileName(filePath);
+            StatusMessage = $"Loaded {layouts.Count} layouts from {Path.GetFileName(filePath)}";
+
+            _logService.Log($"Opened DWG file: {Path.GetFileName(filePath)} ({layouts.Count} layouts)", "AutoCAD");
+            _logger?.LogInformation("DWG file loaded: {Count} layouts", layouts.Count);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Failed to open DWG file: {ex.Message}";
+            _logService.Log($"DWG open error: {ex.Message}", "AutoCAD", AppLogLevel.Error);
+            _logger?.LogError(ex, "Failed to open DWG file: {FilePath}", filePath);
+        }
+    }
+
+    private bool CanOpenDwgFile() => !IsConnecting && !IsExtracting;
+
+    #endregion
+
     #region Phase 2.2: Layout Management
 
     /// <summary>
@@ -377,6 +468,8 @@ public partial class AutoCADViewModel : ObservableObject
 
     /// <summary>
     /// Extracts parameters from the selected layout.
+    /// Uses file-based ACadSharp reader when a DWG file is loaded,
+    /// or COM-based GUIProxy when connected to AutoCAD.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanExtractParameters))]
     private async Task ExtractParametersAsync()
@@ -395,54 +488,37 @@ public partial class AutoCADViewModel : ObservableObject
             _logService.Log($"Extracting parameters from layout: {SelectedLayout.Name}", "AutoCAD");
             _logger?.LogInformation("Extracting parameters from layout: {LayoutName}", SelectedLayout.Name);
 
-            var parameters = new Dictionary<string, object?> 
-            { 
-                ["layoutName"] = SelectedLayout.Name 
-            };
-            var response = await _guiProxy.ExecuteInGuiAsync("autocad_extract_parameters", parameters, timeout: 30000);
+            LayoutData? data = null;
 
-            if (response.Success && response.Result is LayoutData data)
+            if (IsDwgFileLoaded)
             {
-                // Update layout attributes
-                LayoutAttributes = data.Parameters;
-
-                // Update table data
-                TableData.Clear();
-                if (data.Tables.Count > 0)
-                {
-                    var table = data.Tables[0]; // Use first table
-                    
-                    // Parse table cells into TableRowData
-                    foreach (var row in table.Cells.Skip(1)) // Skip header row
-                    {
-                        if (row.Count >= 9)
-                        {
-                            var rowData = new TableRowData
-                            {
-                                Position = row[0],
-                                ProductNo = row[1],
-                                Width = row[2],
-                                Height = row[3],
-                                Length = row[4],
-                                Thickness = row[5],
-                                Qty = row[6],
-                                Description = row[7],
-                                DetailId = row[8]
-                            };
-
-                            TableData.Add(rowData);
-                        }
-                    }
-                }
-
-                ExtractionStatus = $"Extracted {TableData.Count} rows from {SelectedLayout.Name}";
-                _logService.Log($"Extracted {TableData.Count} rows from {SelectedLayout.Name}", "AutoCAD");
-                _logger?.LogInformation("Successfully extracted {RowCount} rows", TableData.Count);
+                // File-based extraction via ACadSharp (no COM)
+                data = await Task.Run(() => _dwgReader.ExtractParameters(DwgFilePath, SelectedLayout.Name));
             }
-            else
+            else if (IsConnected)
             {
-                ExtractionStatus = response.ErrorMessage ?? "Extraction failed";
-                _logger?.LogWarning("Parameter extraction failed: {Error}", response.ErrorMessage);
+                // COM-based extraction via GUIProxy
+                var parameters = new Dictionary<string, object?>
+                {
+                    ["layoutName"] = SelectedLayout.Name
+                };
+                var response = await _guiProxy.ExecuteInGuiAsync("autocad_extract_parameters", parameters, timeout: 30000);
+
+                if (response.Success && response.Result is LayoutData comData)
+                {
+                    data = comData;
+                }
+                else
+                {
+                    ExtractionStatus = response.ErrorMessage ?? "Extraction failed";
+                    _logger?.LogWarning("Parameter extraction failed: {Error}", response.ErrorMessage);
+                    return;
+                }
+            }
+
+            if (data != null)
+            {
+                PopulateExtractionResults(data);
             }
         }
         catch (Exception ex)
@@ -456,7 +532,47 @@ public partial class AutoCADViewModel : ObservableObject
         }
     }
 
-    private bool CanExtractParameters() => IsConnected && !IsConnecting && !IsExtracting && SelectedLayout != null;
+    private bool CanExtractParameters() =>
+        (IsConnected || IsDwgFileLoaded) && !IsConnecting && !IsExtracting && SelectedLayout != null;
+
+    /// <summary>
+    /// Populates LayoutAttributes and TableData from extracted LayoutData.
+    /// Shared by both COM and file-based extraction paths.
+    /// </summary>
+    private void PopulateExtractionResults(LayoutData data)
+    {
+        LayoutAttributes = data.Parameters;
+
+        TableData.Clear();
+        if (data.Tables.Count > 0)
+        {
+            var table = data.Tables[0];
+
+            foreach (var row in table.Cells.Skip(1)) // Skip header row
+            {
+                if (row.Count >= 9)
+                {
+                    TableData.Add(new TableRowData
+                    {
+                        Position = row[0],
+                        ProductNo = row[1],
+                        Width = row[2],
+                        Height = row[3],
+                        Length = row[4],
+                        Thickness = row[5],
+                        Qty = row[6],
+                        Description = row[7],
+                        DetailId = row[8]
+                    });
+                }
+            }
+        }
+
+        ExtractionStatus = $"Extracted {data.Parameters.Count} parameters, {TableData.Count} rows from {SelectedLayout!.Name}";
+        _logService.Log($"Extracted {data.Parameters.Count} params, {TableData.Count} rows from {SelectedLayout.Name}", "AutoCAD");
+        _logger?.LogInformation("Successfully extracted {ParamCount} params, {RowCount} rows",
+            data.Parameters.Count, TableData.Count);
+    }
 
     #endregion
 }

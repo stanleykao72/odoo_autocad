@@ -67,6 +67,10 @@ public partial class App : Application
             // Start the host
             await _host.StartAsync();
 
+            // Register OLE message filter — retries COM calls rejected by AutoCAD
+            // during WPF layout processing (RPC_E_CALL_REJECTED)
+            OleMessageFilter.Register();
+
             // Initialize GUI Proxy timer
             InitializeGUIProxyTimer();
 
@@ -148,6 +152,9 @@ public partial class App : Application
         // AutoCAD service (singleton for maintaining connection state)
         services.AddSingleton<IAutoCADService, AutoCADService>();
 
+        // DWG file reader (ACadSharp — no COM, no running AutoCAD needed)
+        services.AddSingleton<IDwgReaderService, DwgReaderService>();
+
         // Odoo service with configured timeout
         services.AddSingleton<IOdooService>(sp =>
         {
@@ -221,6 +228,16 @@ public partial class App : Application
     protected override async void OnExit(ExitEventArgs e)
     {
         Log.Information("Application shutting down");
+
+        // Step 0: Revoke OLE message filter
+        try
+        {
+            OleMessageFilter.Revoke();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to revoke OLE message filter");
+        }
 
         // Step 1: Stop GUI proxy timer
         try

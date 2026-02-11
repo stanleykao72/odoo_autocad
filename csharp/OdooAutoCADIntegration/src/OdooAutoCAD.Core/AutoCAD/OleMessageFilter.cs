@@ -36,7 +36,7 @@ internal interface IOleMessageFilter
 /// Must be registered on an STA thread via <see cref="Register"/> before
 /// making any COM calls to AutoCAD.
 /// </summary>
-internal class OleMessageFilter : IOleMessageFilter
+public class OleMessageFilter : IOleMessageFilter
 {
     private const int SERVERCALL_ISHANDLED = 0;
     private const int SERVERCALL_RETRYLATER = 2;

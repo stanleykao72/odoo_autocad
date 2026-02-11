@@ -218,6 +218,8 @@ public class GUIProxy : IGUIProxy
             {
                 _logger?.LogError(ex, "Error processing request: {RequestId}", request.RequestId);
 
+                _pendingRequests.TryRemove(request.RequestId, out _);
+
                 var response = GUIProxyResponse.CreateError(
                     request.RequestId,
                     ex.Message,
@@ -227,10 +229,6 @@ public class GUIProxy : IGUIProxy
                 Interlocked.Increment(ref _failedRequests);
 
                 ErrorOccurred?.Invoke(this, ex);
-            }
-            finally
-            {
-                _pendingRequests.TryRemove(request.RequestId, out _);
             }
         }
 
@@ -248,6 +246,7 @@ public class GUIProxy : IGUIProxy
     {
         if (request.CancellationTokenSource.Token.IsCancellationRequested)
         {
+            _pendingRequests.TryRemove(request.RequestId, out _);
             var cancelledResponse = GUIProxyResponse.CreateError(
                 request.RequestId,
                 "Request was cancelled",
@@ -258,6 +257,7 @@ public class GUIProxy : IGUIProxy
 
         if (!_handlers.TryGetValue(request.Action, out var handler))
         {
+            _pendingRequests.TryRemove(request.RequestId, out _);
             var notFoundResponse = GUIProxyResponse.CreateError(
                 request.RequestId,
                 $"No handler registered for action: {request.Action}",
@@ -271,35 +271,106 @@ public class GUIProxy : IGUIProxy
 
         try
         {
-            // Execute handler synchronously on GUI thread
+            // Start handler on STA thread — handler returns a Task
             var resultTask = handler(request.Parameters);
 
-            // Wait for result (this is OK because we're on GUI thread and handlers should be quick)
-            var result = resultTask.GetAwaiter().GetResult();
-
-            stopwatch.Stop();
-
-            var response = new GUIProxyResponse
+            if (resultTask.IsCompletedSuccessfully)
             {
-                RequestId = request.RequestId,
-                Success = true,
-                Result = result,
-                Status = ProxyRequestStatus.Completed,
-                StartTime = request.CreatedAt,
-                EndTime = DateTime.UtcNow
-            };
+                // Fast path: handler completed synchronously (Task.FromResult or already-done async)
+                var result = resultTask.Result;
+                stopwatch.Stop();
 
-            request.CompletionSource.TrySetResult(response);
-            Interlocked.Increment(ref _successfulRequests);
+                _pendingRequests.TryRemove(request.RequestId, out _);
 
-            RequestCompleted?.Invoke(this, response);
+                var response = new GUIProxyResponse
+                {
+                    RequestId = request.RequestId,
+                    Success = true,
+                    Result = result,
+                    Status = ProxyRequestStatus.Completed,
+                    StartTime = request.CreatedAt,
+                    EndTime = DateTime.UtcNow
+                };
 
-            _logger?.LogDebug("Request completed: {RequestId} in {ElapsedMs}ms",
-                request.RequestId, stopwatch.ElapsedMilliseconds);
+                request.CompletionSource.TrySetResult(response);
+                Interlocked.Increment(ref _successfulRequests);
+
+                RequestCompleted?.Invoke(this, response);
+
+                _logger?.LogDebug("Request completed (fast path): {RequestId} in {ElapsedMs}ms",
+                    request.RequestId, stopwatch.ElapsedMilliseconds);
+            }
+            else
+            {
+                // Slow path: handler is truly async (e.g. ConnectInternalAsync with Task.Delay).
+                // Schedule continuation on the current SynchronizationContext (STA/GUI thread)
+                // so the continuation runs during a future DispatcherTimer tick — no blocking.
+                var ctx = SynchronizationContext.Current;
+                var scheduler = ctx != null
+                    ? TaskScheduler.FromCurrentSynchronizationContext()
+                    : TaskScheduler.Current;
+
+                resultTask.ContinueWith(t =>
+                {
+                    stopwatch.Stop();
+                    _pendingRequests.TryRemove(request.RequestId, out _);
+
+                    if (t.IsFaulted)
+                    {
+                        var ex = t.Exception?.InnerException ?? t.Exception!;
+                        var errorResponse = new GUIProxyResponse
+                        {
+                            RequestId = request.RequestId,
+                            Success = false,
+                            ErrorMessage = ex.Message,
+                            ErrorType = ex.GetType().Name,
+                            Status = ProxyRequestStatus.Failed,
+                            StartTime = request.CreatedAt,
+                            EndTime = DateTime.UtcNow
+                        };
+
+                        request.CompletionSource.TrySetResult(errorResponse);
+                        Interlocked.Increment(ref _failedRequests);
+
+                        _logger?.LogError(ex, "Request failed (slow path): {RequestId} - {Action}",
+                            request.RequestId, request.Action);
+
+                        ErrorOccurred?.Invoke(this, ex);
+                    }
+                    else if (t.IsCanceled)
+                    {
+                        var cancelResponse = GUIProxyResponse.CreateError(
+                            request.RequestId, "Request was cancelled", "CancelledError");
+                        request.CompletionSource.TrySetResult(cancelResponse);
+                        Interlocked.Increment(ref _failedRequests);
+                    }
+                    else
+                    {
+                        var response = new GUIProxyResponse
+                        {
+                            RequestId = request.RequestId,
+                            Success = true,
+                            Result = t.Result,
+                            Status = ProxyRequestStatus.Completed,
+                            StartTime = request.CreatedAt,
+                            EndTime = DateTime.UtcNow
+                        };
+
+                        request.CompletionSource.TrySetResult(response);
+                        Interlocked.Increment(ref _successfulRequests);
+
+                        RequestCompleted?.Invoke(this, response);
+
+                        _logger?.LogDebug("Request completed (slow path): {RequestId} in {ElapsedMs}ms",
+                            request.RequestId, stopwatch.ElapsedMilliseconds);
+                    }
+                }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, scheduler);
+            }
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
+            _pendingRequests.TryRemove(request.RequestId, out _);
 
             var errorResponse = new GUIProxyResponse
             {

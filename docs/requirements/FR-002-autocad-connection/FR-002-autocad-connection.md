@@ -1,8 +1,8 @@
 # FR-002: AutoCAD Integration Page
 
-> **Document Version**: 1.0
-> **Last Updated**: 2026-02-06
-> **Status**: In Progress (Sprint 3 Complete — US-002-01, US-002-02, US-002-03)
+> **Document Version**: 1.1
+> **Last Updated**: 2026-02-11
+> **Status**: In Progress (Sprint 3 Complete — US-002-01, US-002-02, US-002-03; COM threading fix applied)
 > **Priority**: P1
 
 ## 1. Overview
@@ -265,24 +265,34 @@ public class TableRowData
 - `OdooAutoCAD.Core/AutoCAD/AutoCADService.cs` (implementation)
 - `OdooAutoCAD.Core/Threading/IGUIProxy.cs` (exists)
 
-### Thread Safety (Critical)
+### Thread Safety (Critical) — Updated 2026-02-11
+
 - ALL AutoCAD COM operations MUST go through `IGUIProxy.ExecuteInGuiAsync()`
 - WPF uses `DispatcherTimer` (100ms interval) to call `IGUIProxy.ProcessRequests()`
-- COM requires STA thread; MCP server runs on MTA thread -- GUI proxy bridges this gap
+- COM requires STA thread; MCP server runs on MTA thread — GUI proxy bridges this gap
 - Python pattern: `gui_proxy.execute_in_gui("action", **kwargs)` maps to C#: `IGUIProxy.ExecuteInGuiAsync("action", params)`
+- **Pure STA Mode**: All GUIProxy handlers execute COM operations directly on the STA thread (no `Task.Run`). Sync operations use `Task.FromResult`; `ConnectInternalAsync` uses `await Task.Delay` for retries.
+- **OleMessageFilter**: Registered on STA thread at startup (`App.xaml.cs`) to handle `RPC_E_CALL_REJECTED` when AutoCAD is busy with WPF layout processing.
+- **GUIProxy fast-path/slow-path**: `ProcessSingleRequest` checks `IsCompletedSuccessfully` for instant completion (sync handlers), or schedules `ContinueWith` on STA `SynchronizationContext` (async handlers like connect) to avoid blocking the STA thread.
+- **IDispatch QI warmup**: `GetActiveObject()` calls `Marshal.GetIDispatchForObject()` immediately after obtaining the COM object to prevent deferred cross-process QueryInterface crashes.
 
-### COM Connection Pattern (C#)
+### COM Connection Pattern (C#) — Updated 2026-02-11
 ```csharp
-// Equivalent to Python's connect_autocad
+// ConnectAsync routes through GUIProxy → ConnectInternalAsync runs on STA
 public async Task<bool> ConnectAsync()
 {
-    return await _guiProxy.ExecuteInGuiAsync("connect_autocad", timeout: 30000);
-    // Handler internally:
-    // 1. Marshal.GetActiveObject("AutoCAD.Application")
-    // 2. Fallback: Activator.CreateInstance(Type.GetTypeFromProgID("AutoCAD.Application"))
-    // 3. Set Visible = true
-    // 4. Retry ActiveDocument up to 5 times
+    var response = await _guiProxy.ExecuteInGuiAsync("autocad_connect", null, timeout: 15000);
+    return response.Success && response.Result is bool connected && connected;
 }
+
+// Handler executes directly on STA thread (no Task.Run):
+_guiProxy.RegisterHandler("autocad_connect", async (parameters) =>
+{
+    return await ConnectInternalAsync();
+    // 1. P/Invoke GetActiveObject("AutoCAD.Application") + IDispatch QI warmup
+    // 2. Retry ActiveDocument up to 5 times with await Task.Delay(1000)
+    // OleMessageFilter handles RPC_E_CALL_REJECTED automatically
+});
 ```
 
 ### Text Formatting Cleanup
@@ -304,8 +314,10 @@ Index 8: Detail ID   -> "detail_id" (hidden, used for Odoo sync)
 ```
 
 ### Key Differences from Python
-- Python uses `pythoncom.CoInitialize()` -- C# uses STA thread via DispatcherTimer
-- Python buttons directly call COM -- C# all goes through IGUIProxy
-- Python shows parameter form in main content area -- C# uses dedicated page with panels
-- Python `GetActiveObject` -- C# `Marshal.GetActiveObject`
-- Python `Dispatch` -- C# `Activator.CreateInstance(Type.GetTypeFromProgID(...))`
+- Python uses `pythoncom.CoInitialize()` — C# uses STA thread via DispatcherTimer
+- Python buttons directly call COM — C# all goes through IGUIProxy (Pure STA Mode)
+- Python shows parameter form in main content area — C# uses dedicated page with panels
+- Python `GetActiveObject` — C# P/Invoke `oleaut32.dll!GetActiveObject` + IDispatch QI warmup (since `Marshal.GetActiveObject` removed in .NET Core)
+- Python `Dispatch` — C# `Activator.CreateInstance(Type.GetTypeFromProgID(...))`
+- Python has no COM message filter — C# registers `OleMessageFilter` for `RPC_E_CALL_REJECTED` retry
+- Python uses `Thread.Sleep` for retry — C# uses `await Task.Delay` to keep UI responsive

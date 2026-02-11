@@ -2,7 +2,7 @@
 
 > **Document Version**: 1.0
 > **Last Updated**: 2026-02-06
-> **Status**: In Progress (Sprint 1 Complete)
+> **Status**: In Progress (Sprint 1 Complete, US-008-04 Log Panel Complete)
 > **Priority**: P0
 
 ## 1. Overview
@@ -141,14 +141,14 @@ Sidebar buttons call action methods directly (e.g., `connect_odoo`, `get_paramet
 | FR-008-025 | Connection indicators SHALL update in real-time via data binding to `MainViewModel` observable properties (`AutoCADStatusColor`, `OdooStatusColor`, `MCPStatusColor`) | Must |
 | FR-008-026 | MCP status SHALL display the port number (e.g., "Port 8084") when the server is running | Should |
 
-### System Log Panel
+### System Log Panel ✅
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-008-027 | The status bar at the bottom of the content area SHALL display a `StatusMessage` text, the current date/time, and the application version | Must |
-| FR-008-028 | A dedicated system log panel SHALL be available (either as a collapsible bottom panel or a separate page) to display operational log messages | Should |
-| FR-008-029 | The system log panel SHALL auto-scroll to the latest entry | Should |
-| FR-008-030 | Log entries SHALL include timestamps and category prefixes (e.g., "[SSE GUI]", "[GUI Proxy]") | Should |
+| ID | Requirement | Priority | Status |
+|----|-------------|----------|--------|
+| FR-008-027 | The status bar at the bottom of the content area SHALL display a `StatusMessage` text, the current date/time, and the application version | Must | ✅ Done (Sprint 1) |
+| FR-008-028 | A dedicated system log panel SHALL be available (either as a collapsible bottom panel or a separate page) to display operational log messages | Should | ✅ Done — collapsible Expander in MainWindow + dedicated LogsPage |
+| FR-008-029 | The system log panel SHALL auto-scroll to the latest entry | Should | ✅ Done — auto-scroll with checkbox toggle |
+| FR-008-030 | Log entries SHALL include timestamps and source prefixes (e.g., "Odoo", "AutoCAD", "Settings") | Should | ✅ Done — `HH:mm:ss.fff` timestamps, source column, level-based coloring |
 
 ### Theme and Styling
 

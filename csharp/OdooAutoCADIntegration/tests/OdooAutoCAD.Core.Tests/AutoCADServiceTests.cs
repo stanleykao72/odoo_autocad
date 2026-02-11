@@ -3,7 +3,9 @@
 
 using FluentAssertions;
 using Moq;
+using Microsoft.Extensions.Logging;
 using OdooAutoCAD.Core.AutoCAD;
+using OdooAutoCAD.Core.Threading;
 using Xunit;
 
 namespace OdooAutoCAD.Core.Tests;
@@ -13,8 +15,12 @@ public class AutoCADServiceTests
     [Fact]
     public void NewService_ShouldNotBeConnected()
     {
-        // Arrange & Act
-        using var service = new AutoCADService();
+        // Arrange
+        var mockGUIProxy = new Mock<IGUIProxy>();
+        var mockLogger = new Mock<ILogger<AutoCADService>>();
+
+        // Act
+        using var service = new AutoCADService(mockGUIProxy.Object, mockLogger.Object);
 
         // Assert
         service.IsConnected.Should().BeFalse();
@@ -98,5 +104,37 @@ public class AutoCADServiceTests
         table.Cells.Should().NotBeNull().And.BeEmpty();
         table.RowCount.Should().Be(0);
         table.ColumnCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Constructor_ShouldRegisterAll10Handlers()
+    {
+        // Arrange
+        var mockGUIProxy = new Mock<IGUIProxy>();
+        var registeredActions = new List<string>();
+        mockGUIProxy
+            .Setup(p => p.RegisterHandler(It.IsAny<string>(), It.IsAny<GUIProxyHandler>()))
+            .Callback<string, GUIProxyHandler>((action, _) => registeredActions.Add(action));
+
+        // Act
+        using var service = new AutoCADService(mockGUIProxy.Object);
+
+        // Assert
+        var expectedActions = new[]
+        {
+            "autocad_connect",
+            "autocad_disconnect",
+            "autocad_get_status",
+            "autocad_get_layouts",
+            "autocad_get_active_layout",
+            "autocad_set_active_layout",
+            "autocad_extract_parameters",
+            "autocad_open_document",
+            "autocad_save_document",
+            "autocad_close_document"
+        };
+
+        registeredActions.Should().HaveCount(10);
+        registeredActions.Should().BeEquivalentTo(expectedActions);
     }
 }

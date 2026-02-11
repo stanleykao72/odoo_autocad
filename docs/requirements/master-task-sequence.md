@@ -169,12 +169,12 @@ its parent User Story for full context and acceptance criteria.
 | 107 | TASK-008-03-03 | Implement status update methods in MainViewModel | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | M | TASK-008-03-01 | [ ] |
 | 108 | TASK-008-03-04 | Define connected/disconnected/error color resources | `src/OdooAutoCAD.App/App.xaml` | S | — | [ ] |
 | 109 | TASK-008-03-05 | Wire MCP server status to display port number when running | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | TASK-008-03-01, TASK-008-03-03 | [ ] |
-| 110 | TASK-008-04-01 | Define status bar XAML with three-column layout | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | — | [ ] |
-| 111 | TASK-008-04-02 | Add StatusMessage, CurrentDateTime, and version observable properti... | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | — | [ ] |
-| 112 | TASK-008-04-03 | Implement collapsible log panel XAML with ScrollViewer | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | M | TASK-008-04-01 | [ ] |
-| 113 | TASK-008-04-04 | Create Serilog sink or log collection for UI panel | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | M | TASK-008-04-03 | [ ] |
-| 114 | TASK-008-04-05 | Implement auto-scroll behavior on log panel ScrollViewer | `src/OdooAutoCAD.App/Views/MainWindow.xaml.cs` | S | TASK-008-04-03, TASK-008-04-04 | [ ] |
-| 115 | TASK-008-04-06 | Add DispatcherTimer to update CurrentDateTime every second | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | TASK-008-04-02 | [ ] |
+| 110 | TASK-008-04-01 | Define status bar XAML with three-column layout | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | — | [x] |
+| 111 | TASK-008-04-02 | Add StatusMessage, CurrentDateTime, and version observable properti... | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | — | [x] |
+| 112 | TASK-008-04-03 | Create IAppLogService + LogPanelControl + collapsible panel in MainWindow | `Services/IAppLogService.cs`, `Services/AppLogService.cs`, `Views/Controls/LogPanelControl.xaml/.cs` | M | TASK-008-04-01 | [x] |
+| 113 | TASK-008-04-04 | Create LogsPage full-page viewer + "Logs" nav button | `Views/Pages/LogsPage.xaml/.cs`, `Views/MainWindow.xaml` | M | TASK-008-04-03 | [x] |
+| 114 | TASK-008-04-05 | Implement auto-scroll + source/level filtering in LogPanelControl | `Views/Controls/LogPanelControl.xaml.cs` | S | TASK-008-04-03 | [x] |
+| 115 | TASK-008-04-06 | Add DispatcherTimer to update CurrentDateTime every second | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | TASK-008-04-02 | [x] |
 | 116 | TASK-008-06-01 | Implement App.OnStartup with Serilog configuration, DI host build, ... | `src/OdooAutoCAD.App/App.xaml.cs` | L | — | [ ] |
 | 117 | TASK-008-06-02 | Configure DI services registration in correct order | `src/OdooAutoCAD.App/App.xaml.cs` | M | TASK-008-06-01 | [ ] |
 | 118 | TASK-008-06-03 | Implement --enable-mcp flag parsing with case-insensitive check | `src/OdooAutoCAD.App/App.xaml.cs` | S | TASK-008-06-01 | [ ] |
@@ -746,7 +746,7 @@ its parent User Story for full context and acceptance criteria.
 | US-008-01 | Sidebar Navigation | P1 | 7 | 1 | [TASKS-US-008-01.md](FR-008-ui-framework/TASKS-US-008-01.md) |
 | US-008-02 | Active Page Indicator | P1 | 4 | 1 | [TASKS-US-008-02.md](FR-008-ui-framework/TASKS-US-008-02.md) |
 | US-008-03 | Persistent Connection Status | P1 | 5 | 4 | [TASKS-US-008-03.md](FR-008-ui-framework/TASKS-US-008-03.md) |
-| US-008-04 | System Log Panel | P1 | 6 | 4 | [TASKS-US-008-04.md](FR-008-ui-framework/TASKS-US-008-04.md) |
+| US-008-04 | System Log Panel ✅ | P1 | 8 | 4 | [TASKS-US-008-04.md](FR-008-ui-framework/TASKS-US-008-04.md) |
 | US-008-05 | Window Default Size | P1 | 5 | 1 | [TASKS-US-008-05.md](FR-008-ui-framework/TASKS-US-008-05.md) |
 | US-008-06 | Auto-Start Services | P1 | 6 | 4 | [TASKS-US-008-06.md](FR-008-ui-framework/TASKS-US-008-06.md) |
 | US-008-07 | Keyboard Shortcuts | P1 | 5 | 10 | [TASKS-US-008-07.md](FR-008-ui-framework/TASKS-US-008-07.md) |

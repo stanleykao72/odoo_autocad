@@ -25,10 +25,13 @@ public class OdooService : IOdooService, IDisposable
     private DateTime? _lastSyncTime;
     private bool _isConnected;
 
-    public OdooService(ILogger<OdooService>? logger = null)
+    public OdooService(ILogger<OdooService>? logger = null, int timeoutSeconds = 30)
     {
         _logger = logger;
-        _httpClient = new HttpClient();
+        _httpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(Math.Clamp(timeoutSeconds, 5, 120))
+        };
         _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
     }
 
@@ -156,6 +159,126 @@ public class OdooService : IOdooService, IDisposable
         catch
         {
             return false;
+        }
+    }
+
+    public async Task<OdooStatus> TestConnectionAsync(string serverUrl, string database, string username, string password)
+    {
+        try
+        {
+            // Create temporary HttpClient for non-persistent test
+            using var httpClient = new HttpClient { Timeout = _httpClient.Timeout };
+            httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+
+            var authRequest = new
+            {
+                jsonrpc = "2.0",
+                method = "call",
+                @params = new
+                {
+                    db = database,
+                    login = username,
+                    password = password
+                },
+                id = 1
+            };
+
+            var json = JsonSerializer.Serialize(authRequest);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await httpClient.PostAsync($"{serverUrl.TrimEnd('/')}/web/session/authenticate", content);
+
+            // Handle different failure scenarios with specific error messages
+            if (!response.IsSuccessStatusCode)
+            {
+                return response.StatusCode switch
+                {
+                    System.Net.HttpStatusCode.Unauthorized or 
+                    System.Net.HttpStatusCode.Forbidden =>
+                        new OdooStatus(false, serverUrl, database, username, null, 
+                            "Authentication failed. Please check username and password"),
+                    System.Net.HttpStatusCode.NotFound =>
+                        new OdooStatus(false, serverUrl, database, username, null, 
+                            "Odoo not found at this URL"),
+                    System.Net.HttpStatusCode.InternalServerError =>
+                        new OdooStatus(false, serverUrl, database, username, null, 
+                            "Server error occurred"),
+                    _ =>
+                        new OdooStatus(false, serverUrl, database, username, null, 
+                            $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}")
+                };
+            }
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            var jsonDoc = JsonSerializer.Deserialize<JsonElement>(responseJson);
+
+            // Check for authentication success
+            if (jsonDoc.TryGetProperty("result", out var result))
+            {
+                if (result.TryGetProperty("uid", out var uid) && uid.ValueKind != JsonValueKind.False)
+                {
+                    // Get version info
+                    var versionRequest = new
+                    {
+                        jsonrpc = "2.0",
+                        method = "call",
+                        @params = new { },
+                        id = 2
+                    };
+
+                    var versionJson = JsonSerializer.Serialize(versionRequest);
+                    var versionContent = new StringContent(versionJson, Encoding.UTF8, "application/json");
+                    var versionResponse = await httpClient.PostAsync($"{serverUrl.TrimEnd('/')}/web/webclient/version_info", versionContent);
+
+                    string? version = null;
+                    if (versionResponse.IsSuccessStatusCode)
+                    {
+                        var versionResponseJson = await versionResponse.Content.ReadAsStringAsync();
+                        var versionDoc = JsonSerializer.Deserialize<JsonElement>(versionResponseJson);
+                        if (versionDoc.TryGetProperty("result", out var versionResult) &&
+                            versionResult.TryGetProperty("server_version", out var serverVersion))
+                        {
+                            version = serverVersion.GetString();
+                        }
+                    }
+
+                    return new OdooStatus(true, serverUrl, database, username, version, null);
+                }
+                else if (result.TryGetProperty("db", out var dbArray) && dbArray.ValueKind == JsonValueKind.Array)
+                {
+                    return new OdooStatus(false, serverUrl, database, username, null, 
+                        $"Database '{database}' not found on server");
+                }
+            }
+
+            return new OdooStatus(false, serverUrl, database, username, null, 
+                "Authentication failed. Please check username and password");
+        }
+        catch (TaskCanceledException)
+        {
+            return new OdooStatus(false, serverUrl, database, username, null, 
+                $"Connection timed out after {_httpClient.Timeout.TotalSeconds} seconds");
+        }
+        catch (HttpRequestException ex)
+        {
+            if (ex.InnerException is System.Security.Authentication.AuthenticationException)
+            {
+                return new OdooStatus(false, serverUrl, database, username, null, 
+                    "SSL certificate validation failed");
+            }
+            return new OdooStatus(false, serverUrl, database, username, null, 
+                $"Unable to reach Odoo server at {serverUrl}");
+        }
+        catch (JsonException)
+        {
+            return new OdooStatus(false, serverUrl, database, username, null, 
+                "Invalid response from server");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Unexpected error testing Odoo connection");
+            return new OdooStatus(false, serverUrl, database, username, null, 
+                $"Unexpected error: {ex.Message}");
         }
     }
 

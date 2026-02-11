@@ -132,6 +132,16 @@ public interface IOdooService
     /// <returns>True if connection is valid.</returns>
     Task<bool> TestConnectionAsync();
 
+    /// <summary>
+    /// Tests the connection to Odoo with specific credentials (non-persistent).
+    /// </summary>
+    /// <param name="serverUrl">Server URL to test.</param>
+    /// <param name="database">Database name.</param>
+    /// <param name="username">Username.</param>
+    /// <param name="password">Password or API key.</param>
+    /// <returns>OdooStatus with detailed connection information.</returns>
+    Task<OdooStatus> TestConnectionAsync(string serverUrl, string database, string username, string password);
+
     #endregion
 
     #region Project Operations

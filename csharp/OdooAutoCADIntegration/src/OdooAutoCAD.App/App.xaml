@@ -1,8 +1,13 @@
 <Application x:Class="OdooAutoCAD.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:OdooAutoCAD.App.Converters">
     <Application.Resources>
         <ResourceDictionary>
+            <!-- Value Converters -->
+            <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+            <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
+            
             <!-- CJK Font Chain -->
             <FontFamily x:Key="AppFontFamily">Microsoft JhengHei UI, Microsoft JhengHei, SimHei, Arial Unicode MS</FontFamily>
 
