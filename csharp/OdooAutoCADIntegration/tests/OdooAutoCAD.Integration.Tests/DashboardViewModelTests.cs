@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Moq;
 using OdooAutoCAD.App.Services;
 using OdooAutoCAD.App.ViewModels;
@@ -22,6 +23,7 @@ public class DashboardViewModelTests
     private readonly Mock<IGUIProxy> _mockGuiProxy;
     private readonly Mock<INavigationService> _mockNav;
     private readonly Mock<ISettingsService> _mockSettings;
+    private readonly Mock<IConfiguration> _mockConfiguration;
     private readonly Mock<IAppLogService> _mockLogService;
 
     public DashboardViewModelTests()
@@ -31,6 +33,7 @@ public class DashboardViewModelTests
         _mockGuiProxy = new Mock<IGUIProxy>();
         _mockNav = new Mock<INavigationService>();
         _mockSettings = new Mock<ISettingsService>();
+        _mockConfiguration = new Mock<IConfiguration>();
         _mockLogService = new Mock<IAppLogService>();
 
         // Default: both disconnected
@@ -58,6 +61,7 @@ public class DashboardViewModelTests
             _mockGuiProxy.Object,
             _mockNav.Object,
             _mockSettings.Object,
+            _mockConfiguration.Object,
             _mockLogService.Object);
     }
 
@@ -122,49 +126,29 @@ public class DashboardViewModelTests
     }
 
     [StaFact]
-    public async Task ConnectOdooAsync_WhenSuccessful_SetsConnectedState()
+    public async Task ConnectOdooAsync_WhenNoSettings_SetsErrorMessage()
     {
-        // Arrange
-        _mockSettings.Setup(s => s.LoadServerConfigsAsync())
-            .ReturnsAsync(new Dictionary<string, string?>
-            {
-                ["odoo_swagger_url"] = "https://odoo.example.com/api/v1/boq_import_api/swagger.json?token=abc&db=testdb",
-                ["odoo_user_token"] = "test-token"
-            });
-
-        _mockOdoo
-            .Setup(s => s.TestConnectionAsync(
-                It.IsAny<string>(), It.IsAny<string>(),
-                It.IsAny<string>(), It.IsAny<string>()))
-            .ReturnsAsync(new OdooStatus(true, "https://odoo.example.com", "testdb", null, "v1", null));
-
+        // Arrange - default empty settings (no swagger URL or token)
         var sut = CreateSUT();
 
         // Act
         await sut.ConnectOdooCommand.ExecuteAsync(null);
 
         // Assert
-        sut.IsOdooConnected.Should().BeTrue();
-        sut.OdooServerUrl.Should().Be("https://odoo.example.com");
-        sut.OdooErrorMessage.Should().BeEmpty();
+        sut.IsOdooConnected.Should().BeFalse();
+        sut.OdooErrorMessage.Should().Contain("No Odoo connection settings found");
     }
 
     [StaFact]
-    public async Task ConnectOdooAsync_WhenFails_SetsErrorMessage()
+    public async Task ConnectOdooAsync_WhenInvalidSwaggerUrl_SetsErrorMessage()
     {
-        // Arrange
+        // Arrange - URL without required token/db query params
         _mockSettings.Setup(s => s.LoadServerConfigsAsync())
             .ReturnsAsync(new Dictionary<string, string?>
             {
-                ["odoo_swagger_url"] = "https://odoo.example.com/api/v1/boq_import_api/swagger.json?token=abc&db=testdb",
+                ["odoo_swagger_url"] = "https://odoo.example.com/invalid-url",
                 ["odoo_user_token"] = "test-token"
             });
-
-        _mockOdoo
-            .Setup(s => s.TestConnectionAsync(
-                It.IsAny<string>(), It.IsAny<string>(),
-                It.IsAny<string>(), It.IsAny<string>()))
-            .ReturnsAsync(new OdooStatus(false, null, null, null, null, "Auth failed"));
 
         var sut = CreateSUT();
 
@@ -173,7 +157,29 @@ public class DashboardViewModelTests
 
         // Assert
         sut.IsOdooConnected.Should().BeFalse();
-        sut.OdooErrorMessage.Should().Contain("Unable to connect to Odoo");
+        sut.OdooErrorMessage.Should().Contain("Invalid Swagger URL");
+    }
+
+    [StaFact]
+    public async Task ConnectOdooAsync_WhenServerUnreachable_SetsErrorMessage()
+    {
+        // Arrange - valid URL format but server won't be reachable
+        _mockSettings.Setup(s => s.LoadServerConfigsAsync())
+            .ReturnsAsync(new Dictionary<string, string?>
+            {
+                ["odoo_swagger_url"] = "https://unreachable.invalid/api/v1/boq_import_api/swagger.json?token=abc&db=testdb",
+                ["odoo_user_token"] = "test-token"
+            });
+
+        var sut = CreateSUT();
+
+        // Act
+        await sut.ConnectOdooCommand.ExecuteAsync(null);
+
+        // Assert
+        sut.IsOdooConnected.Should().BeFalse();
+        sut.OdooErrorMessage.Should().NotBeEmpty();
+        sut.IsConnectingOdoo.Should().BeFalse();
     }
 
     [StaFact]

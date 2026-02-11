@@ -1,7 +1,10 @@
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Windows.Media;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OdooAutoCAD.App.Services;
 using OdooAutoCAD.Core.AutoCAD;
@@ -22,6 +25,7 @@ public partial class DashboardViewModel : ObservableObject
     private readonly IGUIProxy _guiProxy;
     private readonly INavigationService _navigationService;
     private readonly ISettingsService _settingsService;
+    private readonly IConfiguration _configuration;
     private readonly IAppLogService _logService;
     private readonly ILogger<DashboardViewModel>? _logger;
     private readonly DispatcherTimer _statusTimer;
@@ -77,6 +81,7 @@ public partial class DashboardViewModel : ObservableObject
         IGUIProxy guiProxy,
         INavigationService navigationService,
         ISettingsService settingsService,
+        IConfiguration configuration,
         IAppLogService logService,
         ILogger<DashboardViewModel>? logger = null)
     {
@@ -85,6 +90,7 @@ public partial class DashboardViewModel : ObservableObject
         _guiProxy = guiProxy;
         _navigationService = navigationService;
         _settingsService = settingsService;
+        _configuration = configuration;
         _logService = logService;
         _logger = logger;
 
@@ -255,8 +261,8 @@ public partial class DashboardViewModel : ObservableObject
 
             var (baseUrl, database, apiToken) = parsed.Value;
 
-            // Test connection (non-persistent)
-            var status = await _odooService.TestConnectionAsync(baseUrl, database, apiToken, userToken);
+            // Test connection via Swagger + Basic Auth (same as OdooConnectionViewModel)
+            var status = await TestSwaggerConnectionAsync(swaggerUrl, baseUrl, database, userToken);
 
             if (status.IsConnected)
             {
@@ -268,7 +274,7 @@ public partial class DashboardViewModel : ObservableObject
             else
             {
                 IsOdooConnected = false;
-                OdooErrorMessage = "Unable to connect to Odoo server. Check connection settings.";
+                OdooErrorMessage = status.ErrorMessage ?? "Unable to connect to Odoo server. Check connection settings.";
                 _logService.Log($"Odoo connection failed: {status.ErrorMessage}", "Dashboard", AppLogLevel.Warning);
             }
         }
@@ -311,6 +317,113 @@ public partial class DashboardViewModel : ObservableObject
     }
 
     private bool CanNavigateToPR() => IsOdooConnected;
+
+    #endregion
+
+    #region Swagger Connection Test
+
+    /// <summary>
+    /// Tests Odoo connection via Swagger + Basic Auth (same approach as OdooConnectionViewModel).
+    /// Step 1: Fetch swagger.json to validate server + API module + API access token.
+    /// Step 2: POST with Basic Auth (database:userToken) to validate user credentials.
+    /// </summary>
+    private async Task<OdooStatus> TestSwaggerConnectionAsync(
+        string swaggerUrl, string baseUrl, string database, string userToken)
+    {
+        try
+        {
+            var timeoutSeconds = _configuration.GetValue<int>("Odoo:TimeoutSeconds", 30);
+            var timeout = TimeSpan.FromSeconds(Math.Clamp(timeoutSeconds, 5, 120));
+
+            using var httpClient = new HttpClient { Timeout = timeout };
+
+            // Step 1: Fetch swagger.json
+            _logService.Log("Dashboard: Fetching swagger spec...", "Odoo");
+            var swaggerResponse = await httpClient.GetAsync(swaggerUrl);
+
+            if (!swaggerResponse.IsSuccessStatusCode)
+            {
+                return swaggerResponse.StatusCode switch
+                {
+                    System.Net.HttpStatusCode.NotFound =>
+                        new OdooStatus(false, baseUrl, database, null, null,
+                            "Swagger endpoint not found. Is the boq_import_api module installed?"),
+                    System.Net.HttpStatusCode.Forbidden or
+                    System.Net.HttpStatusCode.Unauthorized =>
+                        new OdooStatus(false, baseUrl, database, null, null,
+                            "API access denied. Check the token parameter in the Swagger URL"),
+                    _ =>
+                        new OdooStatus(false, baseUrl, database, null, null,
+                            $"HTTP {(int)swaggerResponse.StatusCode}: {swaggerResponse.ReasonPhrase}")
+                };
+            }
+
+            var swaggerJson = await swaggerResponse.Content.ReadAsStringAsync();
+
+            // Parse swagger spec for basePath and version
+            string? basePath = null;
+            string? apiVersion = null;
+            try
+            {
+                var swaggerDoc = System.Text.Json.JsonDocument.Parse(swaggerJson);
+                if (swaggerDoc.RootElement.TryGetProperty("basePath", out var bp))
+                    basePath = bp.GetString();
+                if (swaggerDoc.RootElement.TryGetProperty("info", out var info) &&
+                    info.TryGetProperty("version", out var ver))
+                    apiVersion = ver.GetString();
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                _logService.Log("Could not parse swagger spec as JSON", "Odoo", AppLogLevel.Warning);
+            }
+
+            // Step 2: Test Basic Auth with a lightweight API call
+            _logService.Log("Dashboard: Testing Basic Auth...", "Odoo");
+            var credentials = Convert.ToBase64String(
+                System.Text.Encoding.UTF8.GetBytes($"{database}:{userToken}"));
+
+            var apiEndpoint = basePath != null
+                ? $"{baseUrl}{basePath}"
+                : $"{baseUrl}/api/v1/boq_import_api";
+
+            var testUrl = $"{apiEndpoint}/callMethodForJobWorkingPlanBoqModel";
+            var testRequest = new HttpRequestMessage(HttpMethod.Post, testUrl);
+            testRequest.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+            testRequest.Content = new StringContent(
+                System.Text.Json.JsonSerializer.Serialize(new { method_name = "test_connection" }),
+                System.Text.Encoding.UTF8,
+                "application/json");
+
+            var testResponse = await httpClient.SendAsync(testRequest);
+
+            if (testResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+                testResponse.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                return new OdooStatus(false, baseUrl, database, null, apiVersion,
+                    "User token authentication failed. Check your User Token value");
+            }
+
+            // Any non-auth-error response means connection and auth work
+            var versionDisplay = apiVersion != null ? $"API v{apiVersion}" : "API Available";
+            return new OdooStatus(true, baseUrl, database, null, versionDisplay, null);
+        }
+        catch (TaskCanceledException)
+        {
+            return new OdooStatus(false, baseUrl, database, null, null,
+                $"Connection timed out");
+        }
+        catch (HttpRequestException ex)
+        {
+            return new OdooStatus(false, baseUrl, database, null, null,
+                $"Unable to reach server at {baseUrl}: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Unexpected error testing Odoo connection from Dashboard");
+            return new OdooStatus(false, baseUrl, database, null, null,
+                $"Unexpected error: {ex.Message}");
+        }
+    }
 
     #endregion
 }
