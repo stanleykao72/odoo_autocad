@@ -10,6 +10,7 @@
         <converters:BoolToColorConverter x:Key="BoolToColor"/>
         <converters:ValidationStatusToIconConverter x:Key="StatusToIcon"/>
         <converters:ValidationStatusToColorConverter x:Key="StatusToColor"/>
+        <converters:StringToVisibilityConverter x:Key="StringToVisibility"/>
 
         <CollectionViewSource x:Key="GroupedBoqItems"
                               Source="{Binding BoqItems}">
@@ -23,7 +24,9 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -32,15 +35,16 @@
             <TextBlock Text="BOQ Manager"
                        FontSize="28" FontWeight="Bold"
                        Foreground="{StaticResource PrimaryBrush}"/>
-            <TextBlock Text="Extract Bill of Quantities from AutoCAD drawings and review before pushing to Odoo"
+            <TextBlock Text="Extract Bill of Quantities from AutoCAD drawings, validate, and push to Odoo"
                        FontSize="14" Margin="0,8,0,0"
                        Foreground="{StaticResource TextSecondaryBrush}"/>
         </StackPanel>
 
-        <!-- Row 1: Action Bar -->
-        <Border Grid.Row="1" Style="{StaticResource CardPanel}" Margin="0,0,0,16">
+        <!-- Row 1: Action Bar — Extract + Validate + Refresh -->
+        <Border Grid.Row="1" Style="{StaticResource CardPanel}" Margin="0,0,0,8">
             <Grid>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -60,8 +64,23 @@
                     </StackPanel>
                 </Button>
 
+                <!-- Validate Button -->
+                <Button Grid.Column="1"
+                        Command="{Binding ValidateCommand}"
+                        Style="{StaticResource SecondaryButton}"
+                        Padding="16,8"
+                        MinWidth="120"
+                        Margin="8,0,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Validate All" VerticalAlignment="Center"/>
+                        <TextBlock Text=" ..."
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding IsValidating, Converter={StaticResource BoolToVisibility}}"/>
+                    </StackPanel>
+                </Button>
+
                 <!-- Progress -->
-                <StackPanel Grid.Column="1" Margin="16,0" VerticalAlignment="Center">
+                <StackPanel Grid.Column="2" Margin="16,0" VerticalAlignment="Center">
                     <TextBlock Text="{Binding ExtractionStatus}"
                                FontSize="12"
                                Foreground="{StaticResource TextSecondaryBrush}"
@@ -75,7 +94,7 @@
                 </StackPanel>
 
                 <!-- Refresh Status -->
-                <Button Grid.Column="2"
+                <Button Grid.Column="3"
                         Content="Refresh Status"
                         Command="{Binding RefreshConnectionStatusCommand}"
                         Style="{StaticResource SecondaryButton}"
@@ -83,23 +102,71 @@
             </Grid>
         </Border>
 
-        <!-- Row 2: DataGrid -->
-        <DataGrid Grid.Row="2"
-                  ItemsSource="{Binding Source={StaticResource GroupedBoqItems}}"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True"
-                  BorderThickness="1"
-                  BorderBrush="{StaticResource BorderBrush}"
-                  GridLinesVisibility="Horizontal"
-                  HorizontalGridLinesBrush="{StaticResource BorderBrush}"
-                  RowHeaderWidth="0"
-                  FontFamily="{StaticResource AppFontFamily}"
-                  FontSize="12"
-                  VirtualizingStackPanel.IsVirtualizing="True"
-                  VirtualizingStackPanel.VirtualizationMode="Recycling"
-                  CanUserSortColumns="True"
-                  SelectionMode="Single"
-                  Margin="0,0,0,16">
+        <!-- Row 2: Push Controls (always visible, buttons disabled via CanExecute) -->
+        <Border Grid.Row="2" Style="{StaticResource CardPanel}" Margin="0,0,0,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Push to Odoo Button -->
+                <Button Grid.Column="0"
+                        Command="{Binding PushToOdooCommand}"
+                        Style="{StaticResource PrimaryButton}"
+                        Padding="16,8"
+                        MinWidth="160">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Push to Odoo" VerticalAlignment="Center"/>
+                        <TextBlock Text=" ..."
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding IsPushing, Converter={StaticResource BoolToVisibility}}"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Retry Writeback Button -->
+                <Button Grid.Column="1"
+                        Command="{Binding RetryWritebackCommand}"
+                        Style="{StaticResource SecondaryButton}"
+                        Content="Retry Writeback"
+                        Padding="12,6"
+                        Margin="8,0,0,0"
+                        Visibility="{Binding HasFailedWritebacks, Converter={StaticResource BoolToVisibility}}"/>
+
+                <!-- Push Status -->
+                <StackPanel Grid.Column="2" Margin="16,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding PushStatusText}"
+                               FontSize="12"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               TextTrimming="CharacterEllipsis"/>
+                    <ProgressBar IsIndeterminate="True"
+                                 Height="4"
+                                 Margin="0,4,0,0"
+                                 Foreground="{StaticResource PrimaryBrush}"
+                                 Visibility="{Binding IsPushing, Converter={StaticResource BoolToVisibility}}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Row 3: DataGrid with empty-state overlay -->
+        <Grid Grid.Row="3" Margin="0,0,0,8">
+            <DataGrid ItemsSource="{Binding Source={StaticResource GroupedBoqItems}}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      MinHeight="120"
+                      BorderThickness="1"
+                      BorderBrush="{StaticResource BorderBrush}"
+                      Background="White"
+                      GridLinesVisibility="Horizontal"
+                      HorizontalGridLinesBrush="{StaticResource BorderBrush}"
+                      RowHeaderWidth="0"
+                      FontFamily="{StaticResource AppFontFamily}"
+                      FontSize="12"
+                      VirtualizingStackPanel.IsVirtualizing="True"
+                      VirtualizingStackPanel.VirtualizationMode="Recycling"
+                      CanUserSortColumns="True"
+                      SelectionMode="Single">
 
             <!-- Group Style -->
             <DataGrid.GroupStyle>
@@ -153,6 +220,7 @@
                 <DataGridTextColumn Header="Unit Price" Binding="{Binding UnitPrice, StringFormat=N2}" Width="80"/>
                 <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="70"/>
                 <DataGridTextColumn Header="Reference" Binding="{Binding Reference}" Width="100"/>
+                <DataGridTextColumn Header="Detail ID" Binding="{Binding DetailId}" Width="80"/>
 
                 <!-- Validation Message -->
                 <DataGridTemplateColumn Header="Validation" Width="120" CanUserSort="False">
@@ -169,12 +237,23 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <!-- Row 3: Summary Panel -->
-        <Border Grid.Row="3"
+            <!-- Empty-state overlay -->
+            <TextBlock Text="No BOQ data. Click 'Extract from AutoCAD' to begin."
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       FontSize="14"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       IsHitTestVisible="False"
+                       Visibility="{Binding HasNoData, Converter={StaticResource BoolToVisibility}}"/>
+        </Grid>
+
+        <!-- Row 4: Summary Panel -->
+        <Border Grid.Row="4"
                 Style="{StaticResource CardPanel}"
-                Visibility="{Binding HasData, Converter={StaticResource BoolToVisibility}}">
+                Margin="0,0,0,8">
             <Grid>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
@@ -218,23 +297,36 @@
                                HorizontalAlignment="Center"/>
                 </StackPanel>
 
-                <!-- Invalid -->
+                <!-- Warnings -->
                 <StackPanel Grid.Column="3" HorizontalAlignment="Center">
+                    <TextBlock Text="{Binding WarningItems}"
+                               FontSize="24" FontWeight="Bold"
+                               Foreground="#F57F17"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="Warnings"
+                               FontSize="11"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Errors -->
+                <StackPanel Grid.Column="4" HorizontalAlignment="Center">
                     <TextBlock Text="{Binding InvalidItems}"
                                FontSize="24" FontWeight="Bold"
                                Foreground="#C62828"
                                HorizontalAlignment="Center"/>
-                    <TextBlock Text="Invalid"
+                    <TextBlock Text="Errors"
                                FontSize="11"
                                Foreground="{StaticResource TextSecondaryBrush}"
                                HorizontalAlignment="Center"/>
                 </StackPanel>
 
                 <!-- Skipped -->
-                <StackPanel Grid.Column="4" HorizontalAlignment="Center">
+                <StackPanel Grid.Column="5" HorizontalAlignment="Center"
+                            ToolTip="{Binding SkippedBreakdown}">
                     <TextBlock Text="{Binding SkippedItems}"
                                FontSize="24" FontWeight="Bold"
-                               Foreground="#F57F17"
+                               Foreground="#757575"
                                HorizontalAlignment="Center"/>
                     <TextBlock Text="Skipped"
                                FontSize="11"
@@ -242,6 +334,16 @@
                                HorizontalAlignment="Center"/>
                 </StackPanel>
             </Grid>
+        </Border>
+
+        <!-- Row 5: Push Result -->
+        <Border Grid.Row="5"
+                Style="{StaticResource CardPanel}"
+                Visibility="{Binding LastPushResult, Converter={StaticResource StringToVisibility}}">
+            <TextBlock Text="{Binding LastPushResult}"
+                       FontSize="13"
+                       Foreground="{StaticResource TextPrimaryBrush}"
+                       TextWrapping="Wrap"/>
         </Border>
     </Grid>
 </Page>

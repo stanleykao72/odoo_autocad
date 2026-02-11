@@ -3,6 +3,7 @@
 
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
+using OdooAutoCAD.Core.BOQ;
 using OdooAutoCAD.Core.Threading;
 
 namespace OdooAutoCAD.Core.AutoCAD;
@@ -211,6 +212,104 @@ public class AutoCADService : IAutoCADService, IDisposable
                 _logger?.LogError(ex, "Failed to close document");
                 return Task.FromResult<object?>(false);
             }
+        });
+
+        _guiProxy.RegisterHandler("autocad_write_table_ids", (parameters) =>
+        {
+            if (_acadDoc == null)
+                return Task.FromResult<object?>("Error: No document open");
+
+            var results = new List<string>();
+
+            try
+            {
+                // Extract parameters
+                parameters.TryGetValue("layout_name", out var lnVal);
+                parameters.TryGetValue("header_id", out var hidVal);
+                parameters.TryGetValue("details", out var detailsVal);
+
+                var layoutName = lnVal as string;
+                var headerId = hidVal?.ToString() ?? "";
+                var details = detailsVal as IList<WritebackDetail> ?? new List<WritebackDetail>();
+
+                if (string.IsNullOrEmpty(layoutName))
+                    return Task.FromResult<object?>("Error: layout_name is required");
+
+                // Switch to the target layout
+                bool switched = SwitchToLayout(layoutName);
+                if (!switched)
+                    return Task.FromResult<object?>($"Error: Failed to switch to layout '{layoutName}'");
+
+                dynamic layout = _acadDoc.Layouts.Item(layoutName);
+                dynamic space = layout.Block;
+
+                foreach (dynamic entity in space)
+                {
+                    try
+                    {
+                        string entityType = entity.EntityName;
+                        if (entityType != "AcDbTable") continue;
+
+                        int colCount = entity.Columns;
+                        if (colCount != 9) continue;
+
+                        // Validate: column 6 contains "HEADER_ID"
+                        string headerCell = entity.GetText(0, 6) ?? "";
+                        if (!headerCell.Contains("HEADER_ID")) continue;
+
+                        // Write header_id to cell(0, 8)
+                        try
+                        {
+                            entity.SetText(0, 8, headerId);
+                            results.Add($"Header ID '{headerId}' written to cell(0,8)");
+                        }
+                        catch (Exception ex)
+                        {
+                            results.Add($"Failed to write header_id: {ex.Message}");
+                        }
+
+                        // Write detail_ids to matching rows
+                        int rowCount = entity.Rows;
+                        for (int row = 1; row < rowCount; row++)
+                        {
+                            try
+                            {
+                                var cellProductNo = LM_UnFormat(entity.GetText(row, 1) ?? "");
+                                if (string.IsNullOrWhiteSpace(cellProductNo)) continue;
+
+                                // Find matching detail (case-insensitive)
+                                var match = details.FirstOrDefault(d =>
+                                    string.Equals(d.ProductNo, cellProductNo,
+                                        StringComparison.OrdinalIgnoreCase));
+
+                                if (match?.DetailId != null)
+                                {
+                                    entity.SetText(row, 8, match.DetailId);
+                                    results.Add($"Row {row}: detail_id '{match.DetailId}' written for '{cellProductNo}'");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                results.Add($"Row {row} writeback failed: {ex.Message}");
+                            }
+                        }
+
+                        // Only process first valid table per layout
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Error processing entity during writeback");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Writeback handler failed for layout");
+                return Task.FromResult<object?>($"Error: {ex.Message}");
+            }
+
+            return Task.FromResult<object?>(results);
         });
 
         _logger?.LogDebug("AutoCAD GUI proxy handlers registered");

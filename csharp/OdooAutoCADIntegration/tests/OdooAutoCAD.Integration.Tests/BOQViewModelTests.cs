@@ -6,6 +6,7 @@ using OdooAutoCAD.Core.AutoCAD;
 using OdooAutoCAD.Core.BOQ;
 using OdooAutoCAD.Core.Odoo;
 using OdooAutoCAD.Core.Threading;
+using OdooAutoCAD.Configuration;
 using Xunit;
 
 namespace OdooAutoCAD.Integration.Tests;
@@ -17,6 +18,7 @@ public class BOQViewModelTests
     private readonly Mock<IOdooService> _mockOdoo;
     private readonly Mock<IGUIProxy> _mockGuiProxy;
     private readonly Mock<IAppLogService> _mockLogService;
+    private readonly Mock<ISettingsService> _mockSettingsService;
 
     public BOQViewModelTests()
     {
@@ -25,6 +27,7 @@ public class BOQViewModelTests
         _mockOdoo = new Mock<IOdooService>();
         _mockGuiProxy = new Mock<IGUIProxy>();
         _mockLogService = new Mock<IAppLogService>();
+        _mockSettingsService = new Mock<ISettingsService>();
     }
 
     private BOQViewModel CreateSUT()
@@ -34,8 +37,11 @@ public class BOQViewModelTests
             _mockAutoCAD.Object,
             _mockOdoo.Object,
             _mockGuiProxy.Object,
-            _mockLogService.Object);
+            _mockLogService.Object,
+            _mockSettingsService.Object);
     }
+
+    #region Existing Tests
 
     [Fact]
     public void Constructor_DefaultsToDisconnected()
@@ -165,4 +171,363 @@ public class BOQViewModelTests
         sut.SkippedItems.Should().Be(1);
         sut.LayoutCount.Should().Be(3);
     }
+
+    #endregion
+
+    #region Validate Command Tests
+
+    [Fact]
+    public async Task ValidateCommand_WithValidEntries_SetsAllValid()
+    {
+        _mockBoqProcessor
+            .Setup(p => p.MapProductAsync(It.IsAny<string>()))
+            .ReturnsAsync(new OdooProduct(1, "Test", null, null, null, null, null));
+
+        var sut = CreateSUT();
+        sut.BoqItems.Add(new BOQDisplayItem
+        {
+            LayoutName = "L1", ProductName = "Widget", ProductCode = "W001", Quantity = 5
+        });
+        sut.BoqItems.Add(new BOQDisplayItem
+        {
+            LayoutName = "L1", ProductName = "Gadget", ProductCode = "G001", Quantity = 10
+        });
+        sut.UpdateSummary();
+
+        await sut.ValidateCommand.ExecuteAsync(null);
+
+        sut.BoqItems.Should().OnlyContain(i => i.ValidationStatus == "Valid");
+        sut.HasValidationErrors.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ValidateCommand_WithZeroQty_SetsWarning()
+    {
+        _mockBoqProcessor
+            .Setup(p => p.MapProductAsync(It.IsAny<string>()))
+            .ReturnsAsync(new OdooProduct(1, "Test", null, null, null, null, null));
+
+        var sut = CreateSUT();
+        sut.BoqItems.Add(new BOQDisplayItem
+        {
+            LayoutName = "L1", ProductName = "Widget", ProductCode = "W001", Quantity = 0
+        });
+        sut.UpdateSummary();
+
+        await sut.ValidateCommand.ExecuteAsync(null);
+
+        sut.BoqItems[0].ValidationStatus.Should().Be("Warning");
+        sut.BoqItems[0].ValidationMessage.Should().Contain("Zero quantity");
+        sut.HasValidationErrors.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ValidateCommand_WithMissingProduct_SetsError()
+    {
+        _mockBoqProcessor
+            .Setup(p => p.MapProductAsync(It.IsAny<string>()))
+            .ReturnsAsync((OdooProduct?)null);
+
+        var sut = CreateSUT();
+        sut.BoqItems.Add(new BOQDisplayItem
+        {
+            LayoutName = "L1", ProductName = "Unknown", ProductCode = "X999", Quantity = 5
+        });
+        sut.UpdateSummary();
+
+        await sut.ValidateCommand.ExecuteAsync(null);
+
+        sut.BoqItems[0].ValidationStatus.Should().Be("Error");
+        sut.BoqItems[0].ValidationMessage.Should().Contain("Product not found");
+        sut.HasValidationErrors.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ValidateCommand_UpdatesSummaryCounts()
+    {
+        _mockBoqProcessor
+            .Setup(p => p.MapProductAsync("Good"))
+            .ReturnsAsync(new OdooProduct(1, "Good", null, null, null, null, null));
+        _mockBoqProcessor
+            .Setup(p => p.MapProductAsync("Bad"))
+            .ReturnsAsync((OdooProduct?)null);
+
+        var sut = CreateSUT();
+        sut.BoqItems.Add(new BOQDisplayItem
+        {
+            LayoutName = "L1", ProductName = "Good", Quantity = 10
+        });
+        sut.BoqItems.Add(new BOQDisplayItem
+        {
+            LayoutName = "L1", ProductName = "Good", Quantity = 0
+        });
+        sut.BoqItems.Add(new BOQDisplayItem
+        {
+            LayoutName = "L1", ProductName = "Bad", Quantity = 5
+        });
+        sut.UpdateSummary();
+
+        await sut.ValidateCommand.ExecuteAsync(null);
+
+        sut.ValidItems.Should().Be(1);
+        sut.WarningItems.Should().Be(1);
+        sut.InvalidItems.Should().Be(1);
+    }
+
+    [Fact]
+    public void ValidateCommand_WhenNoData_CannotExecute()
+    {
+        var sut = CreateSUT();
+        sut.ValidateCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    #endregion
+
+    #region Push Command Tests
+
+    [Fact]
+    public void PushCommand_WhenNotValidated_CannotExecute()
+    {
+        _mockOdoo.Setup(s => s.IsConnected).Returns(true);
+        var sut = CreateSUT();
+        sut.BoqItems.Add(new BOQDisplayItem { LayoutName = "L1" });
+        sut.UpdateSummary();
+
+        // _validationCompleted is false
+        sut.PushToOdooCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PushCommand_WhenValidationHasErrors_CannotExecute()
+    {
+        _mockOdoo.Setup(s => s.IsConnected).Returns(true);
+        _mockBoqProcessor
+            .Setup(p => p.MapProductAsync(It.IsAny<string>()))
+            .ReturnsAsync((OdooProduct?)null);
+
+        var sut = CreateSUT();
+        sut.BoqItems.Add(new BOQDisplayItem
+        {
+            LayoutName = "L1", ProductName = "Bad", ProductCode = "X", Quantity = 5
+        });
+        sut.UpdateSummary();
+
+        // Run validation — will set errors
+        await sut.ValidateCommand.ExecuteAsync(null);
+
+        sut.HasValidationErrors.Should().BeTrue();
+        sut.PushToOdooCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    [Fact]
+    public void PushCommand_WhenOdooDisconnected_CannotExecute()
+    {
+        _mockOdoo.Setup(s => s.IsConnected).Returns(false);
+        var sut = CreateSUT();
+        sut.BoqItems.Add(new BOQDisplayItem { LayoutName = "L1" });
+        sut.UpdateSummary();
+
+        sut.PushToOdooCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    [Fact]
+    public void PushCommand_BuildsCorrectImportRequest()
+    {
+        var sut = CreateSUT();
+
+        // Simulate extraction by populating _layoutDataMap via reflection
+        var layoutData = new LayoutData
+        {
+            LayoutName = "TestLayout",
+            Parameters = new Dictionary<string, object>
+            {
+                ["pr_no"] = "PR001",
+                ["project_name"] = "TestProject"
+            },
+            Tables = new List<TableData>
+            {
+                new()
+                {
+                    Name = "MainTable",
+                    ColumnCount = 9,
+                    RowCount = 3,
+                    Cells = new List<List<string>>
+                    {
+                        new() { "Position", "Product No", "Width", "Height", "Length", "Thickness", "Qty", "Description", "HEADER_ID" },
+                        new() { "1", "A001", "100", "200", "300", "10", "5", "Desc A", "" },
+                        new() { "2", "B002", "150", "250", "350", "15", "3", "Desc B", "" }
+                    }
+                }
+            }
+        };
+
+        // Access private field via reflection
+        var field = typeof(BOQViewModel).GetField("_layoutDataMap",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var map = (Dictionary<string, LayoutData>)field!.GetValue(sut)!;
+        map["TestLayout"] = layoutData;
+
+        var request = sut.BuildImportRequest();
+
+        request.All.Should().HaveCount(1);
+        request.All[0].LayoutName.Should().Be("TestLayout");
+        request.All[0].PrNo.Should().Be("PR001");
+        request.All[0].ProjectName.Should().Be("TestProject");
+        request.All[0].Detail.Should().HaveCount(2);
+        request.All[0].Detail[0].ProductNo.Should().Be("A001");
+        request.All[0].Detail[0].Qty.Should().Be("5");
+        request.All[0].Detail[1].ProductNo.Should().Be("B002");
+    }
+
+    [Fact]
+    public async Task PushCommand_OnApiError_SetsPushStatus()
+    {
+        _mockOdoo.Setup(s => s.IsConnected).Returns(true);
+        _mockBoqProcessor
+            .Setup(p => p.MapProductAsync(It.IsAny<string>()))
+            .ReturnsAsync(new OdooProduct(1, "Test", null, null, null, null, null));
+
+        _mockSettingsService
+            .Setup(s => s.LoadServerConfigsAsync())
+            .ReturnsAsync(new Dictionary<string, string?>
+            {
+                ["odoo_swagger_url"] = "https://example.com/api/v1/boq_import_api/swagger.json?token=tok123&db=testdb",
+                ["odoo_user_token"] = "tok123"
+            });
+        _mockSettingsService
+            .Setup(s => s.GetAppSettings())
+            .Returns(new AppSettings());
+
+        _mockOdoo
+            .Setup(s => s.ImportToBOQViaApiAsync(
+                It.IsAny<BoqImportRequest>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(new BoqImportResponse
+            {
+                Success = false,
+                ErrorCode = "IMPORT_ERROR",
+                ErrorMessage = "Some fields are invalid"
+            });
+
+        var sut = CreateSUT();
+        sut.BoqItems.Add(new BOQDisplayItem
+        {
+            LayoutName = "L1", ProductName = "Widget", ProductCode = "W001", Quantity = 5
+        });
+        sut.UpdateSummary();
+
+        // Validate first
+        await sut.ValidateCommand.ExecuteAsync(null);
+
+        // Populate layout data
+        var field = typeof(BOQViewModel).GetField("_layoutDataMap",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var map = (Dictionary<string, LayoutData>)field!.GetValue(sut)!;
+        map["L1"] = new LayoutData { LayoutName = "L1" };
+
+        // Push
+        await sut.PushToOdooCommand.ExecuteAsync(null);
+
+        sut.LastPushResult.Should().Contain("IMPORT_ERROR");
+        sut.LastPushResult.Should().Contain("Some fields are invalid");
+    }
+
+    #endregion
+
+    #region Summary and Utility Tests
+
+    [Fact]
+    public void UpdateSummary_CountsWarningsSeparately()
+    {
+        var sut = CreateSUT();
+
+        sut.BoqItems.Add(new BOQDisplayItem { LayoutName = "L1", ValidationStatus = "Valid" });
+        sut.BoqItems.Add(new BOQDisplayItem { LayoutName = "L1", ValidationStatus = "Warning" });
+        sut.BoqItems.Add(new BOQDisplayItem { LayoutName = "L1", ValidationStatus = "Warning" });
+        sut.BoqItems.Add(new BOQDisplayItem { LayoutName = "L2", ValidationStatus = "Error" });
+        sut.BoqItems.Add(new BOQDisplayItem { LayoutName = "L2", ValidationStatus = "Skipped" });
+
+        sut.UpdateSummary();
+
+        sut.TotalItems.Should().Be(5);
+        sut.ValidItems.Should().Be(1);
+        sut.WarningItems.Should().Be(2);
+        sut.InvalidItems.Should().Be(1);
+        sut.SkippedItems.Should().Be(1);
+    }
+
+    [Fact]
+    public void SkippedBreakdown_FormatsCorrectly()
+    {
+        var sut = CreateSUT();
+        sut.SkippedEmptyRows = 3;
+        sut.SkippedIllegalTables = 1;
+
+        sut.SkippedBreakdown.Should().Contain("Empty rows: 3");
+        sut.SkippedBreakdown.Should().Contain("Illegal tables: 1");
+    }
+
+    [Fact]
+    public async Task ExtractBOQ_StoresLayoutData()
+    {
+        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+
+        var layouts = new List<LayoutInfo> { new("TestLayout", 1, false, "") };
+        _mockGuiProxy
+            .Setup(p => p.ExecuteInGuiAsync("autocad_get_layouts", null, 10000))
+            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", layouts));
+
+        var layoutData = new LayoutData { LayoutName = "TestLayout" };
+        _mockGuiProxy
+            .Setup(p => p.ExecuteInGuiAsync("autocad_extract_parameters",
+                It.IsAny<Dictionary<string, object?>>(), 30000))
+            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req2", layoutData));
+
+        _mockBoqProcessor
+            .Setup(p => p.GenerateBOQAsync(layoutData, It.IsAny<BOQGenerationOptions>()))
+            .ReturnsAsync(new BOQGenerationResult
+            {
+                Success = true,
+                Entries = new List<BOQEntry>
+                {
+                    new() { ProductName = "P1", Quantity = 1, UnitOfMeasure = "pcs" }
+                }
+            });
+
+        var sut = CreateSUT();
+        await sut.ExtractBOQCommand.ExecuteAsync(null);
+
+        // Verify layout data stored via BuildImportRequest
+        var request = sut.BuildImportRequest();
+        request.All.Should().HaveCount(1);
+        request.All[0].LayoutName.Should().Be("TestLayout");
+    }
+
+    [Fact]
+    public void FindDetailId_CaseInsensitiveMatch()
+    {
+        var details = new List<WritebackDetail>
+        {
+            new() { ProductNo = "ABC001", DetailId = "42" },
+            new() { ProductNo = "DEF002", DetailId = "99" }
+        };
+
+        BOQViewModel.FindDetailId(details, "abc001").Should().Be("42");
+        BOQViewModel.FindDetailId(details, "ABC001").Should().Be("42");
+        BOQViewModel.FindDetailId(details, "def002").Should().Be("99");
+    }
+
+    [Fact]
+    public void FindDetailId_ReturnsNull_WhenNoMatch()
+    {
+        var details = new List<WritebackDetail>
+        {
+            new() { ProductNo = "ABC001", DetailId = "42" }
+        };
+
+        BOQViewModel.FindDetailId(details, "NOTFOUND").Should().BeNull();
+        BOQViewModel.FindDetailId(details, "").Should().BeNull();
+    }
+
+    #endregion
 }

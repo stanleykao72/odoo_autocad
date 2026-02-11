@@ -6,6 +6,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using OdooAutoCAD.Core.BOQ;
 
 namespace OdooAutoCAD.Core.Odoo;
 
@@ -518,6 +519,140 @@ public class OdooService : IOdooService, IDisposable
             RecordsUpdated: updated,
             RecordsFailed: failed,
             Errors: errors.Count > 0 ? errors : null);
+    }
+
+    public async Task<BoqImportResponse> ImportToBOQViaApiAsync(
+        BoqImportRequest request, string baseUrl, string basePath,
+        string database, string userToken)
+    {
+        try
+        {
+            var credentials = Convert.ToBase64String(
+                Encoding.UTF8.GetBytes($"{database}:{userToken}"));
+
+            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{basePath}/callMethodForJobWorkingPlanBoqModel";
+
+            // Build layout_dict payload matching Python import2boq_v2 format
+            var layoutDict = new Dictionary<string, object>();
+            foreach (var layout in request.All)
+            {
+                var details = layout.Detail.Select(d => new Dictionary<string, object?>
+                {
+                    ["position"] = d.Position,
+                    ["product_no"] = d.ProductNo,
+                    ["width"] = d.Width,
+                    ["height"] = d.Height,
+                    ["length"] = d.Length,
+                    ["thickness"] = d.Thickness,
+                    ["qty"] = d.Qty,
+                    ["description"] = d.Description,
+                    ["detail_id"] = d.DetailId ?? ""
+                }).ToList();
+
+                layoutDict[layout.LayoutName] = new Dictionary<string, object?>
+                {
+                    ["header_id"] = layout.HeaderId ?? "",
+                    ["pr_no"] = layout.PrNo,
+                    ["project_name"] = layout.ProjectName,
+                    ["job_working_plan_name"] = layout.JobWorkingPlanName,
+                    ["product_name"] = layout.ProductName,
+                    ["product_catalog"] = layout.ProductCatalog,
+                    ["spec"] = layout.Spec,
+                    ["surface_treatment"] = layout.SurfaceTreatment,
+                    ["operation_flow"] = layout.OperationFlow,
+                    ["color_name"] = layout.ColorName,
+                    ["color_no"] = layout.ColorNo,
+                    ["detail"] = details
+                };
+            }
+
+            var body = new
+            {
+                method_name = "import2boq_v2",
+                args = new object[] { layoutDict },
+                kwargs = new { user_token = userToken },
+                context = new { }
+            };
+
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, apiEndpoint);
+            httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+            httpRequest.Content = new StringContent(
+                JsonSerializer.Serialize(body),
+                Encoding.UTF8,
+                "application/json");
+
+            var response = await _httpClient.SendAsync(httpRequest);
+            response.EnsureSuccessStatusCode();
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            var jsonDoc = JsonSerializer.Deserialize<JsonElement>(responseJson);
+
+            // Check for error response
+            if (jsonDoc.TryGetProperty("error_code", out var errorCode))
+            {
+                return new BoqImportResponse
+                {
+                    Success = false,
+                    ErrorCode = errorCode.GetString(),
+                    ErrorMessage = jsonDoc.TryGetProperty("error_message", out var errMsg)
+                        ? errMsg.GetString() : "Unknown error"
+                };
+            }
+
+            // Parse success response: { "all": [ { layout with header_id, detail with detail_id } ] }
+            var resultLayouts = new List<BoqImportLayout>();
+
+            JsonElement allElement;
+            if (jsonDoc.TryGetProperty("all", out allElement) && allElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var layoutEl in allElement.EnumerateArray())
+                {
+                    var resultLayout = new BoqImportLayout
+                    {
+                        LayoutName = layoutEl.TryGetProperty("layout_name", out var ln)
+                            ? ln.GetString() ?? "" : "",
+                        HeaderId = layoutEl.TryGetProperty("header_id", out var hid)
+                            ? hid.ToString() : null
+                    };
+
+                    if (layoutEl.TryGetProperty("detail", out var detailArr) &&
+                        detailArr.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var detailEl in detailArr.EnumerateArray())
+                        {
+                            resultLayout.Detail.Add(new BoqImportDetail
+                            {
+                                ProductNo = detailEl.TryGetProperty("product_no", out var pn)
+                                    ? pn.GetString() ?? "" : "",
+                                DetailId = detailEl.TryGetProperty("detail_id", out var did)
+                                    ? did.ToString() : null
+                            });
+                        }
+                    }
+
+                    resultLayouts.Add(resultLayout);
+                }
+            }
+
+            _logger?.LogInformation("import2boq_v2 succeeded: {LayoutCount} layouts processed",
+                resultLayouts.Count);
+
+            return new BoqImportResponse
+            {
+                Success = true,
+                All = resultLayouts
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "import2boq_v2 API call failed");
+            return new BoqImportResponse
+            {
+                Success = false,
+                ErrorCode = "HTTP_ERROR",
+                ErrorMessage = ex.Message
+            };
+        }
     }
 
     public async Task<IReadOnlyList<BOQEntry>> GetBOQEntriesAsync(int projectId)

@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using OdooAutoCAD.Core.BOQ;
 
 namespace OdooAutoCAD.Core.Odoo;
 
@@ -230,6 +231,14 @@ public interface IOdooService
     /// <param name="entries">BOQ entries to import.</param>
     /// <returns>Sync result with details.</returns>
     Task<SyncResult> ImportToBOQAsync(IEnumerable<BOQEntry> entries);
+
+    /// <summary>
+    /// Imports BOQ data via the Swagger/BasicAuth import2boq_v2 API.
+    /// Posts layout data and returns assigned header_id/detail_id values.
+    /// </summary>
+    Task<BoqImportResponse> ImportToBOQViaApiAsync(
+        BoqImportRequest request, string baseUrl, string basePath,
+        string database, string userToken);
 
     /// <summary>
     /// Gets BOQ entries for a project.
