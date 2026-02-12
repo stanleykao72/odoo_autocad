@@ -895,7 +895,7 @@ public class OdooService : IOdooService, IDisposable
         }
     }
 
-    public async Task<OdooProjectInfo?> GetProjectViaApiAsync(
+    public async Task<ProjectLookupResult> GetProjectViaApiAsync(
         string prNumber, string baseUrl, string basePath,
         string database, string userToken)
     {
@@ -926,6 +926,7 @@ public class OdooService : IOdooService, IDisposable
             response.EnsureSuccessStatusCode();
 
             var responseJson = await response.Content.ReadAsStringAsync();
+            _logger?.LogInformation("get_project_v2 response: {Response}", responseJson);
             var jsonDoc = JsonSerializer.Deserialize<JsonElement>(responseJson);
 
             // Check for error response
@@ -933,8 +934,7 @@ public class OdooService : IOdooService, IDisposable
             {
                 var errMsg = jsonDoc.TryGetProperty("error_message", out var em)
                     ? em.GetString() : "Unknown error";
-                _logger?.LogWarning("get_project_v2 error: {Error}", errMsg);
-                return null;
+                return new ProjectLookupResult(null, $"API error: {errMsg}");
             }
 
             // Parse response: { id, name, job_working_plan_id, job_working_plan_name }
@@ -949,18 +949,19 @@ public class OdooService : IOdooService, IDisposable
 
             if (projectId == null || projectName == null)
             {
-                _logger?.LogWarning("get_project_v2 returned no project for PR '{PrNumber}'", prNumber);
-                return null;
+                // Truncate response for log display (max 500 chars)
+                var truncated = responseJson.Length > 500 ? responseJson[..500] + "..." : responseJson;
+                return new ProjectLookupResult(null, $"No id/name in response: {truncated}");
             }
 
-            _logger?.LogInformation("get_project_v2: found project {Id} '{Name}'", projectId, projectName);
-
-            return new OdooProjectInfo(projectId.Value, projectName, jwpId, jwpName);
+            return new ProjectLookupResult(
+                new OdooProjectInfo(projectId.Value, projectName, jwpId, jwpName),
+                $"Found: {projectName} (ID: {projectId})");
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "get_project_v2 API call failed for PR '{PrNumber}'", prNumber);
-            return null;
+            return new ProjectLookupResult(null, $"API call failed: {ex.Message}");
         }
     }
 

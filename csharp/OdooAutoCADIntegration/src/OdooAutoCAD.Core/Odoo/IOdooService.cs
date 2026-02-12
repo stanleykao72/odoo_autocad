@@ -40,6 +40,11 @@ public record OdooProjectInfo(
     string? JobWorkingPlanName);
 
 /// <summary>
+/// Result of a project lookup via Swagger API. Contains diagnostic info for debugging.
+/// </summary>
+public record ProjectLookupResult(OdooProjectInfo? Project, string DiagnosticMessage);
+
+/// <summary>
 /// Odoo product category information.
 /// </summary>
 public record OdooProductCategory(int Id, string Name, int? ParentId);
@@ -206,7 +211,7 @@ public interface IOdooService
     /// Gets project info via the Swagger/BasicAuth get_project_v2 API.
     /// Matches Python's util_odoo.get_project() using exact name match.
     /// </summary>
-    Task<OdooProjectInfo?> GetProjectViaApiAsync(
+    Task<ProjectLookupResult> GetProjectViaApiAsync(
         string prNumber, string baseUrl, string basePath,
         string database, string userToken);
 

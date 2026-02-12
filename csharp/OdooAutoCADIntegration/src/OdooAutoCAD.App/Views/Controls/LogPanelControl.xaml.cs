@@ -1,4 +1,5 @@
 using System.Collections.Specialized;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -85,6 +86,23 @@ public partial class LogPanelControl : UserControl
         if (DataContext is IAppLogService logService)
         {
             logService.Clear();
+        }
+    }
+
+    private void CopyButton_Click(object sender, RoutedEventArgs e)
+    {
+        var sb = new StringBuilder();
+        foreach (var item in LogListView.Items)
+        {
+            if (item is AppLogEntry entry)
+            {
+                sb.AppendLine($"{entry.Timestamp:yyyy-MM-dd HH:mm:ss.fff}\t[{entry.Level}]\t[{entry.Source}]\t{entry.Message}");
+            }
+        }
+
+        if (sb.Length > 0)
+        {
+            Clipboard.SetText(sb.ToString());
         }
     }
 

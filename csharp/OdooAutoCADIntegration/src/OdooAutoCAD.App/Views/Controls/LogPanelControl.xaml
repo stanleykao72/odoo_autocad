@@ -40,8 +40,12 @@
                 </ComboBox>
 
                 <Button Content="Clear" Style="{StaticResource SecondaryButton}"
-                        Padding="8,2" FontSize="11" Margin="0,0,12,0"
+                        Padding="8,2" FontSize="11" Margin="0,0,4,0"
                         Click="ClearButton_Click"/>
+
+                <Button Content="Copy All" Style="{StaticResource SecondaryButton}"
+                        Padding="8,2" FontSize="11" Margin="0,0,12,0"
+                        Click="CopyButton_Click"/>
 
                 <CheckBox x:Name="AutoScrollCheckBox" Content="Auto-scroll"
                           IsChecked="True" VerticalAlignment="Center"

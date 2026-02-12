@@ -505,16 +505,20 @@ public partial class AutoCADViewModel : ObservableObject
                         // Use default basePath
                     }
 
-                    var projectInfo = await _odooService.GetProjectViaApiAsync(
+                    _logService.Log($"Calling get_project_v2: base={baseUrl}, path={basePath}, db={database}, PR={prNum}", "AutoCAD");
+
+                    var result = await _odooService.GetProjectViaApiAsync(
                         prNum, baseUrl, basePath, database, userToken!);
 
-                    if (projectInfo != null)
+                    _logService.Log($"get_project_v2 result: {result.DiagnosticMessage}", "AutoCAD",
+                        result.Project != null ? AppLogLevel.Info : AppLogLevel.Warning);
+
+                    if (result.Project != null)
                     {
-                        ProjectName = projectInfo.Name;
-                        ProjectId = projectInfo.Id;
-                        JobWorkingPlanName = projectInfo.JobWorkingPlanName ?? "";
-                        ProjectLookupStatus = $"Found: {projectInfo.Name} (ID: {projectInfo.Id})";
-                        _logService.Log($"Project found: {projectInfo.Name}", "AutoCAD");
+                        ProjectName = result.Project.Name;
+                        ProjectId = result.Project.Id;
+                        JobWorkingPlanName = result.Project.JobWorkingPlanName ?? "";
+                        ProjectLookupStatus = $"Found: {result.Project.Name} (ID: {result.Project.Id})";
                     }
                     else
                     {
@@ -522,7 +526,6 @@ public partial class AutoCADViewModel : ObservableObject
                         ProjectId = 0;
                         JobWorkingPlanName = "";
                         ProjectLookupStatus = $"No project found for PR '{prNum}'";
-                        _logService.Log($"No project found for PR '{prNum}'", "AutoCAD", AppLogLevel.Warning);
                     }
                 }
                 catch (Exception ex)

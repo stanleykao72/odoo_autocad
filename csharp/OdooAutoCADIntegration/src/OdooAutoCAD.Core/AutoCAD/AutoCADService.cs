@@ -2,6 +2,7 @@
 // AutoCAD COM Service Implementation - equivalent to Python util_autocad.py
 
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using OdooAutoCAD.Core.BOQ;
 using OdooAutoCAD.Core.Threading;
@@ -241,7 +242,7 @@ public class AutoCADService : IAutoCADService, IDisposable
                                 int colCount = entity.Columns;
                                 if (colCount != 9) continue;
 
-                                string headerCell = entity.GetText(0, 6) ?? "";
+                                string headerCell = entity.GetText(0, 7) ?? "";
                                 if (!headerCell.Contains("HEADER_ID")) continue;
 
                                 string headerId = LM_UnFormat(entity.GetText(0, 8) ?? "");
@@ -312,8 +313,8 @@ public class AutoCADService : IAutoCADService, IDisposable
                         int colCount = entity.Columns;
                         if (colCount != 9) continue;
 
-                        // Validate: column 6 contains "HEADER_ID"
-                        string headerCell = entity.GetText(0, 6) ?? "";
+                        // Validate: column 7 contains "HEADER_ID"
+                        string headerCell = entity.GetText(0, 7) ?? "";
                         if (!headerCell.Contains("HEADER_ID")) continue;
 
                         // Write header_id to cell(0, 8)
@@ -327,9 +328,9 @@ public class AutoCADService : IAutoCADService, IDisposable
                             results.Add($"Failed to write header_id: {ex.Message}");
                         }
 
-                        // Write detail_ids to matching rows
+                        // Write detail_ids to matching rows (skip header rows 0-1, data starts at row 2)
                         int rowCount = entity.Rows;
-                        for (int row = 1; row < rowCount; row++)
+                        for (int row = 2; row < rowCount; row++)
                         {
                             try
                             {
@@ -481,7 +482,7 @@ public class AutoCADService : IAutoCADService, IDisposable
                         int colCount = entity.Columns;
                         if (colCount != 9) continue;
 
-                        string headerCell = entity.GetText(0, 6) ?? "";
+                        string headerCell = entity.GetText(0, 7) ?? "";
                         if (!headerCell.Contains("HEADER_ID")) continue;
 
                         int rowCount = entity.Rows;
@@ -489,8 +490,8 @@ public class AutoCADService : IAutoCADService, IDisposable
                         // Clear header_id cell(0, 8)
                         try { entity.SetText(0, 8, ""); clearedCount++; } catch { }
 
-                        // Clear detail_id cells (col 8) for data rows
-                        for (int row = 1; row < rowCount; row++)
+                        // Clear detail_id cells (col 8) for data rows (skip header rows 0-1)
+                        for (int row = 2; row < rowCount; row++)
                         {
                             try { entity.SetText(row, 8, ""); clearedCount++; } catch { }
                         }
@@ -532,7 +533,7 @@ public class AutoCADService : IAutoCADService, IDisposable
                                 int colCount = entity.Columns;
                                 if (colCount != 9) continue;
 
-                                string headerCell = entity.GetText(0, 6) ?? "";
+                                string headerCell = entity.GetText(0, 7) ?? "";
                                 if (!headerCell.Contains("HEADER_ID")) continue;
 
                                 int rowCount = entity.Rows;
@@ -540,8 +541,8 @@ public class AutoCADService : IAutoCADService, IDisposable
                                 // Clear header_id
                                 try { entity.SetText(0, 8, ""); totalCleared++; } catch { }
 
-                                // Clear detail_ids
-                                for (int row = 1; row < rowCount; row++)
+                                // Clear detail_ids (skip header rows 0-1)
+                                for (int row = 2; row < rowCount; row++)
                                 {
                                     try { entity.SetText(row, 8, ""); totalCleared++; } catch { }
                                 }
@@ -1074,69 +1075,45 @@ public class AutoCADService : IAutoCADService, IDisposable
     #region Parameter Extraction
 
     /// <summary>
-    /// Strips AutoCAD MText formatting codes.
-    /// Removes codes like \P (paragraph), \C (color), \F (font), \H (height), etc.
+    /// Strips AutoCAD MText formatting codes (matches Python LM_UnFormat).
+    /// Handles: \P (paragraph), \f/\F (font), \C/\c (color), \H (height),
+    /// \A (alignment), \L/\l (underline), \O/\o (overline), \Q (oblique),
+    /// \T (tracking), \W (width), \S (stacking), \p (paragraph style), {} braces.
     /// </summary>
-    private string LM_UnFormat(string text)
+    private static string LM_UnFormat(string text)
     {
         if (string.IsNullOrEmpty(text))
             return string.Empty;
 
-        // Remove common MText formatting codes
         var result = text;
 
-        // Remove \P (paragraph break) - replace with space
-        result = System.Text.RegularExpressions.Regex.Replace(result, @"\\P", " ");
+        // Step 1: Preserve escaped backslashes (matches Python: r"\\\\" -> "\032")
+        result = result.Replace("\\\\", "\x1A");
 
-        // Remove \C# (color codes like \C1, \C255)
-        result = System.Text.RegularExpressions.Regex.Replace(result, @"\\C\d+;", "");
+        // Step 2: Replace \P, newlines, tabs with space
+        result = Regex.Replace(result, @"\\P|\n|\t", " ");
 
-        // Remove \F (font)
-        result = System.Text.RegularExpressions.Regex.Replace(result, @"\\F[^;]*;", "");
+        // Step 3: Remove parameterized formatting codes ending with semicolon
+        // Covers \A, \C, \c, \F, \f, \H, \L, \l, \O, \o, \p, \Q, \T, \W
+        // e.g. \fPMingLiU|b0|i0|c136|p2; or \C1; or \H1.5x;
+        result = Regex.Replace(result, @"\\[ACcFfHLlOopQTW][^\\;]*;", "");
 
-        // Remove \H (height)
-        result = System.Text.RegularExpressions.Regex.Replace(result, @"\\H[^;]*;", "");
+        // Step 4: Remove toggle codes without semicolon (e.g. \L, \l, \O, \o)
+        result = Regex.Replace(result, @"\\[ACcFfHLlOopQTW]", "");
 
-        // Remove \S (stacking)
-        result = System.Text.RegularExpressions.Regex.Replace(result, @"\\S[^;]*;", "");
+        // Step 5: Remove stacking \S patterns
+        result = Regex.Replace(result, @"\\S[^;]*;", "");
 
-        // Remove \Q (obliquing angle)
-        result = System.Text.RegularExpressions.Regex.Replace(result, @"\\Q\d+;", "");
-
-        // Remove \T (tracking)
-        result = System.Text.RegularExpressions.Regex.Replace(result, @"\\T\d+;", "");
-
-        // Remove \W (width factor)
-        result = System.Text.RegularExpressions.Regex.Replace(result, @"\\W\d+\.?\d*;", "");
-
-        // Remove \A (alignment)
-        result = System.Text.RegularExpressions.Regex.Replace(result, @"\\A\d+;", "");
-
-        // Remove \L (underline on)
-        result = result.Replace("\\L", "");
-
-        // Remove \l (underline off)
-        result = result.Replace("\\l", "");
-
-        // Remove \O (overline on)
-        result = result.Replace("\\O", "");
-
-        // Remove \o (overline off)
-        result = result.Replace("\\o", "");
-
-        // Remove \~ (non-breaking space) - replace with space
+        // Step 6: Remove \~ (non-breaking space) → space
         result = result.Replace("\\~", " ");
 
-        // Remove curly braces {} (group delimiters)
-        result = result.Replace("{", "").Replace("}", "");
+        // Step 7: Remove braces (group delimiters)
+        result = Regex.Replace(result, @"[{}]", "");
 
-        // Remove \\ (escaped backslash) - replace with single backslash
-        result = result.Replace("\\\\", "\\");
+        // Step 8: Restore preserved backslashes
+        result = result.Replace("\x1A", "\\");
 
-        // Trim whitespace
-        result = result.Trim();
-
-        return result;
+        return result.Trim();
     }
 
     /// <summary>
@@ -1208,7 +1185,8 @@ public class AutoCADService : IAutoCADService, IDisposable
 
     /// <summary>
     /// Extracts table data from the layout.
-    /// Validates: exactly 9 columns, HEADER_ID in column 7 (index 6).
+    /// Validates: exactly 9 columns, HEADER_ID in column 7 (0-indexed).
+    /// Rows 0-1 are title/header; data starts at row 2 (matching Python's "if i > 1").
     /// Returns rows with: Position, Product No, Width, Height, Length, Thickness, Qty, Description, Detail ID.
     /// Filters empty rows (both qty AND product_no empty).
     /// </summary>
@@ -1241,16 +1219,16 @@ public class AutoCADService : IAutoCADService, IDisposable
                             continue;
                         }
 
-                        // Validate: column 6 (index 6, 7th column) contains "HEADER_ID" in header
-                        string headerCell = entity.GetText(0, 6) ?? "";
+                        // Validate: column 7 (0-indexed) contains "HEADER_ID" in header
+                        string headerCell = entity.GetText(0, 7) ?? "";
                         if (!headerCell.Contains("HEADER_ID"))
                         {
-                            _logger?.LogWarning("Column 6 does not contain HEADER_ID. Found: {Header}", headerCell);
+                            _logger?.LogWarning("Column 7 does not contain HEADER_ID. Found: '{Header}'", headerCell);
                             continue;
                         }
 
-                        // Extract data rows (skip header row 0)
-                        for (int row = 1; row < rowCount; row++)
+                        // Extract data rows (skip title row 0 and header row 1; data starts at row 2)
+                        for (int row = 2; row < rowCount; row++)
                         {
                             var position = LM_UnFormat(entity.GetText(row, 0) ?? "");
                             var productNo = LM_UnFormat(entity.GetText(row, 1) ?? "");
