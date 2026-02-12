@@ -360,17 +360,18 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTextColumn Header="Product Name" Binding="{Binding ProductName}" Width="*"/>
-                <DataGridTextColumn Header="Code" Binding="{Binding ProductCode}" Width="90"/>
-                <DataGridTextColumn Header="Qty" Binding="{Binding Quantity, StringFormat=N2}" Width="70"/>
-                <DataGridTextColumn Header="UoM" Binding="{Binding UnitOfMeasure}" Width="60"/>
-                <DataGridTextColumn Header="Unit Price" Binding="{Binding UnitPrice, StringFormat=N2}" Width="80"/>
-                <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="70"/>
-                <DataGridTextColumn Header="Reference" Binding="{Binding Reference}" Width="100"/>
-                <DataGridTextColumn Header="Detail ID" Binding="{Binding DetailId}" Width="80"/>
+                <DataGridTextColumn Header="Position" Binding="{Binding Position}" MinWidth="60" Width="Auto"/>
+                <DataGridTextColumn Header="Product No" Binding="{Binding ProductCode}" MinWidth="100" Width="*"/>
+                <DataGridTextColumn Header="Width" Binding="{Binding Width}" MinWidth="55" Width="Auto"/>
+                <DataGridTextColumn Header="Height" Binding="{Binding Height}" MinWidth="55" Width="Auto"/>
+                <DataGridTextColumn Header="Length" Binding="{Binding Length}" MinWidth="55" Width="Auto"/>
+                <DataGridTextColumn Header="Thickness" Binding="{Binding Thickness}" MinWidth="65" Width="Auto"/>
+                <DataGridTextColumn Header="Qty" Binding="{Binding Quantity, StringFormat=N0}" MinWidth="50" Width="Auto"/>
+                <DataGridTextColumn Header="Description" Binding="{Binding ProductName}" MinWidth="120" Width="*"/>
+                <DataGridTextColumn Header="Detail ID" Binding="{Binding DetailId}" MinWidth="70" Width="Auto"/>
 
                 <!-- Validation Message -->
-                <DataGridTemplateColumn Header="Validation" Width="120" CanUserSort="False">
+                <DataGridTemplateColumn Header="Validation" Width="100" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding ValidationMessage}"

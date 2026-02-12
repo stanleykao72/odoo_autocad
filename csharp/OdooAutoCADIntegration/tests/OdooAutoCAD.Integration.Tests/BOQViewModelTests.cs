@@ -179,10 +179,6 @@ public class BOQViewModelTests
     [Fact]
     public async Task ValidateCommand_WithValidEntries_SetsAllValid()
     {
-        _mockBoqProcessor
-            .Setup(p => p.MapProductAsync(It.IsAny<string>()))
-            .ReturnsAsync(new OdooProduct(1, "Test", null, null, null, null, null));
-
         var sut = CreateSUT();
         sut.BoqItems.Add(new BOQDisplayItem
         {
@@ -203,10 +199,6 @@ public class BOQViewModelTests
     [Fact]
     public async Task ValidateCommand_WithZeroQty_SetsWarning()
     {
-        _mockBoqProcessor
-            .Setup(p => p.MapProductAsync(It.IsAny<string>()))
-            .ReturnsAsync(new OdooProduct(1, "Test", null, null, null, null, null));
-
         var sut = CreateSUT();
         sut.BoqItems.Add(new BOQDisplayItem
         {
@@ -222,36 +214,25 @@ public class BOQViewModelTests
     }
 
     [Fact]
-    public async Task ValidateCommand_WithMissingProduct_SetsError()
+    public async Task ValidateCommand_WithMissingProductNo_SetsError()
     {
-        _mockBoqProcessor
-            .Setup(p => p.MapProductAsync(It.IsAny<string>()))
-            .ReturnsAsync((OdooProduct?)null);
-
         var sut = CreateSUT();
         sut.BoqItems.Add(new BOQDisplayItem
         {
-            LayoutName = "L1", ProductName = "Unknown", ProductCode = "X999", Quantity = 5
+            LayoutName = "L1", ProductName = "", ProductCode = "", Quantity = 5
         });
         sut.UpdateSummary();
 
         await sut.ValidateCommand.ExecuteAsync(null);
 
         sut.BoqItems[0].ValidationStatus.Should().Be("Error");
-        sut.BoqItems[0].ValidationMessage.Should().Contain("Product not found");
+        sut.BoqItems[0].ValidationMessage.Should().Contain("Missing product number");
         sut.HasValidationErrors.Should().BeTrue();
     }
 
     [Fact]
     public async Task ValidateCommand_UpdatesSummaryCounts()
     {
-        _mockBoqProcessor
-            .Setup(p => p.MapProductAsync("Good"))
-            .ReturnsAsync(new OdooProduct(1, "Good", null, null, null, null, null));
-        _mockBoqProcessor
-            .Setup(p => p.MapProductAsync("Bad"))
-            .ReturnsAsync((OdooProduct?)null);
-
         var sut = CreateSUT();
         sut.BoqItems.Add(new BOQDisplayItem
         {
@@ -263,7 +244,7 @@ public class BOQViewModelTests
         });
         sut.BoqItems.Add(new BOQDisplayItem
         {
-            LayoutName = "L1", ProductName = "Bad", Quantity = 5
+            LayoutName = "L1", ProductName = "", ProductCode = "", Quantity = 5
         });
         sut.UpdateSummary();
 
@@ -301,18 +282,15 @@ public class BOQViewModelTests
     public async Task PushCommand_WhenValidationHasErrors_CannotExecute()
     {
         _mockOdoo.Setup(s => s.IsConnected).Returns(true);
-        _mockBoqProcessor
-            .Setup(p => p.MapProductAsync(It.IsAny<string>()))
-            .ReturnsAsync((OdooProduct?)null);
 
         var sut = CreateSUT();
         sut.BoqItems.Add(new BOQDisplayItem
         {
-            LayoutName = "L1", ProductName = "Bad", ProductCode = "X", Quantity = 5
+            LayoutName = "L1", ProductName = "", ProductCode = "", Quantity = 5
         });
         sut.UpdateSummary();
 
-        // Run validation — will set errors
+        // Run validation — missing product number will set errors
         await sut.ValidateCommand.ExecuteAsync(null);
 
         sut.HasValidationErrors.Should().BeTrue();
@@ -383,9 +361,6 @@ public class BOQViewModelTests
     public async Task PushCommand_OnApiError_SetsPushStatus()
     {
         _mockOdoo.Setup(s => s.IsConnected).Returns(true);
-        _mockBoqProcessor
-            .Setup(p => p.MapProductAsync(It.IsAny<string>()))
-            .ReturnsAsync(new OdooProduct(1, "Test", null, null, null, null, null));
 
         _mockSettingsService
             .Setup(s => s.LoadServerConfigsAsync())
@@ -536,13 +511,6 @@ public class BOQViewModelTests
     [Fact]
     public async Task ValidateCommand_PopulatesValidationErrors()
     {
-        _mockBoqProcessor
-            .Setup(p => p.MapProductAsync("Good"))
-            .ReturnsAsync(new OdooProduct(1, "Good", null, null, null, null, null));
-        _mockBoqProcessor
-            .Setup(p => p.MapProductAsync("Bad"))
-            .ReturnsAsync((OdooProduct?)null);
-
         var sut = CreateSUT();
         sut.BoqItems.Add(new BOQDisplayItem
         {
@@ -550,7 +518,7 @@ public class BOQViewModelTests
         });
         sut.BoqItems.Add(new BOQDisplayItem
         {
-            LayoutName = "L1", ProductName = "Bad", Quantity = 5
+            LayoutName = "L1", ProductName = "", ProductCode = "", Quantity = 5
         });
         sut.BoqItems.Add(new BOQDisplayItem
         {
@@ -560,7 +528,7 @@ public class BOQViewModelTests
 
         await sut.ValidateCommand.ExecuteAsync(null);
 
-        sut.ValidationErrors.Should().HaveCount(2); // 1 error + 1 warning
+        sut.ValidationErrors.Should().HaveCount(2); // 1 error (missing product) + 1 warning (zero qty)
         sut.ValidationErrorCount.Should().Be(1);
         sut.ValidationWarningCount.Should().Be(1);
         sut.IsValidationPanelVisible.Should().BeTrue();
@@ -569,10 +537,6 @@ public class BOQViewModelTests
     [Fact]
     public async Task ValidateCommand_NoErrors_HidesPanel()
     {
-        _mockBoqProcessor
-            .Setup(p => p.MapProductAsync(It.IsAny<string>()))
-            .ReturnsAsync(new OdooProduct(1, "Test", null, null, null, null, null));
-
         var sut = CreateSUT();
         sut.BoqItems.Add(new BOQDisplayItem
         {

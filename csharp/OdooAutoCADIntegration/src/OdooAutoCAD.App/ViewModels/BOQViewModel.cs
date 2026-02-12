@@ -481,6 +481,7 @@ public partial class BOQViewModel : ObservableObject
     {
         IsValidating = true;
         _logService.Log("BOQ: Starting validation...", "BOQ");
+        await Task.CompletedTask; // Keep async signature for RelayCommand
 
         try
         {
@@ -495,55 +496,36 @@ public partial class BOQViewModel : ObservableObject
 
             foreach (var item in BoqItems)
             {
-                // Check product mapping
-                bool productValid = true;
-                if (!string.IsNullOrWhiteSpace(item.ProductCode))
-                {
-                    var product = await _boqProcessor.MapProductAsync(item.ProductCode);
-                    if (product == null && !string.IsNullOrWhiteSpace(item.ProductName))
-                    {
-                        product = await _boqProcessor.MapProductAsync(item.ProductName);
-                    }
-                    if (product == null)
-                    {
-                        item.ValidationStatus = "Error";
-                        item.ValidationMessage = "Product not found in Odoo";
-                        productValid = false;
-                        errorCount++;
-                    }
-                }
-                else if (!string.IsNullOrWhiteSpace(item.ProductName))
-                {
-                    var product = await _boqProcessor.MapProductAsync(item.ProductName);
-                    if (product == null)
-                    {
-                        item.ValidationStatus = "Error";
-                        item.ValidationMessage = "Product not found in Odoo";
-                        productValid = false;
-                        errorCount++;
-                    }
-                }
-                else
-                {
-                    item.ValidationStatus = "Error";
-                    item.ValidationMessage = "Missing product name/code";
-                    productValid = false;
-                    errorCount++;
-                }
+                var errors = new List<string>();
+                var warnings = new List<string>();
 
-                if (!productValid) continue;
+                // Check product no / code is present
+                if (string.IsNullOrWhiteSpace(item.ProductCode) && string.IsNullOrWhiteSpace(item.ProductName))
+                {
+                    errors.Add("Missing product number");
+                }
 
                 // Check quantity
                 if (item.Quantity < 0)
                 {
-                    item.ValidationStatus = "Error";
-                    item.ValidationMessage = "Negative quantity";
-                    errorCount++;
+                    errors.Add("Negative quantity");
                 }
                 else if (item.Quantity == 0)
                 {
+                    warnings.Add("Zero quantity");
+                }
+
+                // Determine final status
+                if (errors.Count > 0)
+                {
+                    item.ValidationStatus = "Error";
+                    item.ValidationMessage = string.Join("; ", errors);
+                    errorCount++;
+                }
+                else if (warnings.Count > 0)
+                {
                     item.ValidationStatus = "Warning";
-                    item.ValidationMessage = "Zero quantity";
+                    item.ValidationMessage = string.Join("; ", warnings);
                     warningCount++;
                 }
                 else
