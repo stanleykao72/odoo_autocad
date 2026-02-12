@@ -490,25 +490,23 @@ public partial class AutoCADViewModel : ObservableObject
 
                     var (baseUrl, database, apiToken) = parsed.Value;
 
-                    // Fetch basePath from swagger spec (best-effort, fallback)
-                    var basePath = "/api/v1/boq_import_api";
+                    // Resolve endpoint path from swagger spec
+                    var endpointPath = "/api/v1/boq_import_api/callMethodForJobWorkingPlanBoqModel";
                     try
                     {
                         using var httpClient = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(10) };
                         var specJson = await httpClient.GetStringAsync(swaggerUrl);
-                        var doc = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(specJson);
-                        if (doc.TryGetProperty("basePath", out var bp))
-                            basePath = bp.GetString() ?? basePath;
+                        endpointPath = OdooConnectionViewModel.ResolveSwaggerEndpoint(specJson);
                     }
                     catch
                     {
-                        // Use default basePath
+                        // Use default endpoint path
                     }
 
-                    _logService.Log($"Calling get_project_v2: base={baseUrl}, path={basePath}, db={database}, PR={prNum}", "AutoCAD");
+                    _logService.Log($"Calling get_project_v2: base={baseUrl}, endpoint={endpointPath}, PR={prNum}", "AutoCAD");
 
                     var result = await _odooService.GetProjectViaApiAsync(
-                        prNum, baseUrl, basePath, database, userToken!);
+                        prNum, baseUrl, endpointPath, database, userToken!);
 
                     _logService.Log($"get_project_v2 result: {result.DiagnosticMessage}", "AutoCAD",
                         result.Project != null ? AppLogLevel.Info : AppLogLevel.Warning);

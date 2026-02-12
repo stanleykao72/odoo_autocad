@@ -212,7 +212,7 @@ public interface IOdooService
     /// Matches Python's util_odoo.get_project() using exact name match.
     /// </summary>
     Task<ProjectLookupResult> GetProjectViaApiAsync(
-        string prNumber, string baseUrl, string basePath,
+        string prNumber, string baseUrl, string endpointPath,
         string database, string userToken);
 
     #endregion
@@ -228,7 +228,7 @@ public interface IOdooService
     /// Gets products via Swagger API with Basic Auth (no JSON-RPC session required).
     /// </summary>
     Task<IReadOnlyList<OdooProduct>> GetProductsViaApiAsync(
-        string baseUrl, string basePath, string database, string userToken);
+        string baseUrl, string endpointPath, string database, string userToken);
 
     /// <summary>
     /// Gets a product by ID.
@@ -270,7 +270,7 @@ public interface IOdooService
     /// Posts layout data and returns assigned header_id/detail_id values.
     /// </summary>
     Task<BoqImportResponse> ImportToBOQViaApiAsync(
-        BoqImportRequest request, string baseUrl, string basePath,
+        BoqImportRequest request, string baseUrl, string endpointPath,
         string database, string userToken);
 
     /// <summary>
@@ -311,7 +311,7 @@ public interface IOdooService
     /// Posts header_ids and returns created PRs with lines.
     /// </summary>
     Task<Boq2PrResponse> ConvertBOQToPRViaApiAsync(
-        List<string> headerIds, string baseUrl, string basePath,
+        List<string> headerIds, string baseUrl, string endpointPath,
         string database, string userToken);
 
     /// <summary>

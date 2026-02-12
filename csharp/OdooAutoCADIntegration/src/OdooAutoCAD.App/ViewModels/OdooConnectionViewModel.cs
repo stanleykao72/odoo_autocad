@@ -279,6 +279,36 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
         return (baseUrl, database, apiToken);
     }
 
+    /// <summary>
+    /// Resolves the full endpoint path for a Swagger operation from the spec JSON.
+    /// Searches the "paths" object for the given operationId and returns basePath + path.
+    /// Falls back to basePath + "/" + operationId if not found.
+    /// </summary>
+    internal static string ResolveSwaggerEndpoint(
+        string specJson, string operationId = "callMethodForJobWorkingPlanBoqModel")
+    {
+        var doc = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(specJson);
+        var basePath = doc.TryGetProperty("basePath", out var bp) ? bp.GetString() ?? "" : "";
+
+        if (doc.TryGetProperty("paths", out var paths))
+        {
+            foreach (var pathEntry in paths.EnumerateObject())
+            {
+                foreach (var method in pathEntry.Value.EnumerateObject())
+                {
+                    if (method.Value.TryGetProperty("operationId", out var opId) &&
+                        opId.GetString() == operationId)
+                    {
+                        return basePath + pathEntry.Name;
+                    }
+                }
+            }
+        }
+
+        // Fallback: basePath + /operationId
+        return basePath + "/" + operationId;
+    }
+
     #endregion
 
     #region Commands
@@ -440,8 +470,8 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
 
             var (baseUrl, database, apiToken) = parsed.Value;
 
-            // Get basePath from swagger spec (best-effort, fallback to default)
-            var basePath = "/api/v1/boq_import_api";
+            // Resolve endpoint path from swagger spec
+            var endpointPath = "/api/v1/boq_import_api/callMethodForJobWorkingPlanBoqModel";
             try
             {
                 using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
@@ -449,17 +479,15 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
                 if (swaggerResponse.IsSuccessStatusCode)
                 {
                     var json = await swaggerResponse.Content.ReadAsStringAsync();
-                    var doc = System.Text.Json.JsonDocument.Parse(json);
-                    if (doc.RootElement.TryGetProperty("basePath", out var bp))
-                        basePath = bp.GetString() ?? basePath;
+                    endpointPath = ResolveSwaggerEndpoint(json);
                 }
             }
             catch
             {
-                // Use default basePath
+                // Use default endpoint path
             }
 
-            var products = await _odooService.GetProductsViaApiAsync(baseUrl, basePath, database, UserToken);
+            var products = await _odooService.GetProductsViaApiAsync(baseUrl, endpointPath, database, UserToken);
 
             Products.Clear();
             _allProducts = products.ToList();

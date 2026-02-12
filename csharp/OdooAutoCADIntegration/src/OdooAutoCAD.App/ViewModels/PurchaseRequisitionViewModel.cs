@@ -225,20 +225,18 @@ public partial class PurchaseRequisitionViewModel : ObservableObject
 
             var (baseUrl, database, apiToken) = parsed.Value;
 
-            // Step 4: Fetch basePath from swagger spec
-            var basePath = "/api/v1/boq_import_api";
+            // Step 4: Resolve endpoint path from swagger spec
+            var endpointPath = "/api/v1/boq_import_api/callMethodForJobWorkingPlanBoqModel";
             ConvertStatusText = "Fetching API configuration...";
             try
             {
                 using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
                 var specJson = await httpClient.GetStringAsync(swaggerUrl);
-                var doc = JsonSerializer.Deserialize<JsonElement>(specJson);
-                if (doc.TryGetProperty("basePath", out var bp))
-                    basePath = bp.GetString() ?? basePath;
+                endpointPath = OdooConnectionViewModel.ResolveSwaggerEndpoint(specJson);
             }
             catch
             {
-                // Use default basePath
+                // Use default endpoint path
             }
 
             // Step 5: Call boq2pr_v2
@@ -246,7 +244,7 @@ public partial class PurchaseRequisitionViewModel : ObservableObject
             _logService.Log($"PR: Calling boq2pr_v2 with {headerIds.Count} header IDs...", "PR");
 
             var response = await _odooService.ConvertBOQToPRViaApiAsync(
-                headerIds, baseUrl, basePath, database, userToken);
+                headerIds, baseUrl, endpointPath, database, userToken);
 
             if (!response.Success)
             {

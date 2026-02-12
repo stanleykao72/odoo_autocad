@@ -554,20 +554,18 @@ public partial class BOQViewModel : ObservableObject
 
             var (baseUrl, database, apiToken) = parsed.Value;
 
-            // Fetch basePath from swagger spec (best-effort, fallback to default)
-            var basePath = "/api/v1/boq_import_api";
+            // Resolve endpoint path from swagger spec
+            var endpointPath = "/api/v1/boq_import_api/callMethodForJobWorkingPlanBoqModel";
             PushStatusText = "Fetching API configuration...";
             try
             {
                 using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
                 var specJson = await httpClient.GetStringAsync(swaggerUrl);
-                var doc = JsonSerializer.Deserialize<JsonElement>(specJson);
-                if (doc.TryGetProperty("basePath", out var bp))
-                    basePath = bp.GetString() ?? basePath;
+                endpointPath = OdooConnectionViewModel.ResolveSwaggerEndpoint(specJson);
             }
             catch
             {
-                // Use default basePath
+                // Use default endpoint path
             }
 
             // Build BoqImportRequest from layout data
@@ -586,7 +584,7 @@ public partial class BOQViewModel : ObservableObject
             _logService.Log($"BOQ: Pushing {request.All.Count} layouts via import2boq_v2...", "BOQ");
 
             var response = await _odooService.ImportToBOQViaApiAsync(
-                request, baseUrl, basePath, database, userToken);
+                request, baseUrl, endpointPath, database, userToken);
 
             if (!response.Success)
             {

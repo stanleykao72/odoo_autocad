@@ -407,14 +407,14 @@ public class OdooService : IOdooService, IDisposable
     }
 
     public async Task<IReadOnlyList<OdooProduct>> GetProductsViaApiAsync(
-        string baseUrl, string basePath, string database, string userToken)
+        string baseUrl, string endpointPath, string database, string userToken)
     {
         try
         {
             var credentials = Convert.ToBase64String(
                 Encoding.UTF8.GetBytes($"{database}:{userToken}"));
 
-            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{basePath}/callMethodForJobWorkingPlanBoqModel";
+            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{endpointPath}";
 
             var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint);
             request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
@@ -535,7 +535,7 @@ public class OdooService : IOdooService, IDisposable
     }
 
     public async Task<BoqImportResponse> ImportToBOQViaApiAsync(
-        BoqImportRequest request, string baseUrl, string basePath,
+        BoqImportRequest request, string baseUrl, string endpointPath,
         string database, string userToken)
     {
         try
@@ -543,7 +543,7 @@ public class OdooService : IOdooService, IDisposable
             var credentials = Convert.ToBase64String(
                 Encoding.UTF8.GetBytes($"{database}:{userToken}"));
 
-            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{basePath}/callMethodForJobWorkingPlanBoqModel";
+            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{endpointPath}";
 
             // Build layout_dict payload matching Python import2boq_v2 format
             var layoutDict = new Dictionary<string, object>();
@@ -789,7 +789,7 @@ public class OdooService : IOdooService, IDisposable
     }
 
     public async Task<Boq2PrResponse> ConvertBOQToPRViaApiAsync(
-        List<string> headerIds, string baseUrl, string basePath,
+        List<string> headerIds, string baseUrl, string endpointPath,
         string database, string userToken)
     {
         try
@@ -797,7 +797,7 @@ public class OdooService : IOdooService, IDisposable
             var credentials = Convert.ToBase64String(
                 Encoding.UTF8.GetBytes($"{database}:{userToken}"));
 
-            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{basePath}/callMethodForJobWorkingPlanBoqModel";
+            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{endpointPath}";
 
             var body = new
             {
@@ -896,7 +896,7 @@ public class OdooService : IOdooService, IDisposable
     }
 
     public async Task<ProjectLookupResult> GetProjectViaApiAsync(
-        string prNumber, string baseUrl, string basePath,
+        string prNumber, string baseUrl, string endpointPath,
         string database, string userToken)
     {
         try
@@ -904,7 +904,7 @@ public class OdooService : IOdooService, IDisposable
             var credentials = Convert.ToBase64String(
                 Encoding.UTF8.GetBytes($"{database}:{userToken}"));
 
-            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{basePath}/callMethodForJobWorkingPlanBoqModel";
+            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{endpointPath}";
 
             // Match Python: get_project_v2 with exact name match
             var body = new
