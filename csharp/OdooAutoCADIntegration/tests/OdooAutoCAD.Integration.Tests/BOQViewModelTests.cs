@@ -331,9 +331,9 @@ public class BOQViewModelTests
                     RowCount = 3,
                     Cells = new List<List<string>>
                     {
-                        new() { "Position", "Product No", "Width", "Height", "Length", "Thickness", "Qty", "Description", "HEADER_ID" },
-                        new() { "1", "A001", "100", "200", "300", "10", "5", "Desc A", "" },
-                        new() { "2", "B002", "150", "250", "350", "15", "3", "Desc B", "" }
+                        new() { "Position", "Product No", "Width", "Height", "Length", "Thickness", "Qty", "Description", "HEADER_ID" },  // Row 0: column headers (added by C# extraction)
+                        new() { "1", "A001", "100", "200", "300", "10", "5", "Desc A", "" },  // Row 1: data
+                        new() { "2", "B002", "150", "250", "350", "15", "3", "Desc B", "" }   // Row 2: data
                     }
                 }
             }

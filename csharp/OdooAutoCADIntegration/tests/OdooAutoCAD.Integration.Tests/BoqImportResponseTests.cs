@@ -61,6 +61,7 @@ public class BoqImportResponseTests
             LayoutName = "TestLayout",
             Parameters = new Dictionary<string, object>
             {
+                ["header_id"] = "12345",
                 ["pr_no"] = "PR-2026-001",
                 ["project_name"] = "Bridge Project",
                 ["product_name"] = "Steel Beam",
@@ -75,9 +76,9 @@ public class BoqImportResponseTests
                     RowCount = 3,
                     Cells = new List<List<string>>
                     {
-                        new() { "Position", "Product No", "Width", "Height", "Length", "Thickness", "Qty", "Description", "HEADER_ID" },
-                        new() { "1", "STL-001", "100", "200", "5000", "12", "8", "Main beam", "" },
-                        new() { "2", "STL-002", "80", "150", "3000", "10", "4", "Cross beam", "EXISTING-42" }
+                        new() { "Position", "Product No", "Width", "Height", "Length", "Thickness", "Qty", "Description", "HEADER_ID" },  // Row 0: column headers (added by C# extraction)
+                        new() { "1", "STL-001", "100", "200", "5000", "12", "8", "Main beam", "" },  // Row 1: data
+                        new() { "2", "STL-002", "80", "150", "3000", "10", "4", "Cross beam", "EXISTING-42" }  // Row 2: data
                     }
                 }
             }
@@ -99,6 +100,7 @@ public class BoqImportResponseTests
         layout.ProjectName.Should().Be("Bridge Project");
         layout.ProductName.Should().Be("Steel Beam");
         layout.ColorName.Should().Be("Silver");
+        layout.HeaderId.Should().Be("12345");
         layout.Detail.Should().HaveCount(2);
 
         layout.Detail[0].Position.Should().Be("1");

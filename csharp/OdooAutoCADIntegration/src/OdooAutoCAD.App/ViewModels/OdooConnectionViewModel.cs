@@ -305,8 +305,8 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
             }
         }
 
-        // Fallback: basePath + /operationId
-        return basePath + "/" + operationId;
+        // Fallback: standard Odoo OpenAPI path pattern with {method_name} placeholder
+        return basePath + "/job.working.plan.boq/call/{method_name}";
     }
 
     #endregion
@@ -471,20 +471,25 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
             var (baseUrl, database, apiToken) = parsed.Value;
 
             // Resolve endpoint path from swagger spec
-            var endpointPath = "/api/v1/boq_import_api/callMethodForJobWorkingPlanBoqModel";
+            var endpointPath = "/api/v1/boq_import_api/job.working.plan.boq/call/{method_name}";
             try
             {
-                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
                 var swaggerResponse = await httpClient.GetAsync(SwaggerUrl);
                 if (swaggerResponse.IsSuccessStatusCode)
                 {
                     var json = await swaggerResponse.Content.ReadAsStringAsync();
                     endpointPath = ResolveSwaggerEndpoint(json);
+                    _logService.Log($"Swagger endpoint resolved: {endpointPath}", "Odoo");
+                }
+                else
+                {
+                    _logService.Log($"Swagger spec fetch returned HTTP {(int)swaggerResponse.StatusCode}, using default path", "Odoo", AppLogLevel.Warning);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Use default endpoint path
+                _logService.Log($"Swagger spec fetch failed ({ex.Message}), using default path", "Odoo", AppLogLevel.Warning);
             }
 
             var products = await _odooService.GetProductsViaApiAsync(baseUrl, endpointPath, database, UserToken);

@@ -269,17 +269,18 @@ public partial class PurchaseRequisitionViewModel : ObservableObject
             var (baseUrl, database, apiToken) = parsed.Value;
 
             // Step 4: Resolve endpoint path from swagger spec
-            var endpointPath = "/api/v1/boq_import_api/callMethodForJobWorkingPlanBoqModel";
+            var endpointPath = "/api/v1/boq_import_api/job.working.plan.boq/call/{method_name}";
             ConvertStatusText = "Fetching API configuration...";
             try
             {
-                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
                 var specJson = await httpClient.GetStringAsync(swaggerUrl);
                 endpointPath = OdooConnectionViewModel.ResolveSwaggerEndpoint(specJson);
+                _logService.Log($"PR: Swagger endpoint resolved: {endpointPath}", "PR");
             }
-            catch
+            catch (Exception ex)
             {
-                // Use default endpoint path
+                _logService.Log($"PR: Swagger spec fetch failed ({ex.Message}), using default path", "PR", AppLogLevel.Warning);
             }
 
             // Step 5: Call boq2pr_v2

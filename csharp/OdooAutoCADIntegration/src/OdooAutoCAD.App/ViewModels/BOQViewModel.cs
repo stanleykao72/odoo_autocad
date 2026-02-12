@@ -68,6 +68,37 @@ public partial class BOQDisplayItem : ObservableObject
     [ObservableProperty]
     private string _thickness = string.Empty;
 
+    // Header-level fields (per-layout, same for all rows in a layout group)
+    [ObservableProperty]
+    private string _headerId = string.Empty;
+
+    [ObservableProperty]
+    private string _prNo = string.Empty;
+
+    [ObservableProperty]
+    private string _projectName = string.Empty;
+
+    [ObservableProperty]
+    private string _jobWorkingPlanName = string.Empty;
+
+    [ObservableProperty]
+    private string _productCatalog = string.Empty;
+
+    [ObservableProperty]
+    private string _spec = string.Empty;
+
+    [ObservableProperty]
+    private string _surfaceTreatment = string.Empty;
+
+    [ObservableProperty]
+    private string _operationFlow = string.Empty;
+
+    [ObservableProperty]
+    private string _colorName = string.Empty;
+
+    [ObservableProperty]
+    private string _colorNo = string.Empty;
+
     public BOQEntry? OriginalEntry { get; set; }
 }
 
@@ -410,7 +441,18 @@ public partial class BOQViewModel : ObservableObject
                             Source = "AutoCAD",
                             ValidationStatus = "Pending",
                             ValidationMessage = string.Empty,
-                            OriginalEntry = entry
+                            OriginalEntry = entry,
+                            // Header-level fields from layout parameters
+                            HeaderId = GetParam(layoutData, "header_id"),
+                            PrNo = GetParam(layoutData, "pr_no"),
+                            ProjectName = GetParam(layoutData, "project_name"),
+                            JobWorkingPlanName = GetParam(layoutData, "job_working_plan_name"),
+                            ProductCatalog = GetParam(layoutData, "product_catelog"),
+                            Spec = GetParam(layoutData, "spec"),
+                            SurfaceTreatment = GetParam(layoutData, "surface_treatment"),
+                            OperationFlow = GetParam(layoutData, "operation_flow"),
+                            ColorName = GetParam(layoutData, "color_name"),
+                            ColorNo = GetParam(layoutData, "color_no")
                         };
 
                         // Populate detail fields from table data if available
@@ -607,17 +649,18 @@ public partial class BOQViewModel : ObservableObject
             var (baseUrl, database, apiToken) = parsed.Value;
 
             // Resolve endpoint path from swagger spec
-            var endpointPath = "/api/v1/boq_import_api/callMethodForJobWorkingPlanBoqModel";
+            var endpointPath = "/api/v1/boq_import_api/job.working.plan.boq/call/{method_name}";
             PushStatusText = "Fetching API configuration...";
             try
             {
-                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
                 var specJson = await httpClient.GetStringAsync(swaggerUrl);
                 endpointPath = OdooConnectionViewModel.ResolveSwaggerEndpoint(specJson);
+                _logService.Log($"BOQ: Swagger endpoint resolved: {endpointPath}", "BOQ");
             }
-            catch
+            catch (Exception ex)
             {
-                // Use default endpoint path
+                _logService.Log($"BOQ: Swagger spec fetch failed ({ex.Message}), using default path", "BOQ", AppLogLevel.Warning);
             }
 
             // Build BoqImportRequest from layout data
@@ -713,12 +756,13 @@ public partial class BOQViewModel : ObservableObject
             var importLayout = new BoqImportLayout
             {
                 LayoutName = layoutName,
-                // Pull header fields from layout parameters
+                // Pull header fields from layout parameters (keys stored as lowercase)
+                HeaderId = GetParam(layoutData, "header_id"),
                 PrNo = GetParam(layoutData, "pr_no"),
                 ProjectName = GetParam(layoutData, "project_name"),
                 JobWorkingPlanName = GetParam(layoutData, "job_working_plan_name"),
                 ProductName = GetParam(layoutData, "product_name"),
-                ProductCatalog = GetParam(layoutData, "product_catalog"),
+                ProductCatalog = GetParam(layoutData, "product_catelog"),
                 Spec = GetParam(layoutData, "spec"),
                 SurfaceTreatment = GetParam(layoutData, "surface_treatment"),
                 OperationFlow = GetParam(layoutData, "operation_flow"),
@@ -727,13 +771,24 @@ public partial class BOQViewModel : ObservableObject
             };
 
             // Build detail rows from table data
+            // Row 0 = title (contains header_id at col 8), Row 1 = column headers, Row 2+ = data
             if (layoutData.Tables.Count > 0)
             {
                 var table = layoutData.Tables[0];
-                // Skip header row (index 0)
+
+                // C# extraction adds a manual header row at Cells[0] — no title row exists.
+                // Header_id comes from GetTableData (stored in row dict), not from Cells[0].
+                // Data rows start at index 1 (skip only the header row at index 0).
                 for (int i = 1; i < table.Cells.Count; i++)
                 {
                     var cells = table.Cells[i];
+
+                    // Skip empty rows (matching Python: skip if qty and product_no both empty)
+                    var qty = cells.Count > 6 ? cells[6]?.Trim() ?? "" : "";
+                    var productNo = cells.Count > 1 ? cells[1]?.Trim() ?? "" : "";
+                    if (string.IsNullOrEmpty(qty) && string.IsNullOrEmpty(productNo))
+                        continue;
+
                     importLayout.Detail.Add(new BoqImportDetail
                     {
                         Position = cells.Count > 0 ? cells[0] : "",

@@ -506,16 +506,17 @@ public partial class AutoCADViewModel : ObservableObject
                     var (baseUrl, database, apiToken) = parsed.Value;
 
                     // Resolve endpoint path from swagger spec
-                    var endpointPath = "/api/v1/boq_import_api/callMethodForJobWorkingPlanBoqModel";
+                    var endpointPath = "/api/v1/boq_import_api/job.working.plan.boq/call/{method_name}";
                     try
                     {
-                        using var httpClient = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                        using var httpClient = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(30) };
                         var specJson = await httpClient.GetStringAsync(swaggerUrl);
                         endpointPath = OdooConnectionViewModel.ResolveSwaggerEndpoint(specJson);
+                        _logService.Log($"Swagger endpoint resolved: {endpointPath}", "AutoCAD");
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Use default endpoint path
+                        _logService.Log($"Swagger spec fetch failed ({ex.Message}), using default path", "AutoCAD", AppLogLevel.Warning);
                     }
 
                     _logService.Log($"Calling get_project_v2: base={baseUrl}, endpoint={endpointPath}, PR={prNum}", "AutoCAD");

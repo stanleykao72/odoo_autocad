@@ -1149,20 +1149,24 @@ public class AutoCADService : IAutoCADService, IDisposable
                                 string tag = attr.TagString;
                                 string value = LM_UnFormat(attr.TextString);
 
-                                // Map standard attribute tags
+                                // Map standard attribute tags (store lowercase to match Python tag_list)
                                 switch (tag.ToLower())
                                 {
                                     case "pr_no":
                                     case "project_name":
                                     case "job_working_plan_name":
                                     case "product_name":
+                                    case "product_catelog":
                                     case "spec":
+                                    case "surface_treatment":
+                                    case "operation_flow":
                                     case "color_name":
+                                    case "color_no":
                                     case "unit":
                                     case "remarks":
                                     case "block_name":
                                     case "quantity":
-                                        attributes[tag] = value;
+                                        attributes[tag.ToLower()] = value;
                                         break;
                                 }
                             }
@@ -1190,13 +1194,14 @@ public class AutoCADService : IAutoCADService, IDisposable
     /// Returns rows with: Position, Product No, Width, Height, Length, Thickness, Qty, Description, Detail ID.
     /// Filters empty rows (both qty AND product_no empty).
     /// </summary>
-    private List<Dictionary<string, object>> GetTableData(dynamic layout)
+    private (string? HeaderId, List<Dictionary<string, object>> Rows) GetTableData(dynamic layout)
     {
         var tableRows = new List<Dictionary<string, object>>();
+        string? headerId = null;
 
         try
         {
-            if (_acadDoc == null) return tableRows;
+            if (_acadDoc == null) return (null, tableRows);
 
             dynamic space = layout.Block;
 
@@ -1226,6 +1231,9 @@ public class AutoCADService : IAutoCADService, IDisposable
                             _logger?.LogWarning("Column 7 does not contain HEADER_ID. Found: '{Header}'", headerCell);
                             continue;
                         }
+
+                        // Extract header_id from row 0, column 8 (matches Python get_table_data)
+                        headerId = LM_UnFormat(entity.GetText(0, 8) ?? "");
 
                         // Extract data rows (skip title row 0 and header row 1; data starts at row 2)
                         for (int row = 2; row < rowCount; row++)
@@ -1277,7 +1285,7 @@ public class AutoCADService : IAutoCADService, IDisposable
             _logger?.LogError(ex, "Failed to extract table data");
         }
 
-        return tableRows;
+        return (headerId, tableRows);
     }
 
     /// <summary>
@@ -1312,8 +1320,12 @@ public class AutoCADService : IAutoCADService, IDisposable
             // Extract block attributes
             data.Parameters = GetAttributeValues(layout);
 
-            // Extract table data
-            var tableRows = GetTableData(layout);
+            // Extract table data (cast to avoid dynamic tuple name loss)
+            (string? headerId, List<Dictionary<string, object>> tableRows) = GetTableData((object)layout);
+
+            // Store header_id in parameters for BuildImportRequest
+            if (!string.IsNullOrWhiteSpace(headerId))
+                data.Parameters["header_id"] = headerId;
 
             // Convert to TableData format
             if (tableRows.Count > 0)

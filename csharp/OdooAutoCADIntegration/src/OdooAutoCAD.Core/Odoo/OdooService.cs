@@ -546,9 +546,11 @@ public class OdooService : IOdooService, IDisposable
 
             var resolvedPath = endpointPath.Replace("{method_name}", "import2boq_v2");
             var apiEndpoint = $"{baseUrl.TrimEnd('/')}{resolvedPath}";
+            _logger?.LogInformation("ImportToBOQ: PATCH {Endpoint}", apiEndpoint);
 
-            // Build layout_dict payload matching Python import2boq_v2 format
-            var layoutDict = new Dictionary<string, object>();
+            // Build layout_dict payload matching Python get_layouts_values() format:
+            // { "all": [ { "layout_name": ..., "header_id": ..., "detail": [...] }, ... ] }
+            var layoutList = new List<Dictionary<string, object?>>();
             foreach (var layout in request.All)
             {
                 var details = layout.Detail.Select(d => new Dictionary<string, object?>
@@ -557,29 +559,35 @@ public class OdooService : IOdooService, IDisposable
                     ["product_no"] = d.ProductNo,
                     ["width"] = d.Width,
                     ["height"] = d.Height,
-                    ["length"] = d.Length,
+                    ["len"] = d.Length,
                     ["thickness"] = d.Thickness,
                     ["qty"] = d.Qty,
-                    ["description"] = d.Description,
+                    ["desc"] = d.Description,
                     ["detail_id"] = d.DetailId ?? ""
                 }).ToList();
 
-                layoutDict[layout.LayoutName] = new Dictionary<string, object?>
+                layoutList.Add(new Dictionary<string, object?>
                 {
+                    ["layout_name"] = layout.LayoutName,
                     ["header_id"] = layout.HeaderId ?? "",
                     ["pr_no"] = layout.PrNo,
                     ["project_name"] = layout.ProjectName,
                     ["job_working_plan_name"] = layout.JobWorkingPlanName,
                     ["product_name"] = layout.ProductName,
-                    ["product_catalog"] = layout.ProductCatalog,
+                    ["product_catelog"] = layout.ProductCatalog,
                     ["spec"] = layout.Spec,
                     ["surface_treatment"] = layout.SurfaceTreatment,
                     ["operation_flow"] = layout.OperationFlow,
                     ["color_name"] = layout.ColorName,
                     ["color_no"] = layout.ColorNo,
                     ["detail"] = details
-                };
+                });
             }
+
+            var layoutDict = new Dictionary<string, object>
+            {
+                ["all"] = layoutList
+            };
 
             var body = new
             {
@@ -588,17 +596,29 @@ public class OdooService : IOdooService, IDisposable
                 context = new { }
             };
 
+            var jsonPayload = JsonSerializer.Serialize(body);
+            _logger?.LogDebug("ImportToBOQ payload ({Length} bytes): {Payload}",
+                jsonPayload.Length, jsonPayload.Length > 2000 ? jsonPayload[..2000] + "..." : jsonPayload);
+
             var httpRequest = new HttpRequestMessage(HttpMethod.Patch, apiEndpoint);
             httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
-            httpRequest.Content = new StringContent(
-                JsonSerializer.Serialize(body),
-                Encoding.UTF8,
-                "application/json");
+            httpRequest.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.SendAsync(httpRequest);
-            response.EnsureSuccessStatusCode();
-
             var responseJson = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger?.LogError("ImportToBOQ HTTP {StatusCode}: {Body}",
+                    (int)response.StatusCode, responseJson.Length > 2000 ? responseJson[..2000] : responseJson);
+                return new BoqImportResponse
+                {
+                    Success = false,
+                    ErrorCode = "HTTP_" + (int)response.StatusCode,
+                    ErrorMessage = $"HTTP {(int)response.StatusCode}: {responseJson}"
+                };
+            }
+
             var jsonDoc = JsonSerializer.Deserialize<JsonElement>(responseJson);
 
             // Check for error response
