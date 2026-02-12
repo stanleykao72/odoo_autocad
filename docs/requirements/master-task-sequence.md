@@ -1,9 +1,9 @@
 # Master Task Sequence — Odoo-AutoCAD C# WPF
 
-> **Total Tasks**: 500 | **Phases**: 4 | **Sprints**: 12
-> **Estimates**: 313S + 160M + 27L
-> **User Stories**: 78 | **Generated**: 2026-02-06
-> **Last Reordered**: 2026-02-10
+> **Total Tasks**: 521 | **Phases**: 4 | **Sprints**: 13
+> **Estimates**: 321S + 171M + 29L
+> **User Stories**: 81 | **Generated**: 2026-02-06
+> **Last Reordered**: 2026-02-12
 
 ## Overview
 
@@ -18,7 +18,7 @@ its parent User Story for full context and acceptance criteria.
 |-------|---------|-------------|-------|---|---|---|--------|
 | Phase 1: Core Infrastructure | 1–3 | 17 | 104 | 66 | 30 | 8 | Complete |
 | Phase 2: UI Foundation & Business Logic | 4–6 | 16 | 106 | 61 | 34 | 11 | Not Started |
-| Phase 3: Feature Completion | 7–9 | 22 | 151 | 100 | 48 | 3 | Not Started |
+| Phase 3: Feature Completion | 7–9.5 | 25 | 172 | 108 | 59 | 5 | Not Started |
 | Phase 4: Polish & AI Integration | 10–12 | 23 | 139 | 86 | 48 | 5 | Not Started |
 
 ---
@@ -466,6 +466,35 @@ its parent User Story for full context and acceptance criteria.
 | 360 | TASK-005-08-06 | Ensure LineCount displayed in PR list item template | `Views/Pages/PurchaseRequisitionPage.xaml` | S | — | [ ] |
 | 361 | TASK-005-08-07 | Bind SelectedPRTotal in detail view with currency formatting | `Views/Pages/PurchaseRequisitionPage.xaml` | S | — | [ ] |
 
+### Sprint 9.5: Odoo Parameter Configuration
+> **Focus**: Fetch material/setup/color options from Odoo, parameter form with searchable dropdowns, write to AutoCAD attribute blocks
+> **User Stories**: US-009-01, US-009-02, US-009-03
+> **Tasks**: 21 (8S + 11M + 2L)
+
+| # | Task ID | Title | Target | Est | Depends On | Status |
+|---|---------|-------|--------|-----|------------|--------|
+| 362 | TASK-009-01-01 | Define OdooSetupValue and OdooColor record types | `OdooAutoCAD.Core/Odoo/IOdooService.cs` | S | — | [ ] |
+| 363 | TASK-009-01-02 | Add GetSetupViaApiAsync and GetColorsViaApiAsync to IOdooService | `OdooAutoCAD.Core/Odoo/IOdooService.cs` | S | TASK-009-01-01 | [ ] |
+| 364 | TASK-009-01-03 | Implement GetSetupViaApiAsync in OdooService | `OdooAutoCAD.Core/Odoo/OdooService.cs` | M | TASK-009-01-01, TASK-009-01-02 | [ ] |
+| 365 | TASK-009-01-04 | Implement GetColorsViaApiAsync in OdooService | `OdooAutoCAD.Core/Odoo/OdooService.cs` | M | TASK-009-01-01, TASK-009-01-02 | [ ] |
+| 366 | TASK-009-01-05 | Unit tests for GetSetupViaApiAsync | `tests/.../OdooServiceSetupTests.cs` | M | TASK-009-01-03 | [ ] |
+| 367 | TASK-009-01-06 | Unit tests for GetColorsViaApiAsync | `tests/.../OdooServiceColorTests.cs` | S | TASK-009-01-04 | [ ] |
+| 368 | TASK-009-02-01 | Create ParameterConfigViewModel with all properties and collections | `ViewModels/ParameterConfigViewModel.cs` | L | — | [ ] |
+| 369 | TASK-009-02-02 | Create ParameterConfigPage.xaml with 3 GroupBox sections | `Views/Pages/ParameterConfigPage.xaml` | L | — | [ ] |
+| 370 | TASK-009-02-03 | Code-behind with DI resolution pattern | `Views/Pages/ParameterConfigPage.xaml.cs` | S | TASK-009-02-01, TASK-009-02-02 | [ ] |
+| 371 | TASK-009-02-04 | Add sidebar navigation button for 參數配置 | `Views/MainWindow.xaml` | S | — | [ ] |
+| 372 | TASK-009-02-05 | DI registration + page title mapping for ParameterConfig | `App.xaml.cs`, `ViewModels/MainViewModel.cs` | S | TASK-009-02-01 | [ ] |
+| 373 | TASK-009-02-06 | Implement parallel API loading in LoadOptionsCommand | `ViewModels/ParameterConfigViewModel.cs` | M | TASK-009-02-01 | [ ] |
+| 374 | TASK-009-02-07 | Implement selection changed auto-fill handlers (Unit, ColorNo) | `ViewModels/ParameterConfigViewModel.cs` | S | TASK-009-02-01 | [ ] |
+| 375 | TASK-009-02-08 | Implement AllFieldsFilled + CanExecute for Submit | `ViewModels/ParameterConfigViewModel.cs` | S | TASK-009-02-01 | [ ] |
+| 376 | TASK-009-02-09 | ViewModel unit tests for form state, loading, selection, validation | `tests/.../ParameterConfigViewModelTests.cs` | M | TASK-009-02-06, TASK-009-02-07, TASK-009-02-08 | [ ] |
+| 377 | TASK-009-03-01 | Implement autocad_get_attribute_block GUIProxy handler | `OdooAutoCAD.Core/AutoCAD/AutoCADService.cs` | M | — | [ ] |
+| 378 | TASK-009-03-02 | Implement autocad_set_attribute_values GUIProxy handler | `OdooAutoCAD.Core/AutoCAD/AutoCADService.cs` | M | TASK-009-03-01 | [ ] |
+| 379 | TASK-009-03-03 | Implement SubmitCommand in ParameterConfigViewModel | `ViewModels/ParameterConfigViewModel.cs` | M | TASK-009-03-01, TASK-009-03-02, TASK-009-02-08 | [ ] |
+| 380 | TASK-009-03-04 | Implement project_id resolution flow for color API | `ViewModels/ParameterConfigViewModel.cs` | M | TASK-009-02-01 | [ ] |
+| 381 | TASK-009-03-05 | Unit tests for SubmitCommand | `tests/.../ParameterConfigViewModelTests.cs` | M | TASK-009-03-03 | [ ] |
+| 382 | TASK-009-03-06 | Unit tests for handler registration | `tests/.../AutoCADHandlerTests.cs` | S | TASK-009-03-01, TASK-009-03-02 | [ ] |
+
 ---
 
 ## Phase 4: Polish & AI Integration
@@ -477,66 +506,66 @@ its parent User Story for full context and acceptance criteria.
 
 | # | Task ID | Title | Target | Est | Depends On | Status |
 |---|---------|-------|--------|-----|------------|--------|
-| 362 | TASK-007-02-01 | Add environment selector dropdown to Connection tab in XAML | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
-| 363 | TASK-007-02-02 | Add SelectedEnvironment, AvailableEnvironments, and ChangeEnvironme... | `ViewModels/SettingsViewModel.cs` | M | — | [ ] |
-| 364 | TASK-007-02-03 | Extend ConfigurationLoader.GetAvailableConfigs() to discover appset... | `OdooAutoCAD.Configuration/ConfigurationLoader.cs` | M | — | [ ] |
-| 365 | TASK-007-02-04 | Implement confirmation dialog with change preview and cancel handling | `ViewModels/SettingsViewModel.cs` | M | TASK-007-02-02 | [ ] |
-| 366 | TASK-007-02-05 | Load environment-specific values and populate ViewModel fields on c... | `ViewModels/SettingsViewModel.cs` | M | TASK-007-02-03, TASK-007-02-04 | [ ] |
-| 367 | TASK-007-02-06 | Persist selected environment to UserPreferences table | `ViewModels/SettingsViewModel.cs` | S | TASK-007-02-02 | [ ] |
-| 368 | TASK-007-03-01 | Add "Test Connection" button with inline result display area to Con... | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
-| 369 | TASK-007-03-02 | Implement TestConnectionCommand as IAsyncRelayCommand in ViewModel | `ViewModels/SettingsViewModel.cs` | M | — | [ ] |
-| 370 | TASK-007-03-03 | Add IsTestingConnection, ConnectionTestResult, and ConnectionTestMe... | `ViewModels/SettingsViewModel.cs` | S | — | [ ] |
-| 371 | TASK-007-03-04 | Implement IOdooService.TestConnectionAsync method | `` | M | — | [ ] |
-| 372 | TASK-007-03-05 | Add error classification logic for timeout, auth failure, and netwo... | `ViewModels/SettingsViewModel.cs` | M | TASK-007-03-02 | [ ] |
-| 373 | TASK-007-03-06 | Add XAML data triggers for success (green), failure (red), and test... | `Views/Pages/SettingsPage.xaml` | S | TASK-007-03-01, TASK-007-03-03 | [ ] |
-| 374 | TASK-007-03-07 | Clear test result when connection fields are modified | `ViewModels/SettingsViewModel.cs` | S | TASK-007-03-02 | [ ] |
-| 375 | TASK-007-07-01 | Add theme radio buttons (System, Light, Dark) to Appearance tab in ... | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
-| 376 | TASK-007-07-02 | Add SelectedTheme property to ViewModel that triggers live preview ... | `ViewModels/SettingsViewModel.cs` | S | — | [ ] |
-| 377 | TASK-007-07-03 | Implement IThemeService with ApplyTheme() to swap WPF ResourceDicti... | `...IThemeService.cs` and `Services/ThemeService.cs` | M | TASK-007-07-04 | [ ] |
-| 378 | TASK-007-07-04 | Create Light and Dark theme ResourceDictionary XAML files | `...heme.xaml` and `Resources/Themes/DarkTheme.xaml` | M | — | [ ] |
-| 379 | TASK-007-07-05 | Implement "System" theme detection following Windows OS light/dark ... | `Services/ThemeService.cs` | M | TASK-007-07-03 | [ ] |
-| 380 | TASK-007-07-06 | Persist theme selection to UserPreferences table on Save | `ViewModels/SettingsViewModel.cs` | S | TASK-007-07-02 | [ ] |
-| 381 | TASK-007-07-07 | Load theme preference on application startup and apply before main ... | `App.xaml.cs` | S | TASK-007-07-06 | [ ] |
-| 382 | TASK-007-08-01 | Add language selector dropdown to Appearance tab in XAML | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
-| 383 | TASK-007-08-02 | Add restart notification text that appears when language differs fr... | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
-| 384 | TASK-007-08-03 | Add SelectedLanguage property to ViewModel with supported locale codes | `ViewModels/SettingsViewModel.cs` | S | — | [ ] |
-| 385 | TASK-007-08-04 | Persist language selection to UserPreferences table on Save | `ViewModels/SettingsViewModel.cs` | S | TASK-007-08-03 | [ ] |
-| 386 | TASK-007-08-05 | Load language preference on application startup and set CultureInfo... | `App.xaml.cs` | M | TASK-007-08-04 | [ ] |
-| 387 | TASK-007-08-06 | Create resource files (.resx) for English and Traditional Chinese s... | `...resx` and `Resources/Strings/Strings.zh-TW.resx` | L | TASK-007-08-03 | [ ] |
-| 388 | TASK-007-09-01 | Add Logging section to Advanced tab with log level dropdown, log pa... | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
-| 389 | TASK-007-09-02 | Add SelectedLogLevel and LogFilePath properties to ViewModel | `ViewModels/SettingsViewModel.cs` | S | — | [ ] |
-| 390 | TASK-007-09-03 | Implement OpenLogFolderCommand that opens log directory in Windows ... | `ViewModels/SettingsViewModel.cs` | S | — | [ ] |
-| 391 | TASK-007-09-04 | Implement validation for log level (must be one of the six valid op... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-09-02 | [ ] |
-| 392 | TASK-007-09-05 | Persist log level to UserPreferences table on Save | `ViewModels/SettingsViewModel.cs` | S | TASK-007-09-02 | [ ] |
-| 393 | TASK-007-09-06 | Apply log level change at runtime by reconfiguring the logging prov... | `ViewModels/SettingsViewModel.cs` | M | TASK-007-09-02 | [ ] |
-| 394 | TASK-007-09-07 | Load log level from UserPreferences table on page initialization wi... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-09-05 | [ ] |
-| 395 | TASK-007-10-01 | Add "Clear Cache" button to Data Management section of Advanced tab... | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
-| 396 | TASK-007-10-02 | Implement ClearCacheCommand as IAsyncRelayCommand in ViewModel | `ViewModels/SettingsViewModel.cs` | M | — | [ ] |
-| 397 | TASK-007-10-03 | Query BOQCache and ProductMapping record counts for confirmation di... | `ViewModels/SettingsViewModel.cs` | S | — | [ ] |
-| 398 | TASK-007-10-04 | Implement confirmation dialog with record counts and Cancel/Continu... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-10-02, TASK-007-10-03 | [ ] |
-| 399 | TASK-007-10-05 | Execute RemoveRange on BOQCache and ProductMapping tables via AppDb... | `ViewModels/SettingsViewModel.cs` | M | TASK-007-10-04 | [ ] |
-| 400 | TASK-007-10-06 | Invalidate in-memory caches in IOdooService after database clear | `` | S | TASK-007-10-05 | [ ] |
-| 401 | TASK-007-10-07 | Add success/error result feedback after cache clear operation | `ViewModels/SettingsViewModel.cs` | S | TASK-007-10-02, TASK-007-10-05 | [ ] |
-| 402 | TASK-007-10-08 | Log cache clear operation to SyncLog table | `ViewModels/SettingsViewModel.cs` | S | TASK-007-10-02 | [ ] |
-| 403 | TASK-007-11-01 | Add "Export Configuration" button to Data Management section of Adv... | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
-| 404 | TASK-007-11-02 | Implement ExportConfigCommand as IAsyncRelayCommand in ViewModel | `ViewModels/SettingsViewModel.cs` | M | — | [ ] |
-| 405 | TASK-007-11-03 | Implement IFileDialogService.ShowSaveFileDialog() for JSON file sel... | `...gService.cs` and `Services/FileDialogService.cs` | S | — | [ ] |
-| 406 | TASK-007-11-04 | Serialize current settings to JSON excluding sensitive fields (token) | `OdooAutoCAD.Configuration/ConfigurationLoader.cs` | M | — | [ ] |
-| 407 | TASK-007-11-05 | Write serialized JSON to the user-selected file path with error han... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-11-02, TASK-007-11-04 | [ ] |
-| 408 | TASK-007-11-06 | Display success or error feedback after export operation | `ViewModels/SettingsViewModel.cs` | S | TASK-007-11-05 | [ ] |
-| 409 | TASK-007-11-07 | Log export operation to SyncLog table | `ViewModels/SettingsViewModel.cs` | S | TASK-007-11-02 | [ ] |
-| 410 | TASK-007-12-01 | Add "Import Configuration" button to Data Management section of Adv... | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
-| 411 | TASK-007-12-02 | Implement ImportConfigCommand as IAsyncRelayCommand in ViewModel | `ViewModels/SettingsViewModel.cs` | M | — | [ ] |
-| 412 | TASK-007-12-03 | Implement IFileDialogService.ShowOpenFileDialog() for JSON file sel... | `...gService.cs` and `Services/FileDialogService.cs` | S | — | [ ] |
-| 413 | TASK-007-12-04 | Implement JSON parsing and validation for structure and expected to... | `OdooAutoCAD.Configuration/ConfigurationLoader.cs` | M | — | [ ] |
-| 414 | TASK-007-12-05 | Map imported JSON values to ViewModel properties and set HasUnsaved... | `ViewModels/SettingsViewModel.cs` | M | TASK-007-12-02, TASK-007-12-04 | [ ] |
-| 415 | TASK-007-12-06 | Display success, partial-import warning, or error feedback based on... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-12-04 | [ ] |
-| 416 | TASK-007-12-07 | Log import operation to SyncLog table | `ViewModels/SettingsViewModel.cs` | S | TASK-007-12-02 | [ ] |
-| 417 | TASK-008-07-01 | Define InputBindings for Ctrl+1 through Ctrl+7 navigation shortcuts | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | M | — | [ ] |
-| 418 | TASK-008-07-02 | Define InputBinding for F5 Refresh shortcut | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | — | [ ] |
-| 419 | TASK-008-07-03 | Define InputBinding for Alt+Left GoBack shortcut | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | TASK-008-07-04 | [ ] |
-| 420 | TASK-008-07-04 | Add GoBackCommand to MainViewModel | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | — | [ ] |
-| 421 | TASK-008-07-05 | Ensure NavigateCommand accepts string parameter for keyboard shortc... | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | — | [ ] |
+| 383 | TASK-007-02-01 | Add environment selector dropdown to Connection tab in XAML | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
+| 384 | TASK-007-02-02 | Add SelectedEnvironment, AvailableEnvironments, and ChangeEnvironme... | `ViewModels/SettingsViewModel.cs` | M | — | [ ] |
+| 385 | TASK-007-02-03 | Extend ConfigurationLoader.GetAvailableConfigs() to discover appset... | `OdooAutoCAD.Configuration/ConfigurationLoader.cs` | M | — | [ ] |
+| 386 | TASK-007-02-04 | Implement confirmation dialog with change preview and cancel handling | `ViewModels/SettingsViewModel.cs` | M | TASK-007-02-02 | [ ] |
+| 387 | TASK-007-02-05 | Load environment-specific values and populate ViewModel fields on c... | `ViewModels/SettingsViewModel.cs` | M | TASK-007-02-03, TASK-007-02-04 | [ ] |
+| 388 | TASK-007-02-06 | Persist selected environment to UserPreferences table | `ViewModels/SettingsViewModel.cs` | S | TASK-007-02-02 | [ ] |
+| 389 | TASK-007-03-01 | Add "Test Connection" button with inline result display area to Con... | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
+| 390 | TASK-007-03-02 | Implement TestConnectionCommand as IAsyncRelayCommand in ViewModel | `ViewModels/SettingsViewModel.cs` | M | — | [ ] |
+| 391 | TASK-007-03-03 | Add IsTestingConnection, ConnectionTestResult, and ConnectionTestMe... | `ViewModels/SettingsViewModel.cs` | S | — | [ ] |
+| 392 | TASK-007-03-04 | Implement IOdooService.TestConnectionAsync method | `` | M | — | [ ] |
+| 393 | TASK-007-03-05 | Add error classification logic for timeout, auth failure, and netwo... | `ViewModels/SettingsViewModel.cs` | M | TASK-007-03-02 | [ ] |
+| 394 | TASK-007-03-06 | Add XAML data triggers for success (green), failure (red), and test... | `Views/Pages/SettingsPage.xaml` | S | TASK-007-03-01, TASK-007-03-03 | [ ] |
+| 395 | TASK-007-03-07 | Clear test result when connection fields are modified | `ViewModels/SettingsViewModel.cs` | S | TASK-007-03-02 | [ ] |
+| 396 | TASK-007-07-01 | Add theme radio buttons (System, Light, Dark) to Appearance tab in ... | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
+| 397 | TASK-007-07-02 | Add SelectedTheme property to ViewModel that triggers live preview ... | `ViewModels/SettingsViewModel.cs` | S | — | [ ] |
+| 398 | TASK-007-07-03 | Implement IThemeService with ApplyTheme() to swap WPF ResourceDicti... | `...IThemeService.cs` and `Services/ThemeService.cs` | M | TASK-007-07-04 | [ ] |
+| 399 | TASK-007-07-04 | Create Light and Dark theme ResourceDictionary XAML files | `...heme.xaml` and `Resources/Themes/DarkTheme.xaml` | M | — | [ ] |
+| 400 | TASK-007-07-05 | Implement "System" theme detection following Windows OS light/dark ... | `Services/ThemeService.cs` | M | TASK-007-07-03 | [ ] |
+| 401 | TASK-007-07-06 | Persist theme selection to UserPreferences table on Save | `ViewModels/SettingsViewModel.cs` | S | TASK-007-07-02 | [ ] |
+| 402 | TASK-007-07-07 | Load theme preference on application startup and apply before main ... | `App.xaml.cs` | S | TASK-007-07-06 | [ ] |
+| 403 | TASK-007-08-01 | Add language selector dropdown to Appearance tab in XAML | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
+| 404 | TASK-007-08-02 | Add restart notification text that appears when language differs fr... | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
+| 405 | TASK-007-08-03 | Add SelectedLanguage property to ViewModel with supported locale codes | `ViewModels/SettingsViewModel.cs` | S | — | [ ] |
+| 406 | TASK-007-08-04 | Persist language selection to UserPreferences table on Save | `ViewModels/SettingsViewModel.cs` | S | TASK-007-08-03 | [ ] |
+| 407 | TASK-007-08-05 | Load language preference on application startup and set CultureInfo... | `App.xaml.cs` | M | TASK-007-08-04 | [ ] |
+| 408 | TASK-007-08-06 | Create resource files (.resx) for English and Traditional Chinese s... | `...resx` and `Resources/Strings/Strings.zh-TW.resx` | L | TASK-007-08-03 | [ ] |
+| 409 | TASK-007-09-01 | Add Logging section to Advanced tab with log level dropdown, log pa... | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
+| 410 | TASK-007-09-02 | Add SelectedLogLevel and LogFilePath properties to ViewModel | `ViewModels/SettingsViewModel.cs` | S | — | [ ] |
+| 411 | TASK-007-09-03 | Implement OpenLogFolderCommand that opens log directory in Windows ... | `ViewModels/SettingsViewModel.cs` | S | — | [ ] |
+| 412 | TASK-007-09-04 | Implement validation for log level (must be one of the six valid op... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-09-02 | [ ] |
+| 413 | TASK-007-09-05 | Persist log level to UserPreferences table on Save | `ViewModels/SettingsViewModel.cs` | S | TASK-007-09-02 | [ ] |
+| 414 | TASK-007-09-06 | Apply log level change at runtime by reconfiguring the logging prov... | `ViewModels/SettingsViewModel.cs` | M | TASK-007-09-02 | [ ] |
+| 415 | TASK-007-09-07 | Load log level from UserPreferences table on page initialization wi... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-09-05 | [ ] |
+| 416 | TASK-007-10-01 | Add "Clear Cache" button to Data Management section of Advanced tab... | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
+| 417 | TASK-007-10-02 | Implement ClearCacheCommand as IAsyncRelayCommand in ViewModel | `ViewModels/SettingsViewModel.cs` | M | — | [ ] |
+| 418 | TASK-007-10-03 | Query BOQCache and ProductMapping record counts for confirmation di... | `ViewModels/SettingsViewModel.cs` | S | — | [ ] |
+| 419 | TASK-007-10-04 | Implement confirmation dialog with record counts and Cancel/Continu... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-10-02, TASK-007-10-03 | [ ] |
+| 420 | TASK-007-10-05 | Execute RemoveRange on BOQCache and ProductMapping tables via AppDb... | `ViewModels/SettingsViewModel.cs` | M | TASK-007-10-04 | [ ] |
+| 421 | TASK-007-10-06 | Invalidate in-memory caches in IOdooService after database clear | `` | S | TASK-007-10-05 | [ ] |
+| 422 | TASK-007-10-07 | Add success/error result feedback after cache clear operation | `ViewModels/SettingsViewModel.cs` | S | TASK-007-10-02, TASK-007-10-05 | [ ] |
+| 423 | TASK-007-10-08 | Log cache clear operation to SyncLog table | `ViewModels/SettingsViewModel.cs` | S | TASK-007-10-02 | [ ] |
+| 424 | TASK-007-11-01 | Add "Export Configuration" button to Data Management section of Adv... | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
+| 425 | TASK-007-11-02 | Implement ExportConfigCommand as IAsyncRelayCommand in ViewModel | `ViewModels/SettingsViewModel.cs` | M | — | [ ] |
+| 426 | TASK-007-11-03 | Implement IFileDialogService.ShowSaveFileDialog() for JSON file sel... | `...gService.cs` and `Services/FileDialogService.cs` | S | — | [ ] |
+| 427 | TASK-007-11-04 | Serialize current settings to JSON excluding sensitive fields (token) | `OdooAutoCAD.Configuration/ConfigurationLoader.cs` | M | — | [ ] |
+| 428 | TASK-007-11-05 | Write serialized JSON to the user-selected file path with error han... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-11-02, TASK-007-11-04 | [ ] |
+| 429 | TASK-007-11-06 | Display success or error feedback after export operation | `ViewModels/SettingsViewModel.cs` | S | TASK-007-11-05 | [ ] |
+| 430 | TASK-007-11-07 | Log export operation to SyncLog table | `ViewModels/SettingsViewModel.cs` | S | TASK-007-11-02 | [ ] |
+| 431 | TASK-007-12-01 | Add "Import Configuration" button to Data Management section of Adv... | `Views/Pages/SettingsPage.xaml` | S | — | [ ] |
+| 432 | TASK-007-12-02 | Implement ImportConfigCommand as IAsyncRelayCommand in ViewModel | `ViewModels/SettingsViewModel.cs` | M | — | [ ] |
+| 433 | TASK-007-12-03 | Implement IFileDialogService.ShowOpenFileDialog() for JSON file sel... | `...gService.cs` and `Services/FileDialogService.cs` | S | — | [ ] |
+| 434 | TASK-007-12-04 | Implement JSON parsing and validation for structure and expected to... | `OdooAutoCAD.Configuration/ConfigurationLoader.cs` | M | — | [ ] |
+| 435 | TASK-007-12-05 | Map imported JSON values to ViewModel properties and set HasUnsaved... | `ViewModels/SettingsViewModel.cs` | M | TASK-007-12-02, TASK-007-12-04 | [ ] |
+| 436 | TASK-007-12-06 | Display success, partial-import warning, or error feedback based on... | `ViewModels/SettingsViewModel.cs` | S | TASK-007-12-04 | [ ] |
+| 437 | TASK-007-12-07 | Log import operation to SyncLog table | `ViewModels/SettingsViewModel.cs` | S | TASK-007-12-02 | [ ] |
+| 438 | TASK-008-07-01 | Define InputBindings for Ctrl+1 through Ctrl+7 navigation shortcuts | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | M | — | [ ] |
+| 439 | TASK-008-07-02 | Define InputBinding for F5 Refresh shortcut | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | — | [ ] |
+| 440 | TASK-008-07-03 | Define InputBinding for Alt+Left GoBack shortcut | `src/OdooAutoCAD.App/Views/MainWindow.xaml` | S | TASK-008-07-04 | [ ] |
+| 441 | TASK-008-07-04 | Add GoBackCommand to MainViewModel | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | — | [ ] |
+| 442 | TASK-008-07-05 | Ensure NavigateCommand accepts string parameter for keyboard shortc... | `src/OdooAutoCAD.App/ViewModels/MainViewModel.cs` | S | — | [ ] |
 
 ### Sprint 11: MCP Server Foundation
 > **Focus**: MCP server start/stop, server status, test connection, tool registry, configuration, recent activity
@@ -545,47 +574,47 @@ its parent User Story for full context and acceptance criteria.
 
 | # | Task ID | Title | Target | Est | Depends On | Status |
 |---|---------|-------|--------|-----|------------|--------|
-| 422 | TASK-006-01-01 | Implement StartServerCommand in MCPViewModel with port validation a... | `ViewModels/MCPViewModel.cs` | M | — | [ ] |
-| 423 | TASK-006-01-02 | Add Start button with toggle binding and disabled state in XAML | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
-| 424 | TASK-006-01-03 | Implement MCPSSEServer.StartAsync() with port availability check an... | `MCP/Server/MCPSSEServer.cs` | L | — | [ ] |
-| 425 | TASK-006-01-04 | Register all MCP tools via MCPToolRegistry.RegisterAllTools() durin... | `MCP/Tools/MCPToolRegistry.cs` | L | TASK-006-01-03 | [ ] |
-| 426 | TASK-006-01-05 | Initialize IGUIProxy and start DispatcherTimer for proxy polling on... | `Views/Pages/MCPAssistantPage.xaml.cs` | M | TASK-006-01-01 | [ ] |
-| 427 | TASK-006-01-06 | Wire status callback to update ViewModel properties on state change | `ViewModels/MCPViewModel.cs` | S | TASK-006-01-01 | [ ] |
-| 428 | TASK-006-02-01 | Implement StopServerCommand in MCPViewModel with graceful shutdown ... | `ViewModels/MCPViewModel.cs` | M | — | [ ] |
-| 429 | TASK-006-02-02 | Enhance MCPSSEServer.StopAsync() to close all SSE connections and r... | `MCP/Server/MCPSSEServer.cs` | M | — | [ ] |
-| 430 | TASK-006-02-03 | Stop DispatcherTimer and clean up IGUIProxy resources on server stop | `Views/Pages/MCPAssistantPage.xaml.cs` | S | — | [ ] |
-| 431 | TASK-006-02-04 | Update XAML button binding to show "Start Server" when stopped and ... | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
-| 432 | TASK-006-02-05 | Log server shutdown event and connection closures in activity log | `ViewModels/MCPViewModel.cs` | S | TASK-006-02-01 | [ ] |
-| 433 | TASK-006-03-01 | Create Server Control panel XAML layout with status indicator, port... | `Views/Pages/MCPAssistantPage.xaml` | M | — | [ ] |
-| 434 | TASK-006-03-02 | Implement BoolToColorConverter for mapping IsServerRunning to green... | `Converters/BoolToColorConverter.cs` | S | TASK-006-03-01 | [ ] |
-| 435 | TASK-006-03-03 | Add ViewModel properties for server status display | `ViewModels/MCPViewModel.cs` | M | — | [ ] |
-| 436 | TASK-006-03-04 | Implement status callback handler that updates ViewModel on server ... | `ViewModels/MCPViewModel.cs` | S | TASK-006-03-03 | [ ] |
-| 437 | TASK-006-03-05 | Implement uptime timer that updates ServerUptime every second while... | `ViewModels/MCPViewModel.cs` | S | TASK-006-03-03 | [ ] |
-| 438 | TASK-006-03-06 | Expose ActiveConnections count and IsInitialized from MCPSSEServer ... | `MCP/Server/MCPSSEServer.cs` | M | — | [ ] |
-| 439 | TASK-006-04-01 | Implement TestConnectionCommand in MCPViewModel that calls health a... | `ViewModels/MCPViewModel.cs` | M | — | [ ] |
-| 440 | TASK-006-04-02 | Add Test Connection button to XAML with CanExecute bound to IsServe... | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
-| 441 | TASK-006-04-03 | Implement two-phase test: HTTP GET /health followed by JSON-RPC tes... | `ViewModels/MCPViewModel.cs` | M | — | [ ] |
-| 442 | TASK-006-04-04 | Display test results in the status panel | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
-| 443 | TASK-006-04-05 | Handle timeout and failure scenarios with appropriate user-facing e... | `ViewModels/MCPViewModel.cs` | S | TASK-006-04-01 | [ ] |
-| 444 | TASK-006-05-01 | Create Registered Tools panel XAML with grouped ListView and catego... | `Views/Pages/MCPAssistantPage.xaml` | M | — | [ ] |
-| 445 | TASK-006-05-02 | Implement MCPToolViewModel with display properties | `ViewModels/MCPViewModel.cs` | S | — | [ ] |
-| 446 | TASK-006-05-03 | Populate RegisteredTools ObservableCollection from MCPToolRegistry.... | `ViewModels/MCPViewModel.cs` | S | TASK-006-05-02 | [ ] |
-| 447 | TASK-006-05-04 | Add GroupStyle to ItemsControl for category-based grouping with Col... | `Views/Pages/MCPAssistantPage.xaml` | M | TASK-006-05-01 | [ ] |
-| 448 | TASK-006-05-05 | Display prerequisite badges next to tool names using DataTemplate | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
-| 449 | TASK-006-05-06 | Ensure MCPToolRegistry.RegisterTool() triggers collection update vi... | `MCP/Tools/MCPToolRegistry.cs` | M | — | [ ] |
-| 450 | TASK-006-06-01 | Create Configuration panel XAML layout with server settings, endpoi... | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
-| 451 | TASK-006-06-02 | Add ViewModel properties for computed endpoint URLs | `ViewModels/MCPViewModel.cs` | S | — | [ ] |
-| 452 | TASK-006-06-03 | Display GUI Proxy status and pending request count in Configuration... | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
-| 453 | TASK-006-06-04 | Display prerequisite legend in Configuration panel | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
-| 454 | TASK-006-06-05 | Add client configuration guidance text for Gemini CLI and Claude Co... | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
-| 455 | TASK-001-03-01 | Create Current Project info panel in XAML | `Views/Pages/DashboardPage.xaml` | M | — | [ ] |
-| 456 | TASK-001-03-02 | Add ViewModel properties for project info and sync time | `ViewModels/DashboardViewModel.cs` | S | — | [ ] |
-| 457 | TASK-001-03-03 | Implement logic to fetch current project context from IAutoCADService | `ViewModels/DashboardViewModel.cs` | M | TASK-001-03-02 | [ ] |
-| 458 | TASK-001-03-04 | Implement logic to retrieve LastSyncTime from IOdooService | `ViewModels/DashboardViewModel.cs` | S | TASK-001-03-02 | [ ] |
-| 459 | TASK-001-03-05 | Create Recent Operations summary section in XAML | `Views/Pages/DashboardPage.xaml` | M | TASK-001-03-01 | [ ] |
-| 460 | TASK-001-03-06 | Add ViewModel properties and logic for recent operation counts | `ViewModels/DashboardViewModel.cs` | M | TASK-001-03-02 | [ ] |
-| 461 | TASK-001-03-07 | Handle "no project context" state | `ViewModels/DashboardViewModel.cs` | S | TASK-001-03-02 | [ ] |
-| 462 | TASK-001-03-08 | Subscribe to AutoCAD document change events to refresh project info | `ViewModels/DashboardViewModel.cs` | S | TASK-001-03-02, TASK-001-03-03 | [ ] |
+| 443 | TASK-006-01-01 | Implement StartServerCommand in MCPViewModel with port validation a... | `ViewModels/MCPViewModel.cs` | M | — | [ ] |
+| 444 | TASK-006-01-02 | Add Start button with toggle binding and disabled state in XAML | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
+| 445 | TASK-006-01-03 | Implement MCPSSEServer.StartAsync() with port availability check an... | `MCP/Server/MCPSSEServer.cs` | L | — | [ ] |
+| 446 | TASK-006-01-04 | Register all MCP tools via MCPToolRegistry.RegisterAllTools() durin... | `MCP/Tools/MCPToolRegistry.cs` | L | TASK-006-01-03 | [ ] |
+| 447 | TASK-006-01-05 | Initialize IGUIProxy and start DispatcherTimer for proxy polling on... | `Views/Pages/MCPAssistantPage.xaml.cs` | M | TASK-006-01-01 | [ ] |
+| 448 | TASK-006-01-06 | Wire status callback to update ViewModel properties on state change | `ViewModels/MCPViewModel.cs` | S | TASK-006-01-01 | [ ] |
+| 449 | TASK-006-02-01 | Implement StopServerCommand in MCPViewModel with graceful shutdown ... | `ViewModels/MCPViewModel.cs` | M | — | [ ] |
+| 450 | TASK-006-02-02 | Enhance MCPSSEServer.StopAsync() to close all SSE connections and r... | `MCP/Server/MCPSSEServer.cs` | M | — | [ ] |
+| 451 | TASK-006-02-03 | Stop DispatcherTimer and clean up IGUIProxy resources on server stop | `Views/Pages/MCPAssistantPage.xaml.cs` | S | — | [ ] |
+| 452 | TASK-006-02-04 | Update XAML button binding to show "Start Server" when stopped and ... | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
+| 453 | TASK-006-02-05 | Log server shutdown event and connection closures in activity log | `ViewModels/MCPViewModel.cs` | S | TASK-006-02-01 | [ ] |
+| 454 | TASK-006-03-01 | Create Server Control panel XAML layout with status indicator, port... | `Views/Pages/MCPAssistantPage.xaml` | M | — | [ ] |
+| 455 | TASK-006-03-02 | Implement BoolToColorConverter for mapping IsServerRunning to green... | `Converters/BoolToColorConverter.cs` | S | TASK-006-03-01 | [ ] |
+| 456 | TASK-006-03-03 | Add ViewModel properties for server status display | `ViewModels/MCPViewModel.cs` | M | — | [ ] |
+| 457 | TASK-006-03-04 | Implement status callback handler that updates ViewModel on server ... | `ViewModels/MCPViewModel.cs` | S | TASK-006-03-03 | [ ] |
+| 458 | TASK-006-03-05 | Implement uptime timer that updates ServerUptime every second while... | `ViewModels/MCPViewModel.cs` | S | TASK-006-03-03 | [ ] |
+| 459 | TASK-006-03-06 | Expose ActiveConnections count and IsInitialized from MCPSSEServer ... | `MCP/Server/MCPSSEServer.cs` | M | — | [ ] |
+| 460 | TASK-006-04-01 | Implement TestConnectionCommand in MCPViewModel that calls health a... | `ViewModels/MCPViewModel.cs` | M | — | [ ] |
+| 461 | TASK-006-04-02 | Add Test Connection button to XAML with CanExecute bound to IsServe... | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
+| 462 | TASK-006-04-03 | Implement two-phase test: HTTP GET /health followed by JSON-RPC tes... | `ViewModels/MCPViewModel.cs` | M | — | [ ] |
+| 463 | TASK-006-04-04 | Display test results in the status panel | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
+| 464 | TASK-006-04-05 | Handle timeout and failure scenarios with appropriate user-facing e... | `ViewModels/MCPViewModel.cs` | S | TASK-006-04-01 | [ ] |
+| 465 | TASK-006-05-01 | Create Registered Tools panel XAML with grouped ListView and catego... | `Views/Pages/MCPAssistantPage.xaml` | M | — | [ ] |
+| 466 | TASK-006-05-02 | Implement MCPToolViewModel with display properties | `ViewModels/MCPViewModel.cs` | S | — | [ ] |
+| 467 | TASK-006-05-03 | Populate RegisteredTools ObservableCollection from MCPToolRegistry.... | `ViewModels/MCPViewModel.cs` | S | TASK-006-05-02 | [ ] |
+| 468 | TASK-006-05-04 | Add GroupStyle to ItemsControl for category-based grouping with Col... | `Views/Pages/MCPAssistantPage.xaml` | M | TASK-006-05-01 | [ ] |
+| 469 | TASK-006-05-05 | Display prerequisite badges next to tool names using DataTemplate | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
+| 470 | TASK-006-05-06 | Ensure MCPToolRegistry.RegisterTool() triggers collection update vi... | `MCP/Tools/MCPToolRegistry.cs` | M | — | [ ] |
+| 471 | TASK-006-06-01 | Create Configuration panel XAML layout with server settings, endpoi... | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
+| 472 | TASK-006-06-02 | Add ViewModel properties for computed endpoint URLs | `ViewModels/MCPViewModel.cs` | S | — | [ ] |
+| 473 | TASK-006-06-03 | Display GUI Proxy status and pending request count in Configuration... | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
+| 474 | TASK-006-06-04 | Display prerequisite legend in Configuration panel | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
+| 475 | TASK-006-06-05 | Add client configuration guidance text for Gemini CLI and Claude Co... | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
+| 476 | TASK-001-03-01 | Create Current Project info panel in XAML | `Views/Pages/DashboardPage.xaml` | M | — | [ ] |
+| 477 | TASK-001-03-02 | Add ViewModel properties for project info and sync time | `ViewModels/DashboardViewModel.cs` | S | — | [ ] |
+| 478 | TASK-001-03-03 | Implement logic to fetch current project context from IAutoCADService | `ViewModels/DashboardViewModel.cs` | M | TASK-001-03-02 | [ ] |
+| 479 | TASK-001-03-04 | Implement logic to retrieve LastSyncTime from IOdooService | `ViewModels/DashboardViewModel.cs` | S | TASK-001-03-02 | [ ] |
+| 480 | TASK-001-03-05 | Create Recent Operations summary section in XAML | `Views/Pages/DashboardPage.xaml` | M | TASK-001-03-01 | [ ] |
+| 481 | TASK-001-03-06 | Add ViewModel properties and logic for recent operation counts | `ViewModels/DashboardViewModel.cs` | M | TASK-001-03-02 | [ ] |
+| 482 | TASK-001-03-07 | Handle "no project context" state | `ViewModels/DashboardViewModel.cs` | S | TASK-001-03-02 | [ ] |
+| 483 | TASK-001-03-08 | Subscribe to AutoCAD document change events to refresh project info | `ViewModels/DashboardViewModel.cs` | S | TASK-001-03-02, TASK-001-03-03 | [ ] |
 
 ### Sprint 12: MCP Monitoring & Configuration
 > **Focus**: MCP connection monitoring, activity logs, tool prerequisites, restart, tool execution, port config, MCP dashboard status
@@ -594,44 +623,44 @@ its parent User Story for full context and acceptance criteria.
 
 | # | Task ID | Title | Target | Est | Depends On | Status |
 |---|---------|-------|--------|-----|------------|--------|
-| 463 | TASK-006-07-01 | Expose ActiveConnections count property from MCPSSEServer with chan... | `MCP/Server/MCPSSEServer.cs` | S | — | [ ] |
-| 464 | TASK-006-07-02 | Bind ActiveConnectionCount ViewModel property to MCPSSEServer.Activ... | `ViewModels/MCPViewModel.cs` | S | TASK-006-07-01 | [ ] |
-| 465 | TASK-006-07-03 | Display connection count in the Server Control panel XAML | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
-| 466 | TASK-006-07-04 | Update connection count on SSE connect/disconnect events using the ... | `MCP/Server/MCPSSEServer.cs` | S | — | [ ] |
-| 467 | TASK-006-08-01 | Create Activity Log panel XAML with scrollable ListBox, Clear Log b... | `Views/Pages/MCPAssistantPage.xaml` | M | — | [ ] |
-| 468 | TASK-006-08-02 | Implement LogEntry model with Timestamp, Level, Message, and Source... | `ViewModels/MCPViewModel.cs` | S | — | [ ] |
-| 469 | TASK-006-08-03 | Add ActivityLog ObservableCollection and log management methods to ... | `ViewModels/MCPViewModel.cs` | M | TASK-006-08-02 | [ ] |
-| 470 | TASK-006-08-04 | Implement auto-scroll behavior with IsAutoScrollEnabled toggle and ... | `Views/Pages/MCPAssistantPage.xaml.cs` | S | TASK-006-08-01 | [ ] |
-| 471 | TASK-006-08-05 | Implement ClearLogCommand and ToggleAutoScrollCommand relay commands | `ViewModels/MCPViewModel.cs` | S | — | [ ] |
-| 472 | TASK-006-08-06 | Wire MCPSSEServer events to the ActivityLog collection | `ViewModels/MCPViewModel.cs` | M | TASK-006-08-03 | [ ] |
-| 473 | TASK-006-09-01 | Add RequiresAutoCAD and RequiresOdoo boolean properties to MCPToolV... | `ViewModels/MCPViewModel.cs` | S | — | [ ] |
-| 474 | TASK-006-09-02 | Display [A] and [O] badges with warning indicators for unmet prereq... | `Views/Pages/MCPAssistantPage.xaml` | S | TASK-006-09-01 | [ ] |
-| 475 | TASK-006-09-03 | Add prerequisite legend section to the Configuration panel XAML | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
-| 476 | TASK-006-09-04 | Implement prerequisite checking in MCPToolRegistry.ExecuteToolAsync... | `MCP/Tools/MCPToolRegistry.cs` | M | — | [ ] |
-| 477 | TASK-006-09-05 | Query IAutoCADService.IsConnected and IOdooService.IsConnected for ... | `ViewModels/MCPViewModel.cs` | M | — | [ ] |
-| 478 | TASK-006-10-01 | Implement RestartServerCommand in MCPViewModel that chains StopAsyn... | `ViewModels/MCPViewModel.cs` | M | — | [ ] |
-| 479 | TASK-006-10-02 | Add Restart button to Server Control panel XAML | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
-| 480 | TASK-006-10-03 | Implement MCPSSEServer.RestartAsync() with 1-second delay between s... | `MCP/Server/MCPSSEServer.cs` | M | — | [ ] |
-| 481 | TASK-006-10-04 | Update ServerStatus property through intermediate states during res... | `ViewModels/MCPViewModel.cs` | S | TASK-006-10-01 | [ ] |
-| 482 | TASK-006-10-05 | Log restart operation start and completion in activity log | `ViewModels/MCPViewModel.cs` | S | TASK-006-10-01 | [ ] |
-| 483 | TASK-006-11-01 | Add execution logging hooks in MCPToolRegistry.ExecuteToolAsync() | `MCP/Tools/MCPToolRegistry.cs` | M | — | [ ] |
-| 484 | TASK-006-11-02 | Implement tool execution event handler in MCPViewModel to append Lo... | `ViewModels/MCPViewModel.cs` | S | TASK-006-11-01 | [ ] |
-| 485 | TASK-006-11-03 | Add Stopwatch-based duration measurement in ExecuteToolAsync | `MCP/Tools/MCPToolRegistry.cs` | S | — | [ ] |
-| 486 | TASK-006-11-04 | Log GUI Proxy action queuing and completion events | `ViewModels/MCPViewModel.cs` | S | — | [ ] |
-| 487 | TASK-006-11-05 | Ensure log entries are dispatched to the UI thread for ObservableCo... | `ViewModels/MCPViewModel.cs` | S | — | [ ] |
-| 488 | TASK-006-12-01 | Add editable port TextBox to Configuration panel XAML | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
-| 489 | TASK-006-12-02 | Implement port validation in MCPViewModel | `ViewModels/MCPViewModel.cs` | S | — | [ ] |
-| 490 | TASK-006-12-03 | Update computed endpoint URL properties when ServerPort changes | `ViewModels/MCPViewModel.cs` | S | — | [ ] |
-| 491 | TASK-006-12-04 | Persist port configuration to application settings | `ViewModels/MCPViewModel.cs` | L | — | [ ] |
-| 492 | TASK-006-12-05 | Add port availability check on server start and display error if po... | `MCP/Server/MCPSSEServer.cs` | M | — | [ ] |
-| 493 | TASK-006-12-06 | Display validation error styling for invalid port input | `Views/Pages/MCPAssistantPage.xaml` | S | TASK-006-12-01 | [ ] |
-| 494 | TASK-001-04-01 | Create MCP Server status card in XAML | `Views/Pages/DashboardPage.xaml` | M | — | [ ] |
-| 495 | TASK-001-04-02 | Add ViewModel properties for MCP status | `ViewModels/DashboardViewModel.cs` | S | — | [ ] |
-| 496 | TASK-001-04-03 | Implement ToggleMCPCommand with async start/stop | `ViewModels/DashboardViewModel.cs` | M | TASK-001-04-02 | [ ] |
-| 497 | TASK-001-04-04 | Implement async monitoring of MCP SSE server state | `ViewModels/DashboardViewModel.cs` | M | TASK-001-04-02 | [ ] |
-| 498 | TASK-001-04-05 | Add error handling for MCP server start failure | `ViewModels/DashboardViewModel.cs` | S | TASK-001-04-03 | [ ] |
-| 499 | TASK-001-04-06 | Bind toggle button content and status indicator in XAML | `Views/Pages/DashboardPage.xaml` | S | TASK-001-04-01 | [ ] |
-| 500 | TASK-001-04-07 | Integrate with MCP SSE Manager service for server lifecycle management | `ViewModels/DashboardViewModel.cs` | L | TASK-001-04-02, TASK-001-04-03, TASK-001-04-04 | [ ] |
+| 484 | TASK-006-07-01 | Expose ActiveConnections count property from MCPSSEServer with chan... | `MCP/Server/MCPSSEServer.cs` | S | — | [ ] |
+| 485 | TASK-006-07-02 | Bind ActiveConnectionCount ViewModel property to MCPSSEServer.Activ... | `ViewModels/MCPViewModel.cs` | S | TASK-006-07-01 | [ ] |
+| 486 | TASK-006-07-03 | Display connection count in the Server Control panel XAML | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
+| 487 | TASK-006-07-04 | Update connection count on SSE connect/disconnect events using the ... | `MCP/Server/MCPSSEServer.cs` | S | — | [ ] |
+| 488 | TASK-006-08-01 | Create Activity Log panel XAML with scrollable ListBox, Clear Log b... | `Views/Pages/MCPAssistantPage.xaml` | M | — | [ ] |
+| 489 | TASK-006-08-02 | Implement LogEntry model with Timestamp, Level, Message, and Source... | `ViewModels/MCPViewModel.cs` | S | — | [ ] |
+| 490 | TASK-006-08-03 | Add ActivityLog ObservableCollection and log management methods to ... | `ViewModels/MCPViewModel.cs` | M | TASK-006-08-02 | [ ] |
+| 491 | TASK-006-08-04 | Implement auto-scroll behavior with IsAutoScrollEnabled toggle and ... | `Views/Pages/MCPAssistantPage.xaml.cs` | S | TASK-006-08-01 | [ ] |
+| 492 | TASK-006-08-05 | Implement ClearLogCommand and ToggleAutoScrollCommand relay commands | `ViewModels/MCPViewModel.cs` | S | — | [ ] |
+| 493 | TASK-006-08-06 | Wire MCPSSEServer events to the ActivityLog collection | `ViewModels/MCPViewModel.cs` | M | TASK-006-08-03 | [ ] |
+| 494 | TASK-006-09-01 | Add RequiresAutoCAD and RequiresOdoo boolean properties to MCPToolV... | `ViewModels/MCPViewModel.cs` | S | — | [ ] |
+| 495 | TASK-006-09-02 | Display [A] and [O] badges with warning indicators for unmet prereq... | `Views/Pages/MCPAssistantPage.xaml` | S | TASK-006-09-01 | [ ] |
+| 496 | TASK-006-09-03 | Add prerequisite legend section to the Configuration panel XAML | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
+| 497 | TASK-006-09-04 | Implement prerequisite checking in MCPToolRegistry.ExecuteToolAsync... | `MCP/Tools/MCPToolRegistry.cs` | M | — | [ ] |
+| 498 | TASK-006-09-05 | Query IAutoCADService.IsConnected and IOdooService.IsConnected for ... | `ViewModels/MCPViewModel.cs` | M | — | [ ] |
+| 499 | TASK-006-10-01 | Implement RestartServerCommand in MCPViewModel that chains StopAsyn... | `ViewModels/MCPViewModel.cs` | M | — | [ ] |
+| 500 | TASK-006-10-02 | Add Restart button to Server Control panel XAML | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
+| 501 | TASK-006-10-03 | Implement MCPSSEServer.RestartAsync() with 1-second delay between s... | `MCP/Server/MCPSSEServer.cs` | M | — | [ ] |
+| 502 | TASK-006-10-04 | Update ServerStatus property through intermediate states during res... | `ViewModels/MCPViewModel.cs` | S | TASK-006-10-01 | [ ] |
+| 503 | TASK-006-10-05 | Log restart operation start and completion in activity log | `ViewModels/MCPViewModel.cs` | S | TASK-006-10-01 | [ ] |
+| 504 | TASK-006-11-01 | Add execution logging hooks in MCPToolRegistry.ExecuteToolAsync() | `MCP/Tools/MCPToolRegistry.cs` | M | — | [ ] |
+| 505 | TASK-006-11-02 | Implement tool execution event handler in MCPViewModel to append Lo... | `ViewModels/MCPViewModel.cs` | S | TASK-006-11-01 | [ ] |
+| 506 | TASK-006-11-03 | Add Stopwatch-based duration measurement in ExecuteToolAsync | `MCP/Tools/MCPToolRegistry.cs` | S | — | [ ] |
+| 507 | TASK-006-11-04 | Log GUI Proxy action queuing and completion events | `ViewModels/MCPViewModel.cs` | S | — | [ ] |
+| 508 | TASK-006-11-05 | Ensure log entries are dispatched to the UI thread for ObservableCo... | `ViewModels/MCPViewModel.cs` | S | — | [ ] |
+| 509 | TASK-006-12-01 | Add editable port TextBox to Configuration panel XAML | `Views/Pages/MCPAssistantPage.xaml` | S | — | [ ] |
+| 510 | TASK-006-12-02 | Implement port validation in MCPViewModel | `ViewModels/MCPViewModel.cs` | S | — | [ ] |
+| 511 | TASK-006-12-03 | Update computed endpoint URL properties when ServerPort changes | `ViewModels/MCPViewModel.cs` | S | — | [ ] |
+| 512 | TASK-006-12-04 | Persist port configuration to application settings | `ViewModels/MCPViewModel.cs` | L | — | [ ] |
+| 513 | TASK-006-12-05 | Add port availability check on server start and display error if po... | `MCP/Server/MCPSSEServer.cs` | M | — | [ ] |
+| 514 | TASK-006-12-06 | Display validation error styling for invalid port input | `Views/Pages/MCPAssistantPage.xaml` | S | TASK-006-12-01 | [ ] |
+| 515 | TASK-001-04-01 | Create MCP Server status card in XAML | `Views/Pages/DashboardPage.xaml` | M | — | [ ] |
+| 516 | TASK-001-04-02 | Add ViewModel properties for MCP status | `ViewModels/DashboardViewModel.cs` | S | — | [ ] |
+| 517 | TASK-001-04-03 | Implement ToggleMCPCommand with async start/stop | `ViewModels/DashboardViewModel.cs` | M | TASK-001-04-02 | [ ] |
+| 518 | TASK-001-04-04 | Implement async monitoring of MCP SSE server state | `ViewModels/DashboardViewModel.cs` | M | TASK-001-04-02 | [ ] |
+| 519 | TASK-001-04-05 | Add error handling for MCP server start failure | `ViewModels/DashboardViewModel.cs` | S | TASK-001-04-03 | [ ] |
+| 520 | TASK-001-04-06 | Bind toggle button content and status indicator in XAML | `Views/Pages/DashboardPage.xaml` | S | TASK-001-04-01 | [ ] |
+| 521 | TASK-001-04-07 | Integrate with MCP SSE Manager service for server lifecycle management | `ViewModels/DashboardViewModel.cs` | L | TASK-001-04-02, TASK-001-04-03, TASK-001-04-04 | [ ] |
 
 ---
 
@@ -648,6 +677,7 @@ its parent User Story for full context and acceptance criteria.
 | Sprint 5 → Sprint 7 | Odoo sync needed for PR conversion |
 | Sprint 6 → Sprint 7 | BOQ push to Odoo needed before PR conversion |
 | Sprint 3 → Sprint 8 | Core AutoCAD/Odoo interfaces needed for advanced features |
+| Sprint 3 → Sprint 9.5 | AutoCAD/Odoo connections + Swagger API pattern needed for parameter config |
 | Sprint 6 → Sprint 9 | BOQ pipeline needed for advanced BOQ features |
 | Sprint 7 → Sprint 9 | PR core needed for PR feature completion |
 | Sprint 3 → Sprint 11 | AutoCAD/Odoo services needed for MCP tool prerequisites |
@@ -666,10 +696,11 @@ its parent User Story for full context and acceptance criteria.
 | 7 | Purchase Requisition Core | 17 | 8 | 0 | 25 |
 | 8 | AutoCAD P2 & Odoo Search/Filter | 31 | 24 | 2 | 57 |
 | 9 | BOQ P2 & PR Feature Completion | 52 | 16 | 1 | 69 |
+| 9.5 | Odoo Parameter Configuration | 8 | 11 | 2 | 21 |
 | 10 | Settings Advanced & Keyboard Shortcuts | 39 | 20 | 1 | 60 |
 | 11 | MCP Server Foundation | 23 | 16 | 2 | 41 |
 | 12 | MCP Monitoring & Configuration | 24 | 12 | 2 | 38 |
-| **Total** | | **313** | **160** | **27** | **500** |
+| **Total** | | **321** | **171** | **29** | **521** |
 
 ## User Story Index
 
@@ -753,6 +784,9 @@ its parent User Story for full context and acceptance criteria.
 | US-008-08 | Page Title Header | P1 | 5 | 1 | [TASKS-US-008-08.md](FR-008-ui-framework/TASKS-US-008-08.md) |
 | US-008-09 | Clean Shutdown | P1 | 6 | 1 | [TASKS-US-008-09.md](FR-008-ui-framework/TASKS-US-008-09.md) |
 | US-008-10 | CJK Font Rendering | P1 | 5 | 1 | [TASKS-US-008-10.md](FR-008-ui-framework/TASKS-US-008-10.md) |
+| US-009-01 | Fetch Odoo Parameters | P2 | 6 | 9.5 | [TASKS-US-009-01.md](FR-009-parameter-config/TASKS-US-009-01.md) |
+| US-009-02 | Parameter Form UI | P2 | 9 | 9.5 | [TASKS-US-009-02.md](FR-009-parameter-config/TASKS-US-009-02.md) |
+| US-009-03 | Write Parameters to AutoCAD | P2 | 6 | 9.5 | [TASKS-US-009-03.md](FR-009-parameter-config/TASKS-US-009-03.md) |
 
 ## Legend
 
