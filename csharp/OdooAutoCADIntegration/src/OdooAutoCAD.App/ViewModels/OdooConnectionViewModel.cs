@@ -26,6 +26,9 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
     private readonly ILogger<OdooConnectionViewModel>? _logger;
     private readonly Dictionary<string, List<string>> _errors = new();
 
+    // Cache of all products for restoring after search clear
+    private List<OdooProduct> _allProducts = new();
+
     [ObservableProperty]
     private string _swaggerUrl = string.Empty;
 
@@ -62,7 +65,66 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
     [ObservableProperty]
     private bool _isSyncingProducts;
 
+    #region Product Search & Category Filter (Sprint 8)
+
+    [ObservableProperty]
+    private string _productSearchTerm = string.Empty;
+
+    [ObservableProperty]
+    private bool _isSearchingProducts;
+
+    [ObservableProperty]
+    private string _searchStatusText = string.Empty;
+
+    [ObservableProperty]
+    private OdooProductCategory? _selectedCategory;
+
+    [ObservableProperty]
+    private bool _isLoadingCategories;
+
+    #endregion
+
+    #region Project Search (Sprint 8)
+
+    [ObservableProperty]
+    private string _projectSearchTerm = string.Empty;
+
+    [ObservableProperty]
+    private bool _isSearchingProjects;
+
+    [ObservableProperty]
+    private OdooProject? _selectedProject;
+
+    [ObservableProperty]
+    private string _projectStatusText = string.Empty;
+
+    [ObservableProperty]
+    private int _projectCount;
+
+    #endregion
+
+    #region Server Info & Sync Time (Sprint 8)
+
+    [ObservableProperty]
+    private string _serverVersion = string.Empty;
+
+    [ObservableProperty]
+    private string _connectedDatabase = string.Empty;
+
+    [ObservableProperty]
+    private string _connectedUsername = string.Empty;
+
+    [ObservableProperty]
+    private DateTime? _lastSyncTime;
+
+    [ObservableProperty]
+    private string _lastSyncDisplay = "Never synced";
+
+    #endregion
+
     public ObservableCollection<OdooProduct> Products { get; } = new();
+    public ObservableCollection<OdooProductCategory> Categories { get; } = new();
+    public ObservableCollection<OdooProject> Projects { get; } = new();
 
     public OdooConnectionViewModel(
         IOdooService odooService,
@@ -78,6 +140,14 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
         _configuration = configuration;
         _logService = logService;
         _logger = logger;
+
+        // Initialize last sync time from service
+        var syncTime = _odooService.GetLastSyncTime();
+        if (syncTime.HasValue)
+        {
+            LastSyncTime = syncTime.Value;
+            LastSyncDisplay = syncTime.Value.ToString("yyyy-MM-dd HH:mm:ss");
+        }
 
         // Load settings on initialization
         _ = LoadSettingsAsync();
@@ -275,6 +345,14 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
                 StatusIsSuccess = true;
                 OdooVersion = status.Version ?? "API Available";
                 IsConnected = true;
+
+                // Populate server info (Sprint 8)
+                ServerVersion = status.Version ?? "Unknown";
+                ConnectedDatabase = database;
+                ConnectedUsername = UserToken.Length > 8
+                    ? $"{UserToken[..4]}...{UserToken[^4..]}"
+                    : "(token)";
+
                 _logService.Log($"SUCCESS - {status.Version ?? "API available"}", "Odoo");
                 _logger?.LogInformation("Test connection successful: {Version}", status.Version);
             }
@@ -317,6 +395,12 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
             OdooVersion = string.Empty;
             StatusMessage = "Disconnected from Odoo";
             StatusIsSuccess = false;
+
+            // Clear server info (Sprint 8)
+            ServerVersion = string.Empty;
+            ConnectedDatabase = string.Empty;
+            ConnectedUsername = string.Empty;
+
             _logService.Log("Disconnected from Odoo", "Odoo");
         }
         catch (Exception ex)
@@ -333,6 +417,10 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
     {
         DisconnectCommand.NotifyCanExecuteChanged();
         SyncProductsCommand.NotifyCanExecuteChanged();
+        SearchProductsCommand.NotifyCanExecuteChanged();
+        LoadCategoriesCommand.NotifyCanExecuteChanged();
+        SearchProjectsCommand.NotifyCanExecuteChanged();
+        LoadProjectsCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand(CanExecute = nameof(CanSyncProducts))]
@@ -374,11 +462,16 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
             var products = await _odooService.GetProductsViaApiAsync(baseUrl, basePath, database, UserToken);
 
             Products.Clear();
+            _allProducts = products.ToList();
             foreach (var product in products)
             {
                 Products.Add(product);
             }
             ProductCount = Products.Count;
+
+            // Update sync time (Sprint 8)
+            LastSyncTime = DateTime.Now;
+            LastSyncDisplay = LastSyncTime.Value.ToString("yyyy-MM-dd HH:mm:ss");
 
             SyncStatusMessage = $"Synced {ProductCount} products";
             _logService.Log($"Product sync complete: {ProductCount} products", "Odoo");
@@ -445,6 +538,237 @@ public partial class OdooConnectionViewModel : ObservableObject, INotifyDataErro
             StatusMessage = $"Failed to save settings: {ex.Message}";
             StatusIsSuccess = false;
             _logger?.LogError(ex, "Failed to save Odoo settings");
+        }
+    }
+
+    #endregion
+
+    #region Product Search & Category Filter Commands (Sprint 8)
+
+    [RelayCommand(CanExecute = nameof(CanSearchProducts))]
+    private async Task SearchProductsAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ProductSearchTerm))
+            return;
+
+        IsSearchingProducts = true;
+        SearchStatusText = "Searching...";
+
+        try
+        {
+            var results = await _odooService.SearchProductsAsync(ProductSearchTerm);
+
+            Products.Clear();
+            foreach (var product in results)
+            {
+                Products.Add(product);
+            }
+            ProductCount = Products.Count;
+            SearchStatusText = $"Found {ProductCount} products matching \"{ProductSearchTerm}\"";
+            _logService.Log($"Product search \"{ProductSearchTerm}\": {ProductCount} results", "Odoo");
+        }
+        catch (Exception ex)
+        {
+            SearchStatusText = $"Search failed: {ex.Message}";
+            _logService.Log($"Product search failed: {ex.Message}", "Odoo", AppLogLevel.Error);
+            _logger?.LogError(ex, "Product search error");
+        }
+        finally
+        {
+            IsSearchingProducts = false;
+        }
+    }
+
+    private bool CanSearchProducts() => IsConnected && !IsSearchingProducts && !string.IsNullOrWhiteSpace(ProductSearchTerm);
+
+    partial void OnProductSearchTermChanged(string value)
+    {
+        SearchProductsCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand]
+    private void ClearProductSearch()
+    {
+        ProductSearchTerm = string.Empty;
+        SearchStatusText = string.Empty;
+        SelectedCategory = null;
+
+        Products.Clear();
+        foreach (var product in _allProducts)
+        {
+            Products.Add(product);
+        }
+        ProductCount = Products.Count;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanLoadCategories))]
+    private async Task LoadCategoriesAsync()
+    {
+        IsLoadingCategories = true;
+
+        try
+        {
+            var categories = await _odooService.GetCategoriesAsync();
+
+            Categories.Clear();
+            foreach (var category in categories)
+            {
+                Categories.Add(category);
+            }
+            _logService.Log($"Loaded {categories.Count} product categories", "Odoo");
+        }
+        catch (Exception ex)
+        {
+            _logService.Log($"Load categories failed: {ex.Message}", "Odoo", AppLogLevel.Error);
+            _logger?.LogError(ex, "Load categories error");
+        }
+        finally
+        {
+            IsLoadingCategories = false;
+        }
+    }
+
+    private bool CanLoadCategories() => IsConnected && !IsLoadingCategories;
+
+    partial void OnSelectedCategoryChanged(OdooProductCategory? value)
+    {
+        if (value != null)
+        {
+            _ = FilterByCategoryAsync(value.Id);
+        }
+    }
+
+    private async Task FilterByCategoryAsync(int categoryId)
+    {
+        IsSearchingProducts = true;
+        SearchStatusText = "Filtering by category...";
+
+        try
+        {
+            var results = await _odooService.GetProductsByCategoryAsync(categoryId);
+
+            Products.Clear();
+            foreach (var product in results)
+            {
+                Products.Add(product);
+            }
+            ProductCount = Products.Count;
+            SearchStatusText = $"Showing {ProductCount} products in category";
+            _logService.Log($"Category filter: {ProductCount} products", "Odoo");
+        }
+        catch (Exception ex)
+        {
+            SearchStatusText = $"Filter failed: {ex.Message}";
+            _logger?.LogError(ex, "Category filter error");
+        }
+        finally
+        {
+            IsSearchingProducts = false;
+        }
+    }
+
+    #endregion
+
+    #region Project Search Commands (Sprint 8)
+
+    [RelayCommand(CanExecute = nameof(CanSearchProjects))]
+    private async Task SearchProjectsAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ProjectSearchTerm))
+            return;
+
+        IsSearchingProjects = true;
+        ProjectStatusText = "Searching projects...";
+
+        try
+        {
+            var results = await _odooService.SearchProjectsAsync(ProjectSearchTerm);
+
+            Projects.Clear();
+            foreach (var project in results)
+            {
+                Projects.Add(project);
+            }
+            ProjectCount = Projects.Count;
+            ProjectStatusText = $"Found {ProjectCount} projects matching \"{ProjectSearchTerm}\"";
+            _logService.Log($"Project search \"{ProjectSearchTerm}\": {ProjectCount} results", "Odoo");
+        }
+        catch (Exception ex)
+        {
+            ProjectStatusText = $"Search failed: {ex.Message}";
+            _logService.Log($"Project search failed: {ex.Message}", "Odoo", AppLogLevel.Error);
+            _logger?.LogError(ex, "Project search error");
+        }
+        finally
+        {
+            IsSearchingProjects = false;
+        }
+    }
+
+    private bool CanSearchProjects() => IsConnected && !IsSearchingProjects && !string.IsNullOrWhiteSpace(ProjectSearchTerm);
+
+    partial void OnProjectSearchTermChanged(string value)
+    {
+        SearchProjectsCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanLoadProjects))]
+    private async Task LoadProjectsAsync()
+    {
+        IsSearchingProjects = true;
+        ProjectStatusText = "Loading all projects...";
+
+        try
+        {
+            var results = await _odooService.GetProjectsAsync();
+
+            Projects.Clear();
+            foreach (var project in results)
+            {
+                Projects.Add(project);
+            }
+            ProjectCount = Projects.Count;
+            ProjectStatusText = $"Loaded {ProjectCount} active projects";
+            _logService.Log($"Loaded {ProjectCount} projects", "Odoo");
+        }
+        catch (Exception ex)
+        {
+            ProjectStatusText = $"Load failed: {ex.Message}";
+            _logService.Log($"Load projects failed: {ex.Message}", "Odoo", AppLogLevel.Error);
+            _logger?.LogError(ex, "Load projects error");
+        }
+        finally
+        {
+            IsSearchingProjects = false;
+        }
+    }
+
+    private bool CanLoadProjects() => IsConnected && !IsSearchingProjects;
+
+    [RelayCommand]
+    private async Task SelectProjectAsync()
+    {
+        if (SelectedProject == null)
+        {
+            ProjectStatusText = "No project selected";
+            return;
+        }
+
+        try
+        {
+            await _settingsService.SaveServerConfigsAsync(new Dictionary<string, string?>
+            {
+                ["odoo_project_id"] = SelectedProject.Id.ToString(),
+                ["odoo_project_name"] = SelectedProject.Name
+            });
+
+            ProjectStatusText = $"Selected: {SelectedProject.Name} (ID: {SelectedProject.Id})";
+            _logService.Log($"Project selected: {SelectedProject.Name} (ID: {SelectedProject.Id})", "Odoo");
+        }
+        catch (Exception ex)
+        {
+            ProjectStatusText = $"Failed to save project selection: {ex.Message}";
+            _logger?.LogError(ex, "Save project selection error");
         }
     }
 

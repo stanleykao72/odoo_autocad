@@ -393,6 +393,19 @@ public class OdooService : IOdooService, IDisposable
         return result.Select(r => MapToOdooProduct(r)).ToList();
     }
 
+    public async Task<IReadOnlyList<OdooProductCategory>> GetCategoriesAsync()
+    {
+        var result = await SearchReadAsync("product.category", Array.Empty<object>(),
+            new[] { "id", "name", "parent_id" });
+
+        return result.Select(r => new OdooProductCategory(
+            r.GetProperty("id").GetInt32(),
+            r.GetProperty("name").GetString() ?? "",
+            r.TryGetProperty("parent_id", out var p) && p.ValueKind == JsonValueKind.Array
+                ? p[0].GetInt32() : null
+        )).ToList();
+    }
+
     public async Task<IReadOnlyList<OdooProduct>> GetProductsViaApiAsync(
         string baseUrl, string basePath, string database, string userToken)
     {
@@ -879,6 +892,75 @@ public class OdooService : IOdooService, IDisposable
                 ErrorCode = "HTTP_ERROR",
                 ErrorMessage = ex.Message
             };
+        }
+    }
+
+    public async Task<OdooProjectInfo?> GetProjectViaApiAsync(
+        string prNumber, string baseUrl, string basePath,
+        string database, string userToken)
+    {
+        try
+        {
+            var credentials = Convert.ToBase64String(
+                Encoding.UTF8.GetBytes($"{database}:{userToken}"));
+
+            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{basePath}/callMethodForJobWorkingPlanBoqModel";
+
+            // Match Python: get_project_v2 with exact name match
+            var body = new
+            {
+                method_name = "get_project_v2",
+                args = new object[] { new object[] { new object[] { "name", "=", prNumber } } },
+                kwargs = new { user_token = userToken },
+                context = new { }
+            };
+
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, apiEndpoint);
+            httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+            httpRequest.Content = new StringContent(
+                JsonSerializer.Serialize(body),
+                Encoding.UTF8,
+                "application/json");
+
+            var response = await _httpClient.SendAsync(httpRequest);
+            response.EnsureSuccessStatusCode();
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            var jsonDoc = JsonSerializer.Deserialize<JsonElement>(responseJson);
+
+            // Check for error response
+            if (jsonDoc.TryGetProperty("error_code", out _))
+            {
+                var errMsg = jsonDoc.TryGetProperty("error_message", out var em)
+                    ? em.GetString() : "Unknown error";
+                _logger?.LogWarning("get_project_v2 error: {Error}", errMsg);
+                return null;
+            }
+
+            // Parse response: { id, name, job_working_plan_id, job_working_plan_name }
+            int? projectId = jsonDoc.TryGetProperty("id", out var idEl) && idEl.ValueKind == JsonValueKind.Number
+                ? idEl.GetInt32() : null;
+            string? projectName = jsonDoc.TryGetProperty("name", out var nameEl)
+                ? nameEl.GetString() : null;
+            int? jwpId = jsonDoc.TryGetProperty("job_working_plan_id", out var jwpIdEl) && jwpIdEl.ValueKind == JsonValueKind.Number
+                ? jwpIdEl.GetInt32() : null;
+            string? jwpName = jsonDoc.TryGetProperty("job_working_plan_name", out var jwpNameEl)
+                ? jwpNameEl.GetString() : null;
+
+            if (projectId == null || projectName == null)
+            {
+                _logger?.LogWarning("get_project_v2 returned no project for PR '{PrNumber}'", prNumber);
+                return null;
+            }
+
+            _logger?.LogInformation("get_project_v2: found project {Id} '{Name}'", projectId, projectName);
+
+            return new OdooProjectInfo(projectId.Value, projectName, jwpId, jwpName);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "get_project_v2 API call failed for PR '{PrNumber}'", prNumber);
+            return null;
         }
     }
 

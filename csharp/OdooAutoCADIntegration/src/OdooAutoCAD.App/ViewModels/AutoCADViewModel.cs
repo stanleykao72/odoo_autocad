@@ -6,12 +6,14 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using OdooAutoCAD.App.Services;
 using OdooAutoCAD.Core.AutoCAD;
+using OdooAutoCAD.Core.Odoo;
 using OdooAutoCAD.Core.Threading;
 
 namespace OdooAutoCAD.App.ViewModels;
@@ -26,8 +28,11 @@ public partial class AutoCADViewModel : ObservableObject
     private readonly IAutoCADService _autoCADService;
     private readonly IDwgReaderService _dwgReader;
     private readonly IGUIProxy _guiProxy;
+    private readonly IOdooService _odooService;
+    private readonly ISettingsService _settingsService;
     private readonly IAppLogService _logService;
     private readonly ILogger<AutoCADViewModel>? _logger;
+    private DispatcherTimer? _healthTimer;
 
     [ObservableProperty]
     private bool _isConnected;
@@ -46,6 +51,39 @@ public partial class AutoCADViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isConnecting;
+
+    // Sprint 8: Drawing Info + COM Monitor
+    [ObservableProperty]
+    private string _documentPath = "N/A";
+
+    [ObservableProperty]
+    private bool _isMonitoring;
+
+    [ObservableProperty]
+    private string _comStatusText = "Not monitored";
+
+    // Sprint 8: PR Project Info
+    [ObservableProperty]
+    private string _prNumber = "";
+
+    [ObservableProperty]
+    private string _projectName = "";
+
+    [ObservableProperty]
+    private string _jobWorkingPlanName = "";
+
+    [ObservableProperty]
+    private int _projectId;
+
+    [ObservableProperty]
+    private string _projectLookupStatus = "";
+
+    // Sprint 8: Clear Table IDs
+    [ObservableProperty]
+    private string _clearIdsStatus = "";
+
+    [ObservableProperty]
+    private bool _isClearingIds;
 
     // Phase 2.2: Layouts
     [ObservableProperty]
@@ -88,6 +126,21 @@ public partial class AutoCADViewModel : ObservableObject
         OnPropertyChanged(nameof(HasDataSource));
         ExtractParametersCommand.NotifyCanExecuteChanged();
         OpenDwgFileCommand.NotifyCanExecuteChanged();
+        ClearTableIdsCommand.NotifyCanExecuteChanged();
+        ClearAllTableIdsCommand.NotifyCanExecuteChanged();
+        ExtractPRInfoCommand.NotifyCanExecuteChanged();
+
+        if (value)
+        {
+            ComStatusText = "Connected";
+            StartMonitoring();
+        }
+        else
+        {
+            ComStatusText = "Disconnected";
+            DocumentPath = "N/A";
+            StopMonitoring();
+        }
     }
 
     partial void OnIsDwgFileLoadedChanged(bool value)
@@ -100,18 +153,24 @@ public partial class AutoCADViewModel : ObservableObject
         IAutoCADService autoCADService,
         IDwgReaderService dwgReader,
         IGUIProxy guiProxy,
+        IOdooService odooService,
+        ISettingsService settingsService,
         IAppLogService logService,
         ILogger<AutoCADViewModel>? logger = null)
     {
         _autoCADService = autoCADService ?? throw new ArgumentNullException(nameof(autoCADService));
         _dwgReader = dwgReader ?? throw new ArgumentNullException(nameof(dwgReader));
         _guiProxy = guiProxy ?? throw new ArgumentNullException(nameof(guiProxy));
+        _odooService = odooService ?? throw new ArgumentNullException(nameof(odooService));
+        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         _logger = logger;
 
         // Initialize connection status
         UpdateConnectionStatus();
     }
+
+    #region Connection Management
 
     /// <summary>
     /// Toggle connection command (Connect/Disconnect).
@@ -216,6 +275,7 @@ public partial class AutoCADViewModel : ObservableObject
                 ConnectButtonText = "Connect to AutoCAD";
                 AutoCADVersion = "N/A";
                 CurrentDocument = "No document open";
+                DocumentPath = "N/A";
 
                 _logService.Log("AutoCAD disconnected", "AutoCAD");
                 _logger?.LogInformation("AutoCAD disconnected successfully");
@@ -241,7 +301,7 @@ public partial class AutoCADViewModel : ObservableObject
     private bool CanDisconnect() => !IsConnecting && IsConnected;
 
     /// <summary>
-    /// Updates AutoCAD information (version, document name).
+    /// Updates AutoCAD information (version, document name, document path).
     /// Called after successful connection.
     /// </summary>
     private async Task UpdateAutoCADInfoAsync()
@@ -255,6 +315,7 @@ public partial class AutoCADViewModel : ObservableObject
             {
                 AutoCADVersion = status.Version ?? "Unknown";
                 CurrentDocument = status.CurrentDocument ?? "No document open";
+                DocumentPath = status.DocumentPath ?? "N/A";
 
                 _logger?.LogDebug("AutoCAD info updated - Version: {Version}, Document: {Document}",
                     AutoCADVersion, CurrentDocument);
@@ -265,6 +326,7 @@ public partial class AutoCADViewModel : ObservableObject
             _logger?.LogError(ex, "Failed to update AutoCAD information");
             AutoCADVersion = "Error";
             CurrentDocument = "Error retrieving info";
+            DocumentPath = "N/A";
         }
     }
 
@@ -291,19 +353,244 @@ public partial class AutoCADViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Refreshes the connection status (public method for external updates).
+    /// Refreshes the connection status and info.
     /// </summary>
-    public async Task RefreshStatusAsync()
+    [RelayCommand]
+    public async Task RefreshConnectionStatusAsync()
     {
         if (IsConnected)
         {
             await UpdateAutoCADInfoAsync();
+            StatusMessage = "Status refreshed";
         }
         else
         {
             UpdateConnectionStatus();
         }
     }
+
+    /// <summary>
+    /// Refreshes the connection status (public method for external updates).
+    /// </summary>
+    public async Task RefreshStatusAsync()
+    {
+        await RefreshConnectionStatusAsync();
+    }
+
+    #endregion
+
+    #region COM Health Monitoring
+
+    private void StartMonitoring()
+    {
+        if (_healthTimer != null) return;
+
+        _healthTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(10)
+        };
+        _healthTimer.Tick += OnHealthTimerTick;
+        _healthTimer.Start();
+        IsMonitoring = true;
+        ComStatusText = "Connected (monitoring)";
+        _logger?.LogDebug("COM health monitoring started");
+    }
+
+    private void StopMonitoring()
+    {
+        if (_healthTimer != null)
+        {
+            _healthTimer.Stop();
+            _healthTimer.Tick -= OnHealthTimerTick;
+            _healthTimer = null;
+        }
+        IsMonitoring = false;
+        _logger?.LogDebug("COM health monitoring stopped");
+    }
+
+    private void OnHealthTimerTick(object? sender, EventArgs e)
+    {
+        if (!IsConnected) return;
+
+        try
+        {
+            var isStillConnected = _autoCADService.IsConnected;
+            if (!isStillConnected)
+            {
+                _logger?.LogWarning("COM health check: AutoCAD connection lost");
+                IsConnected = false;
+                StatusMessage = "AutoCAD connection lost (detected by health check)";
+                ConnectButtonText = "Connect to AutoCAD";
+                AutoCADVersion = "N/A";
+                CurrentDocument = "No document open";
+                DocumentPath = "N/A";
+                ComStatusText = "Connection lost";
+
+                _logService.Log("AutoCAD connection lost (health check)", "AutoCAD", AppLogLevel.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "COM health check error");
+        }
+    }
+
+    #endregion
+
+    #region PR Project Info (Sprint 8)
+
+    [RelayCommand(CanExecute = nameof(CanExtractPRInfo))]
+    private async Task ExtractPRInfoAsync()
+    {
+        ProjectLookupStatus = "Extracting PR number...";
+
+        try
+        {
+            var response = await _guiProxy.ExecuteInGuiAsync("autocad_get_pr_number", null, timeout: 10000);
+
+            if (response.Success && response.Result is string prNum && !string.IsNullOrWhiteSpace(prNum))
+            {
+                PrNumber = prNum;
+                _logService.Log($"PR number extracted: {prNum}", "AutoCAD");
+
+                // Lookup project in Odoo via Swagger API (matches Python get_project_v2)
+                ProjectLookupStatus = "Looking up project in Odoo...";
+                try
+                {
+                    var configs = await _settingsService.LoadServerConfigsAsync();
+                    configs.TryGetValue("odoo_url", out var baseUrl);
+                    configs.TryGetValue("odoo_base_path", out var basePath);
+                    configs.TryGetValue("odoo_db", out var database);
+                    configs.TryGetValue("odoo_user_token", out var userToken);
+
+                    if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(database) || string.IsNullOrWhiteSpace(userToken))
+                    {
+                        ProjectLookupStatus = "Odoo connection not configured (check Settings)";
+                        _logService.Log("Odoo lookup skipped: missing connection settings", "AutoCAD", AppLogLevel.Warning);
+                        return;
+                    }
+
+                    var projectInfo = await _odooService.GetProjectViaApiAsync(
+                        prNum, baseUrl!, basePath ?? "/api/v2", database!, userToken!);
+
+                    if (projectInfo != null)
+                    {
+                        ProjectName = projectInfo.Name;
+                        ProjectId = projectInfo.Id;
+                        JobWorkingPlanName = projectInfo.JobWorkingPlanName ?? "";
+                        ProjectLookupStatus = $"Found: {projectInfo.Name} (ID: {projectInfo.Id})";
+                        _logService.Log($"Project found: {projectInfo.Name}", "AutoCAD");
+                    }
+                    else
+                    {
+                        ProjectName = "";
+                        ProjectId = 0;
+                        JobWorkingPlanName = "";
+                        ProjectLookupStatus = $"No project found for PR '{prNum}'";
+                        _logService.Log($"No project found for PR '{prNum}'", "AutoCAD", AppLogLevel.Warning);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ProjectLookupStatus = $"Odoo lookup failed: {ex.Message}";
+                    _logger?.LogWarning(ex, "Odoo project lookup failed for PR {PrNumber}", prNum);
+                }
+            }
+            else
+            {
+                PrNumber = "";
+                ProjectLookupStatus = "No PR number found in drawing";
+                _logService.Log("No PR number found in drawing", "AutoCAD", AppLogLevel.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            ProjectLookupStatus = $"Extraction failed: {ex.Message}";
+            _logger?.LogError(ex, "PR info extraction failed");
+        }
+    }
+
+    private bool CanExtractPRInfo() => IsConnected && !IsConnecting;
+
+    #endregion
+
+    #region Clear Table IDs (Sprint 8)
+
+    [RelayCommand(CanExecute = nameof(CanClearTableIds))]
+    private async Task ClearTableIdsAsync()
+    {
+        if (SelectedLayout == null)
+        {
+            ClearIdsStatus = "Please select a layout first";
+            return;
+        }
+
+        IsClearingIds = true;
+        ClearIdsStatus = $"Clearing IDs in {SelectedLayout.Name}...";
+
+        try
+        {
+            var parameters = new Dictionary<string, object?>
+            {
+                ["layoutName"] = SelectedLayout.Name
+            };
+            var response = await _guiProxy.ExecuteInGuiAsync("autocad_clear_table_ids", parameters, timeout: 10000);
+
+            if (response.Success && response.Result is int count)
+            {
+                ClearIdsStatus = $"Cleared {count} cells in {SelectedLayout.Name}";
+                _logService.Log($"Cleared {count} ID cells in {SelectedLayout.Name}", "AutoCAD");
+            }
+            else
+            {
+                ClearIdsStatus = response.ErrorMessage ?? "Clear operation failed";
+            }
+        }
+        catch (Exception ex)
+        {
+            ClearIdsStatus = $"Error: {ex.Message}";
+            _logger?.LogError(ex, "Clear table IDs failed");
+        }
+        finally
+        {
+            IsClearingIds = false;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanClearTableIds))]
+    private async Task ClearAllTableIdsAsync()
+    {
+        IsClearingIds = true;
+        ClearIdsStatus = "Clearing IDs in all layouts...";
+
+        try
+        {
+            var response = await _guiProxy.ExecuteInGuiAsync("autocad_clear_all_table_ids", null, timeout: 30000);
+
+            if (response.Success && response.Result is int count)
+            {
+                ClearIdsStatus = $"Cleared {count} cells across all layouts";
+                _logService.Log($"Cleared {count} ID cells across all layouts", "AutoCAD");
+            }
+            else
+            {
+                ClearIdsStatus = response.ErrorMessage ?? "Clear all operation failed";
+            }
+        }
+        catch (Exception ex)
+        {
+            ClearIdsStatus = $"Error: {ex.Message}";
+            _logger?.LogError(ex, "Clear all table IDs failed");
+        }
+        finally
+        {
+            IsClearingIds = false;
+        }
+    }
+
+    private bool CanClearTableIds() => IsConnected && !IsConnecting && !IsClearingIds;
+
+    #endregion
 
     #region DWG File-Based Extraction
 
@@ -390,7 +677,7 @@ public partial class AutoCADViewModel : ObservableObject
             {
                 // Exclude "Model" layout
                 var filteredLayouts = layouts.Where(l => !l.IsModelSpace).ToList();
-                
+
                 Layouts.Clear();
                 foreach (var layout in filteredLayouts)
                 {
@@ -434,9 +721,9 @@ public partial class AutoCADViewModel : ObservableObject
         {
             _logger?.LogInformation("Switching to layout: {LayoutName}", layout.Name);
 
-            var parameters = new Dictionary<string, object?> 
-            { 
-                ["layoutName"] = layout.Name 
+            var parameters = new Dictionary<string, object?>
+            {
+                ["layoutName"] = layout.Name
             };
             var response = await _guiProxy.ExecuteInGuiAsync("autocad_set_active_layout", parameters, timeout: 5000);
 

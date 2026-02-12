@@ -83,7 +83,8 @@ public record AutoCADStatus(
     string? Version,
     string? CurrentDocument,
     List<string>? OpenDocuments,
-    string? ErrorMessage);
+    string? ErrorMessage,
+    string? DocumentPath = null);
 
 /// <summary>
 /// Interface for AutoCAD COM operations.

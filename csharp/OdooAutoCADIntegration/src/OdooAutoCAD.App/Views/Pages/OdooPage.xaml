@@ -10,6 +10,7 @@
         <converters:StringToVisibilityConverter x:Key="StringToVisibility"/>
         <converters:BoolToColorConverter x:Key="BoolToColor"/>
         <converters:CountToVisibilityConverter x:Key="CountToVisibility"/>
+        <converters:DateTimeToStringConverter x:Key="DateTimeToString"/>
     </Page.Resources>
 
     <Grid Margin="24">
@@ -78,6 +79,74 @@
                                 VerticalAlignment="Center"
                                 Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}"/>
                     </Grid>
+                </Border>
+
+                <!-- Server Info (Sprint 8) -->
+                <Border Style="{StaticResource CardPanel}" Margin="0,0,0,16"
+                        Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <TextBlock Text="Server Information"
+                                   FontSize="18" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   Margin="0,0,0,12"/>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0"
+                                       Text="Server Version:"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Margin="0,0,0,6"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1"
+                                       Text="{Binding ServerVersion}"
+                                       FontSize="13"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       Margin="0,0,0,6"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0"
+                                       Text="Database:"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Margin="0,0,0,6"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1"
+                                       Text="{Binding ConnectedDatabase}"
+                                       FontSize="13"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       Margin="0,0,0,6"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0"
+                                       Text="Username:"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Margin="0,0,0,6"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1"
+                                       Text="{Binding ConnectedUsername}"
+                                       FontSize="13"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       Margin="0,0,0,6"/>
+
+                            <TextBlock Grid.Row="3" Grid.Column="0"
+                                       Text="Last Sync:"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Margin="0,0,0,6"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1"
+                                       Text="{Binding LastSyncDisplay}"
+                                       FontSize="13"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       Margin="0,0,0,6"/>
+                        </Grid>
+                    </StackPanel>
                 </Border>
 
                 <!-- Connection Settings GroupBox -->
@@ -193,7 +262,7 @@
                                 IsEnabled="{Binding IsTesting, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Test Connection" VerticalAlignment="Center"/>
-                                <TextBlock Text=" ⟳"
+                                <TextBlock Text=" &#x27F3;"
                                            FontSize="16"
                                            VerticalAlignment="Center"
                                            Visibility="{Binding IsTesting, Converter={StaticResource BoolToVisibility}}">
@@ -262,7 +331,7 @@
                                            FontSize="12"
                                            Foreground="#558B2F"
                                            Margin="0,8,0,0"
-                                           Visibility="{Binding OdooVersion, Converter={StaticResource BoolToVisibility}}"/>
+                                           Visibility="{Binding OdooVersion, Converter={StaticResource StringToVisibility}}"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -291,7 +360,7 @@
                 </Border>
 
                 <!-- Product Catalog -->
-                <Border Style="{StaticResource CardPanel}">
+                <Border Style="{StaticResource CardPanel}" Margin="0,0,0,16">
                     <StackPanel>
                         <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
@@ -322,6 +391,73 @@
                             </Button>
                         </Grid>
 
+                        <!-- Product Search Bar (Sprint 8) -->
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding ProductSearchTerm, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Tag="Search products by name or code..."
+                                     Margin="0,0,8,0"/>
+
+                            <Button Grid.Column="1"
+                                    Content="Search"
+                                    Command="{Binding SearchProductsCommand}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Padding="12,6"
+                                    Margin="0,0,4,0"/>
+
+                            <Button Grid.Column="2"
+                                    Content="Clear"
+                                    Command="{Binding ClearProductSearchCommand}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Padding="12,6"
+                                    Margin="0,0,4,0"/>
+
+                            <Button Grid.Column="3"
+                                    Content="Load Categories"
+                                    Command="{Binding LoadCategoriesCommand}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Padding="12,6"/>
+                        </Grid>
+
+                        <!-- Category Filter (Sprint 8) -->
+                        <Grid Margin="0,0,0,8"
+                              Visibility="{Binding Categories.Count, Converter={StaticResource CountToVisibility}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0"
+                                       Text="Category:"
+                                       FontSize="13"
+                                       VerticalAlignment="Center"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Margin="0,0,8,0"/>
+
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{Binding Categories}"
+                                      SelectedItem="{Binding SelectedCategory}"
+                                      DisplayMemberPath="Name"
+                                      FontFamily="{StaticResource AppFontFamily}"
+                                      FontSize="13"
+                                      Padding="8,6"/>
+                        </Grid>
+
+                        <!-- Search Status Text (Sprint 8) -->
+                        <TextBlock Text="{Binding SearchStatusText}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Visibility="{Binding SearchStatusText, Converter={StaticResource StringToVisibility}}"
+                                   Margin="0,0,0,8"/>
+
                         <!-- Product DataGrid -->
                         <DataGrid ItemsSource="{Binding Products}"
                                   AutoGenerateColumns="False"
@@ -344,6 +480,86 @@
                                 <DataGridTextColumn Header="Price" Binding="{Binding ListPrice, StringFormat=N2}" Width="80"/>
                             </DataGrid.Columns>
                         </DataGrid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Project Selection (Sprint 8) -->
+                <Border Style="{StaticResource CardPanel}" Margin="0,0,0,16"
+                        Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <TextBlock Text="Project Selection"
+                                   FontSize="18" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   Margin="0,0,0,12"/>
+
+                        <!-- Project Search Bar -->
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding ProjectSearchTerm, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Tag="Search projects by name or code..."
+                                     Margin="0,0,8,0"/>
+
+                            <Button Grid.Column="1"
+                                    Content="Search"
+                                    Command="{Binding SearchProjectsCommand}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Padding="12,6"
+                                    Margin="0,0,4,0"/>
+
+                            <Button Grid.Column="2"
+                                    Content="Load All"
+                                    Command="{Binding LoadProjectsCommand}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Padding="12,6"/>
+                        </Grid>
+
+                        <!-- Project Status Text -->
+                        <TextBlock Text="{Binding ProjectStatusText}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Visibility="{Binding ProjectStatusText, Converter={StaticResource StringToVisibility}}"
+                                   Margin="0,0,0,8"/>
+
+                        <!-- Project DataGrid -->
+                        <DataGrid ItemsSource="{Binding Projects}"
+                                  SelectedItem="{Binding SelectedProject}"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  MaxHeight="250"
+                                  SelectionMode="Single"
+                                  BorderThickness="1"
+                                  BorderBrush="{StaticResource BorderBrush}"
+                                  GridLinesVisibility="Horizontal"
+                                  HorizontalGridLinesBrush="{StaticResource BorderBrush}"
+                                  RowHeaderWidth="0"
+                                  FontFamily="{StaticResource AppFontFamily}"
+                                  FontSize="12"
+                                  VirtualizingStackPanel.IsVirtualizing="True"
+                                  Visibility="{Binding ProjectCount, Converter={StaticResource CountToVisibility}}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Code" Binding="{Binding Code}" Width="100"/>
+                                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                                <DataGridTextColumn Header="State" Binding="{Binding State}" Width="80"/>
+                                <DataGridTextColumn Header="Start Date" Binding="{Binding DateStart, StringFormat=yyyy-MM-dd}" Width="100"/>
+                                <DataGridTextColumn Header="End Date" Binding="{Binding DateEnd, StringFormat=yyyy-MM-dd}" Width="100"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <!-- Select Project Button -->
+                        <Button Content="Select Project"
+                                Command="{Binding SelectProjectCommand}"
+                                Style="{StaticResource PrimaryButton}"
+                                HorizontalAlignment="Left"
+                                MinWidth="130"
+                                Margin="0,8,0,0"
+                                Visibility="{Binding ProjectCount, Converter={StaticResource CountToVisibility}}"/>
                     </StackPanel>
                 </Border>
             </StackPanel>

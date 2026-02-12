@@ -30,6 +30,21 @@ public record OdooProject(
     DateTime? DateEnd);
 
 /// <summary>
+/// Odoo project info returned from Swagger get_project_v2 API.
+/// Includes job working plan fields not in the standard OdooProject record.
+/// </summary>
+public record OdooProjectInfo(
+    int Id,
+    string Name,
+    int? JobWorkingPlanId,
+    string? JobWorkingPlanName);
+
+/// <summary>
+/// Odoo product category information.
+/// </summary>
+public record OdooProductCategory(int Id, string Name, int? ParentId);
+
+/// <summary>
 /// Odoo product information.
 /// </summary>
 public record OdooProduct(
@@ -187,6 +202,14 @@ public interface IOdooService
     /// <param name="searchTerm">Search term.</param>
     Task<IReadOnlyList<OdooProject>> SearchProjectsAsync(string searchTerm);
 
+    /// <summary>
+    /// Gets project info via the Swagger/BasicAuth get_project_v2 API.
+    /// Matches Python's util_odoo.get_project() using exact name match.
+    /// </summary>
+    Task<OdooProjectInfo?> GetProjectViaApiAsync(
+        string prNumber, string baseUrl, string basePath,
+        string database, string userToken);
+
     #endregion
 
     #region Product Operations
@@ -219,6 +242,11 @@ public interface IOdooService
     /// </summary>
     /// <param name="categoryId">Category ID.</param>
     Task<IReadOnlyList<OdooProduct>> GetProductsByCategoryAsync(int categoryId);
+
+    /// <summary>
+    /// Gets all product categories.
+    /// </summary>
+    Task<IReadOnlyList<OdooProductCategory>> GetCategoriesAsync();
 
     #endregion
 

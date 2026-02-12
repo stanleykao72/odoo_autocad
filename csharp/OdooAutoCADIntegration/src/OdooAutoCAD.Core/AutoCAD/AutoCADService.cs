@@ -371,6 +371,200 @@ public class AutoCADService : IAutoCADService, IDisposable
             return Task.FromResult<object?>(results);
         });
 
+        _guiProxy.RegisterHandler("autocad_get_pr_number", (parameters) =>
+        {
+            if (_acadDoc == null)
+                return Task.FromResult<object?>(string.Empty);
+
+            try
+            {
+                // Python logic: find block reference with Name == "pr_no",
+                // then read the AcDbText inside the block definition.
+                foreach (dynamic layout in _acadDoc.Layouts)
+                {
+                    string layoutName = layout.Name;
+                    if (layoutName == "Model") continue;
+
+                    try
+                    {
+                        dynamic space = layout.Block;
+                        foreach (dynamic entity in space)
+                        {
+                            try
+                            {
+                                string entityType = entity.EntityName;
+                                if (entityType != "AcDbBlockReference") continue;
+
+                                string blockName = entity.Name;
+                                if (!string.Equals(blockName, "pr_no", StringComparison.OrdinalIgnoreCase))
+                                    continue;
+
+                                // Found the pr_no block reference — read text from block definition
+                                string effectiveName = entity.EffectiveName;
+                                dynamic blocks = _acadDoc.Blocks;
+                                dynamic blockDef = blocks.Item(effectiveName);
+
+                                foreach (dynamic item in blockDef)
+                                {
+                                    try
+                                    {
+                                        string itemType = item.ObjectName;
+                                        if (itemType == "AcDbText")
+                                        {
+                                            string text = LM_UnFormat(item.TextString);
+                                            if (!string.IsNullOrWhiteSpace(text))
+                                            {
+                                                _logger?.LogInformation("PR number extracted: {PrNo}", text);
+                                                return Task.FromResult<object?>(text);
+                                            }
+                                        }
+                                    }
+                                    catch { /* skip unreadable block items */ }
+                                }
+
+                                // Block found but no text — try attribute fallback
+                                if ((bool)entity.HasAttributes)
+                                {
+                                    foreach (dynamic attr in entity.GetAttributes())
+                                    {
+                                        string attrText = LM_UnFormat(attr.TextString);
+                                        if (!string.IsNullOrWhiteSpace(attrText))
+                                        {
+                                            _logger?.LogInformation("PR number from attribute: {PrNo}", attrText);
+                                            return Task.FromResult<object?>(attrText);
+                                        }
+                                    }
+                                }
+                            }
+                            catch { /* skip unreadable entities */ }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Error reading layout {Layout} for PR number", layoutName);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to extract PR number");
+            }
+
+            return Task.FromResult<object?>(string.Empty);
+        });
+
+        _guiProxy.RegisterHandler("autocad_clear_table_ids", (parameters) =>
+        {
+            if (_acadDoc == null)
+                return Task.FromResult<object?>(0);
+
+            parameters.TryGetValue("layoutName", out var lnVal);
+            var layoutName = lnVal as string;
+            if (string.IsNullOrEmpty(layoutName))
+                return Task.FromResult<object?>(0);
+
+            int clearedCount = 0;
+            try
+            {
+                bool switched = SwitchToLayout(layoutName);
+                if (!switched)
+                    return Task.FromResult<object?>(0);
+
+                dynamic layout = _acadDoc.Layouts.Item(layoutName);
+                dynamic space = layout.Block;
+
+                foreach (dynamic entity in space)
+                {
+                    try
+                    {
+                        if (entity.EntityName != "AcDbTable") continue;
+                        int colCount = entity.Columns;
+                        if (colCount != 9) continue;
+
+                        string headerCell = entity.GetText(0, 6) ?? "";
+                        if (!headerCell.Contains("HEADER_ID")) continue;
+
+                        int rowCount = entity.Rows;
+
+                        // Clear header_id cell(0, 8)
+                        try { entity.SetText(0, 8, ""); clearedCount++; } catch { }
+
+                        // Clear detail_id cells (col 8) for data rows
+                        for (int row = 1; row < rowCount; row++)
+                        {
+                            try { entity.SetText(row, 8, ""); clearedCount++; } catch { }
+                        }
+
+                        break; // first valid table only
+                    }
+                    catch { }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to clear table IDs in layout {Layout}", layoutName);
+            }
+
+            return Task.FromResult<object?>(clearedCount);
+        });
+
+        _guiProxy.RegisterHandler("autocad_clear_all_table_ids", (parameters) =>
+        {
+            if (_acadDoc == null)
+                return Task.FromResult<object?>(0);
+
+            int totalCleared = 0;
+            try
+            {
+                foreach (dynamic layout in _acadDoc.Layouts)
+                {
+                    string layoutName = layout.Name;
+                    if (layoutName == "Model") continue;
+
+                    try
+                    {
+                        dynamic space = layout.Block;
+                        foreach (dynamic entity in space)
+                        {
+                            try
+                            {
+                                if (entity.EntityName != "AcDbTable") continue;
+                                int colCount = entity.Columns;
+                                if (colCount != 9) continue;
+
+                                string headerCell = entity.GetText(0, 6) ?? "";
+                                if (!headerCell.Contains("HEADER_ID")) continue;
+
+                                int rowCount = entity.Rows;
+
+                                // Clear header_id
+                                try { entity.SetText(0, 8, ""); totalCleared++; } catch { }
+
+                                // Clear detail_ids
+                                for (int row = 1; row < rowCount; row++)
+                                {
+                                    try { entity.SetText(row, 8, ""); totalCleared++; } catch { }
+                                }
+
+                                break;
+                            }
+                            catch { }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Error clearing IDs in layout {Layout}", layoutName);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to clear all table IDs");
+            }
+
+            return Task.FromResult<object?>(totalCleared);
+        });
+
         _logger?.LogDebug("AutoCAD GUI proxy handlers registered");
     }
 
@@ -516,6 +710,8 @@ public class AutoCADService : IAutoCADService, IDisposable
             string appName = _acadApp.Name;
             string version = _acadApp.Version;
             string? currentDoc = _acadDoc?.Name;
+            string? documentPath = null;
+            try { documentPath = _acadDoc?.FullName; } catch { /* may fail if no doc */ }
 
             var openDocs = new List<string>();
             foreach (dynamic doc in _acadApp.Documents)
@@ -529,7 +725,8 @@ public class AutoCADService : IAutoCADService, IDisposable
                 Version: version,
                 CurrentDocument: currentDoc,
                 OpenDocuments: openDocs,
-                ErrorMessage: null);
+                ErrorMessage: null,
+                DocumentPath: documentPath);
         }
         catch (Exception ex)
         {

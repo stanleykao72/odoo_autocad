@@ -4,12 +4,16 @@
       Title="AutoCAD Integration"
       FontFamily="{StaticResource AppFontFamily}"
       Background="{StaticResource BackgroundBrush}">
-    
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
     <Grid Margin="40">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Page Header -->
@@ -30,7 +34,7 @@
                 CornerRadius="8"
                 Padding="30"
                 Margin="0,0,0,20">
-            
+
             <StackPanel>
                 <!-- Connection Header -->
                 <TextBlock Text="AutoCAD Connection"
@@ -117,8 +121,23 @@
                                        ToolTip="{Binding CurrentDocument}"/>
                         </Grid>
 
+                        <!-- Document Path -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Document Path:"
+                                       Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBlock Grid.Column="1" Text="{Binding DocumentPath}"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       FontWeight="Medium"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding DocumentPath}"/>
+                        </Grid>
+
                         <!-- Active Layout -->
-                        <Grid>
+                        <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="140"/>
                                 <ColumnDefinition Width="*"/>
@@ -126,6 +145,19 @@
                             <TextBlock Grid.Column="0" Text="Active Layout:"
                                        Foreground="{StaticResource TextSecondaryBrush}"/>
                             <TextBlock Grid.Column="1" Text="{Binding ActiveLayoutName}"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       FontWeight="Medium"/>
+                        </Grid>
+
+                        <!-- COM Status -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="COM Status:"
+                                       Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBlock Grid.Column="1" Text="{Binding ComStatusText}"
                                        Foreground="{StaticResource TextPrimaryBrush}"
                                        FontWeight="Medium"/>
                         </Grid>
@@ -140,12 +172,14 @@
                            Margin="0,0,0,20"
                            MinHeight="40"/>
 
-                <!-- Buttons Row: Connect + Open DWG File -->
+                <!-- Buttons Row: Connect + Open DWG File + Refresh Status -->
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="16"/>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- Connect/Disconnect Button -->
@@ -200,6 +234,16 @@
                             </Style>
                         </Button.Style>
                     </Button>
+
+                    <!-- Refresh Status Button -->
+                    <Button Grid.Column="4"
+                            Content="Refresh"
+                            Command="{Binding RefreshConnectionStatusCommand}"
+                            Height="40" MinWidth="80"
+                            FontSize="13"
+                            Cursor="Hand"
+                            Style="{StaticResource SecondaryButton}"
+                            Visibility="{Binding IsConnected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 </Grid>
 
                 <!-- DWG File Path Display -->
@@ -214,8 +258,142 @@
             </StackPanel>
         </Border>
 
+        <!-- PR Project Info Panel (visible when connected) -->
+        <Border Grid.Row="2"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="30"
+                Margin="0,0,0,20"
+                Visibility="{Binding IsConnected, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel>
+                <TextBlock Text="PR Project Info"
+                           FontSize="18" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextPrimaryBrush}"
+                           Margin="0,0,0,15"/>
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="PR Number:"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="{Binding PrNumber}"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               FontWeight="Medium"
+                               VerticalAlignment="Center"/>
+                    <Button Grid.Column="2"
+                            Content="Extract PR Info"
+                            Command="{Binding ExtractPRInfoCommand}"
+                            Height="32" MinWidth="110"
+                            FontSize="12"
+                            Background="{StaticResource PrimaryBrush}"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Cursor="Hand"/>
+                </Grid>
+
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Project Name:"
+                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                    <TextBlock Grid.Column="1" Text="{Binding ProjectName}"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               FontWeight="Medium"/>
+                </Grid>
+
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Job Working Plan:"
+                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                    <TextBlock Grid.Column="1" Text="{Binding JobWorkingPlanName}"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               FontWeight="Medium"/>
+                </Grid>
+
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Project ID:"
+                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                    <TextBlock Grid.Column="1" Text="{Binding ProjectId}"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               FontWeight="Medium"/>
+                </Grid>
+
+                <TextBlock Text="{Binding ProjectLookupStatus}"
+                           FontSize="12"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,8,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Clear Table IDs Panel (visible when connected) -->
+        <Border Grid.Row="3"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="30"
+                Margin="0,0,0,20"
+                Visibility="{Binding IsConnected, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel>
+                <TextBlock Text="Table ID Management"
+                           FontSize="18" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextPrimaryBrush}"
+                           Margin="0,0,0,15"/>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="0"
+                            Content="Clear IDs (This Layout)"
+                            Command="{Binding ClearTableIdsCommand}"
+                            Height="36"
+                            FontSize="13"
+                            Background="#FF9800"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Cursor="Hand"/>
+
+                    <Button Grid.Column="2"
+                            Content="Clear All IDs"
+                            Command="{Binding ClearAllTableIdsCommand}"
+                            Height="36"
+                            FontSize="13"
+                            Background="#F44336"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Cursor="Hand"/>
+                </Grid>
+
+                <TextBlock Text="{Binding ClearIdsStatus}"
+                           FontSize="12"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,8,0,0"/>
+            </StackPanel>
+        </Border>
+
         <!-- Layouts and Parameter Extraction Panel (visible when COM connected OR DWG file loaded) -->
-        <Grid Grid.Row="2" Visibility="{Binding HasDataSource, Converter={StaticResource BooleanToVisibilityConverter}}">
+        <Grid Grid.Row="4" MinHeight="400" Visibility="{Binding HasDataSource, Converter={StaticResource BooleanToVisibilityConverter}}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="350"/>
                 <ColumnDefinition Width="*"/>
@@ -398,4 +576,5 @@
             </Border>
         </Grid>
     </Grid>
+    </ScrollViewer>
 </Page>

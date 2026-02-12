@@ -194,7 +194,14 @@ public partial class App : Application
         // ViewModels
         services.AddTransient<MainViewModel>();
         services.AddSingleton<DashboardViewModel>();
-        services.AddTransient<AutoCADViewModel>();
+        services.AddTransient<AutoCADViewModel>(sp => new AutoCADViewModel(
+            sp.GetRequiredService<IAutoCADService>(),
+            sp.GetRequiredService<IDwgReaderService>(),
+            sp.GetRequiredService<IGUIProxy>(),
+            sp.GetRequiredService<IOdooService>(),
+            sp.GetRequiredService<ISettingsService>(),
+            sp.GetRequiredService<IAppLogService>(),
+            sp.GetService<ILogger<AutoCADViewModel>>()));
         services.AddTransient<BOQViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<OdooConnectionViewModel>();
