@@ -414,12 +414,13 @@ public class OdooService : IOdooService, IDisposable
             var credentials = Convert.ToBase64String(
                 Encoding.UTF8.GetBytes($"{database}:{userToken}"));
 
-            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{endpointPath}";
+            var resolvedPath = endpointPath.Replace("{method_name}", "get_product_list");
+            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{resolvedPath}";
 
             var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint);
             request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
             request.Content = new StringContent(
-                JsonSerializer.Serialize(new { method_name = "get_product_list" }),
+                JsonSerializer.Serialize(new { kwargs = new { user_token = userToken }, context = new { } }),
                 Encoding.UTF8,
                 "application/json");
 
@@ -543,7 +544,8 @@ public class OdooService : IOdooService, IDisposable
             var credentials = Convert.ToBase64String(
                 Encoding.UTF8.GetBytes($"{database}:{userToken}"));
 
-            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{endpointPath}";
+            var resolvedPath = endpointPath.Replace("{method_name}", "import2boq_v2");
+            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{resolvedPath}";
 
             // Build layout_dict payload matching Python import2boq_v2 format
             var layoutDict = new Dictionary<string, object>();
@@ -581,7 +583,6 @@ public class OdooService : IOdooService, IDisposable
 
             var body = new
             {
-                method_name = "import2boq_v2",
                 args = new object[] { layoutDict },
                 kwargs = new { user_token = userToken },
                 context = new { }
@@ -797,11 +798,11 @@ public class OdooService : IOdooService, IDisposable
             var credentials = Convert.ToBase64String(
                 Encoding.UTF8.GetBytes($"{database}:{userToken}"));
 
-            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{endpointPath}";
+            var resolvedPath = endpointPath.Replace("{method_name}", "boq2pr_v2");
+            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{resolvedPath}";
 
             var body = new
             {
-                method_name = "boq2pr_v2",
                 args = new object[] { new { all = headerIds } },
                 kwargs = new { user_token = userToken },
                 context = new { }
@@ -904,12 +905,12 @@ public class OdooService : IOdooService, IDisposable
             var credentials = Convert.ToBase64String(
                 Encoding.UTF8.GetBytes($"{database}:{userToken}"));
 
-            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{endpointPath}";
+            var resolvedPath = endpointPath.Replace("{method_name}", "get_project_v2");
+            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{resolvedPath}";
 
             // Match Python: get_project_v2 with exact name match
             var body = new
             {
-                method_name = "get_project_v2",
                 args = new object[] { new object[] { new object[] { "name", "=", prNumber } } },
                 kwargs = new { user_token = userToken },
                 context = new { }
