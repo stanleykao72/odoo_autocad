@@ -39,6 +39,18 @@ public partial class PRDisplayItem : ObservableObject
 }
 
 /// <summary>
+/// Display model for a PR line item in the detail view DataGrid.
+/// </summary>
+public class PRLineDisplayItem
+{
+    public string ProductName { get; set; } = string.Empty;
+    public decimal Quantity { get; set; }
+    public string UnitOfMeasure { get; set; } = string.Empty;
+    public decimal? UnitPrice { get; set; }
+    public decimal LineTotal => Quantity * (UnitPrice ?? 0);
+}
+
+/// <summary>
 /// ViewModel for the Purchase Requisition page.
 /// Handles BOQ-to-PR conversion via Swagger, PR listing, and submission for approval.
 /// </summary>
@@ -52,6 +64,26 @@ public partial class PurchaseRequisitionViewModel : ObservableObject
     private readonly ILogger<PurchaseRequisitionViewModel>? _logger;
 
     public ObservableCollection<PRDisplayItem> PrItems { get; } = new();
+    public ObservableCollection<PRDisplayItem> FilteredPRs { get; } = new();
+    public ObservableCollection<PRLineDisplayItem> SelectedPRLines { get; } = new();
+
+    // Filter/Sort state
+    [ObservableProperty]
+    private string _selectedStateFilter = "All";
+
+    [ObservableProperty]
+    private string _selectedSortOrder = "Newest First";
+
+    // Detail view
+    [ObservableProperty]
+    private decimal _selectedPRTotal;
+
+    // Feedback enhancements
+    [ObservableProperty]
+    private string _statusMessageType = string.Empty;
+
+    [ObservableProperty]
+    private DateTime? _lastConversionTime;
 
     // Connection state
     [ObservableProperty]
@@ -154,6 +186,17 @@ public partial class PurchaseRequisitionViewModel : ObservableObject
     partial void OnSelectedPRChanged(PRDisplayItem? value)
     {
         SubmitPRCommand.NotifyCanExecuteChanged();
+        PopulateSelectedPRLines();
+    }
+
+    partial void OnSelectedStateFilterChanged(string value)
+    {
+        ApplyFilterAndSort();
+    }
+
+    partial void OnSelectedSortOrderChanged(string value)
+    {
+        ApplyFilterAndSort();
     }
 
     partial void OnTotalPRsChanged(int value)
@@ -250,6 +293,7 @@ public partial class PurchaseRequisitionViewModel : ObservableObject
             {
                 ConvertStatusText = $"Conversion failed: {response.ErrorMessage}";
                 LastConvertResult = $"Failed: {response.ErrorCode} — {response.ErrorMessage}";
+                StatusMessageType = "error";
                 _logService.Log($"PR: Conversion failed — {response.ErrorCode}: {response.ErrorMessage}", "PR", AppLogLevel.Error);
                 return;
             }
@@ -260,27 +304,68 @@ public partial class PurchaseRequisitionViewModel : ObservableObject
             {
                 foreach (var pr in response.All)
                 {
+                    var entry = new PREntry
+                    {
+                        Id = pr.PrId ?? 0,
+                        Reference = pr.Reference,
+                        State = pr.State,
+                        CreatedAt = DateTime.Now
+                    };
+                    foreach (var line in pr.Lines)
+                    {
+                        entry.Lines.Add(new PRLine
+                        {
+                            ProductId = line.ProductId,
+                            ProductName = line.ProductName,
+                            Quantity = line.Quantity,
+                            UnitOfMeasure = line.UnitOfMeasure,
+                            UnitPrice = line.UnitPrice
+                        });
+                    }
+
                     PrItems.Add(new PRDisplayItem
                     {
                         Id = pr.PrId ?? 0,
                         Reference = pr.Reference,
                         State = pr.State,
                         LineCount = pr.Lines.Count,
-                        CreatedAt = DateTime.Now
+                        CreatedAt = DateTime.Now,
+                        OriginalEntry = entry
                     });
                 }
             }
 
             UpdateSummary();
 
-            ConvertStatusText = $"Conversion complete: {PrItems.Count} PR(s) created";
-            LastConvertResult = $"Success — {PrItems.Count} Purchase Requisition(s) created";
-            _logService.Log($"PR: Conversion complete — {PrItems.Count} PRs created", "PR");
+            if (PrItems.Count == 0)
+            {
+                ConvertStatusText = "Conversion returned no PRs";
+                LastConvertResult = "No Purchase Requisitions were created from the selected BOQ entries";
+                StatusMessageType = "info";
+                _logService.Log("PR: Conversion returned 0 PRs", "PR", AppLogLevel.Warning);
+            }
+            else
+            {
+                var firstRef = PrItems.Count > 0 ? PrItems[0].Reference : "";
+                ConvertStatusText = $"Conversion complete: {PrItems.Count} PR(s) created";
+                LastConvertResult = $"Success — {PrItems.Count} Purchase Requisition(s) created (e.g. {firstRef})";
+                StatusMessageType = "success";
+                LastConversionTime = DateTime.Now;
+                _logService.Log($"PR: Conversion complete — {PrItems.Count} PRs created", "PR");
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            ConvertStatusText = "Conversion timed out";
+            LastConvertResult = "Failed: Operation timed out. Check network connection and try again.";
+            StatusMessageType = "error";
+            _logService.Log("PR: Conversion timed out", "PR", AppLogLevel.Error);
         }
         catch (Exception ex)
         {
             ConvertStatusText = $"Conversion failed: {ex.Message}";
             LastConvertResult = $"Failed: {ex.Message}";
+            StatusMessageType = "error";
             _logService.Log($"PR: Conversion failed — {ex.Message}", "PR", AppLogLevel.Error);
             _logger?.LogError(ex, "BOQ-to-PR conversion error");
         }
@@ -419,6 +504,55 @@ public partial class PurchaseRequisitionViewModel : ObservableObject
         ApprovedCount = PrItems.Count(i => i.State is "approved" or "done");
         OnPropertyChanged(nameof(HasData));
         OnPropertyChanged(nameof(HasNoData));
+        ApplyFilterAndSort();
+    }
+
+    internal void ApplyFilterAndSort()
+    {
+        IEnumerable<PRDisplayItem> items = PrItems;
+
+        // Filter by state
+        if (!string.IsNullOrEmpty(SelectedStateFilter) && SelectedStateFilter != "All")
+        {
+            var filter = SelectedStateFilter.ToLowerInvariant();
+            items = items.Where(i => string.Equals(i.State, filter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Sort
+        items = SelectedSortOrder switch
+        {
+            "Oldest First" => items.OrderBy(i => i.CreatedAt),
+            "Reference A-Z" => items.OrderBy(i => i.Reference, StringComparer.OrdinalIgnoreCase),
+            "Reference Z-A" => items.OrderByDescending(i => i.Reference, StringComparer.OrdinalIgnoreCase),
+            _ => items.OrderByDescending(i => i.CreatedAt) // "Newest First" default
+        };
+
+        FilteredPRs.Clear();
+        foreach (var item in items)
+        {
+            FilteredPRs.Add(item);
+        }
+    }
+
+    private void PopulateSelectedPRLines()
+    {
+        SelectedPRLines.Clear();
+        SelectedPRTotal = 0;
+
+        if (SelectedPR?.OriginalEntry?.Lines == null) return;
+
+        foreach (var line in SelectedPR.OriginalEntry.Lines)
+        {
+            SelectedPRLines.Add(new PRLineDisplayItem
+            {
+                ProductName = line.ProductName,
+                Quantity = line.Quantity,
+                UnitOfMeasure = line.UnitOfMeasure,
+                UnitPrice = line.UnitPrice
+            });
+        }
+
+        SelectedPRTotal = SelectedPRLines.Sum(l => l.LineTotal);
     }
 
     #endregion

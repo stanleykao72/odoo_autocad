@@ -25,6 +25,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -46,7 +47,9 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
@@ -79,12 +82,32 @@
                     </StackPanel>
                 </Button>
 
+                <!-- Manage Mappings Button -->
+                <Button Grid.Column="2"
+                        Content="Manage Mappings"
+                        x:Name="ManageMappingsBtn"
+                        Click="ManageMappingsBtn_Click"
+                        Style="{StaticResource SecondaryButton}"
+                        Padding="12,6"
+                        Margin="8,0,0,0"/>
+
                 <!-- Progress -->
-                <StackPanel Grid.Column="2" Margin="16,0" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding ExtractionStatus}"
-                               FontSize="12"
-                               Foreground="{StaticResource TextSecondaryBrush}"
-                               TextTrimming="CharacterEllipsis"/>
+                <StackPanel Grid.Column="3" Margin="16,0" VerticalAlignment="Center"
+                            Orientation="Vertical">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding ExtractionStatus}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center"/>
+                        <Button Content="Cancel"
+                                Command="{Binding CancelOperationCommand}"
+                                Style="{StaticResource SecondaryButton}"
+                                Padding="8,2"
+                                FontSize="11"
+                                Margin="8,0,0,0"
+                                Visibility="{Binding IsExtracting, Converter={StaticResource BoolToVisibility}}"/>
+                    </StackPanel>
                     <ProgressBar Value="{Binding ExtractionProgress}"
                                  Minimum="0" Maximum="1"
                                  Height="4"
@@ -93,8 +116,16 @@
                                  Visibility="{Binding IsExtracting, Converter={StaticResource BoolToVisibility}}"/>
                 </StackPanel>
 
+                <!-- Clear All IDs -->
+                <Button Grid.Column="4"
+                        Content="Clear All IDs"
+                        Command="{Binding ClearAllIdsCommand}"
+                        Style="{StaticResource SecondaryButton}"
+                        Padding="12,6"
+                        Margin="0,0,8,0"/>
+
                 <!-- Refresh Status -->
-                <Button Grid.Column="3"
+                <Button Grid.Column="5"
                         Content="Refresh Status"
                         Command="{Binding RefreshConnectionStatusCommand}"
                         Style="{StaticResource SecondaryButton}"
@@ -134,24 +165,140 @@
                         Margin="8,0,0,0"
                         Visibility="{Binding HasFailedWritebacks, Converter={StaticResource BoolToVisibility}}"/>
 
-                <!-- Push Status -->
+                <!-- Push Status + Progress -->
                 <StackPanel Grid.Column="2" Margin="16,0" VerticalAlignment="Center">
                     <TextBlock Text="{Binding PushStatusText}"
                                FontSize="12"
                                Foreground="{StaticResource TextSecondaryBrush}"
                                TextTrimming="CharacterEllipsis"/>
-                    <ProgressBar IsIndeterminate="True"
+                    <ProgressBar Value="{Binding PushProgressPercent}"
+                                 Minimum="0" Maximum="1"
                                  Height="4"
                                  Margin="0,4,0,0"
                                  Foreground="{StaticResource PrimaryBrush}"
                                  Visibility="{Binding IsPushing, Converter={StaticResource BoolToVisibility}}"/>
+                    <TextBlock Text="{Binding PushProgress}"
+                               FontSize="11"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Visibility="{Binding IsPushing, Converter={StaticResource BoolToVisibility}}"
+                               Margin="0,2,0,0"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Row 3: DataGrid with empty-state overlay -->
-        <Grid Grid.Row="3" Margin="0,0,0,8">
+        <!-- Row 3: Validation Panel (collapsible) -->
+        <Border Grid.Row="3"
+                Style="{StaticResource CardPanel}"
+                Margin="0,0,0,8"
+                Visibility="{Binding IsValidationPanelVisible, Converter={StaticResource BoolToVisibility}}">
+            <Expander IsExpanded="True">
+                <Expander.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Validation Results" FontWeight="SemiBold" FontSize="13"
+                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <TextBlock FontSize="12" Margin="8,0,0,0"
+                                   Foreground="{StaticResource TextSecondaryBrush}">
+                            <TextBlock.Text>
+                                <MultiBinding StringFormat="{}{0} Error(s), {1} Warning(s)">
+                                    <Binding Path="ValidationErrorCount"/>
+                                    <Binding Path="ValidationWarningCount"/>
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
+                    </StackPanel>
+                </Expander.Header>
+                <ListView ItemsSource="{Binding ValidationErrors}"
+                          MaxHeight="200"
+                          BorderThickness="0"
+                          Background="Transparent"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="24"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Severity Icon -->
+                                <TextBlock Grid.Column="0" FontSize="14" VerticalAlignment="Center"
+                                           HorizontalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="!"/>
+                                            <Setter Property="Foreground" Value="#C62828"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Severity}" Value="Warning">
+                                                    <Setter Property="Text" Value="⚠"/>
+                                                    <Setter Property="Foreground" Value="#F57F17"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <!-- Message -->
+                                <TextBlock Grid.Column="1" VerticalAlignment="Center" Margin="4,0"
+                                           FontSize="12" TextTrimming="CharacterEllipsis">
+                                    <TextBlock.Text>
+                                        <MultiBinding StringFormat="[{0}] {1}: {2}">
+                                            <Binding Path="LayoutName"/>
+                                            <Binding Path="ProductName"/>
+                                            <Binding Path="Message"/>
+                                        </MultiBinding>
+                                    </TextBlock.Text>
+                                </TextBlock>
+
+                                <!-- Map Product Button -->
+                                <Button Grid.Column="2"
+                                        Content="Map"
+                                        Command="{Binding DataContext.MapProductCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                                        CommandParameter="{Binding}"
+                                        Padding="8,2" Margin="4,0"
+                                        FontSize="11">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ActionType}" Value="Map">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+
+                                <!-- Ignore Button (only for warnings) -->
+                                <Button Grid.Column="3"
+                                        Content="Ignore"
+                                        Command="{Binding DataContext.IgnoreValidationErrorCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                                        CommandParameter="{Binding}"
+                                        Padding="8,2"
+                                        FontSize="11">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Severity}" Value="Warning">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Expander>
+        </Border>
+
+        <!-- Row 4: DataGrid with empty-state overlay -->
+        <Grid Grid.Row="4" Margin="0,0,0,8">
             <DataGrid ItemsSource="{Binding Source={StaticResource GroupedBoqItems}}"
+                      SelectedItem="{Binding SelectedBoqItem, Mode=TwoWay}"
                       AutoGenerateColumns="False"
                       IsReadOnly="True"
                       MinHeight="120"
@@ -247,8 +394,8 @@
                        Visibility="{Binding HasNoData, Converter={StaticResource BoolToVisibility}}"/>
         </Grid>
 
-        <!-- Row 4: Summary Panel -->
-        <Border Grid.Row="4"
+        <!-- Row 5: Summary Panel -->
+        <Border Grid.Row="5"
                 Style="{StaticResource CardPanel}"
                 Margin="0,0,0,8">
             <Grid>
@@ -336,8 +483,8 @@
             </Grid>
         </Border>
 
-        <!-- Row 5: Push Result -->
-        <Border Grid.Row="5"
+        <!-- Row 6: Push Result -->
+        <Border Grid.Row="6"
                 Style="{StaticResource CardPanel}"
                 Visibility="{Binding LastPushResult, Converter={StaticResource StringToVisibility}}">
             <TextBlock Text="{Binding LastPushResult}"

@@ -72,6 +72,30 @@ public partial class BOQDisplayItem : ObservableObject
 }
 
 /// <summary>
+/// Validation error item for the BOQ validation panel.
+/// </summary>
+public partial class BOQValidationErrorItem : ObservableObject
+{
+    [ObservableProperty]
+    private string _severity = "Error"; // Error, Warning
+
+    [ObservableProperty]
+    private string _message = string.Empty;
+
+    [ObservableProperty]
+    private string _layoutName = string.Empty;
+
+    [ObservableProperty]
+    private int _rowIndex = -1;
+
+    [ObservableProperty]
+    private string _actionType = "None"; // Map, Ignore, None
+
+    [ObservableProperty]
+    private string _productName = string.Empty;
+}
+
+/// <summary>
 /// ViewModel for the BOQ (Bill of Quantities) page.
 /// Handles BOQ extraction from AutoCAD, validation, push to Odoo, and ID writeback.
 /// </summary>
@@ -96,9 +120,35 @@ public partial class BOQViewModel : ObservableObject
     /// </summary>
     private readonly List<WritebackLayout> _failedWritebacks = new();
 
-    private bool _validationCompleted;
-
     public ObservableCollection<BOQDisplayItem> BoqItems { get; } = new();
+    public ObservableCollection<BOQValidationErrorItem> ValidationErrors { get; } = new();
+
+    // Validation panel state
+    [ObservableProperty]
+    private bool _isValidationPanelVisible;
+
+    [ObservableProperty]
+    private int _validationErrorCount;
+
+    [ObservableProperty]
+    private int _validationWarningCount;
+
+    [ObservableProperty]
+    private BOQDisplayItem? _selectedBoqItem;
+
+    // Push progress
+    [ObservableProperty]
+    private double _pushProgressPercent;
+
+    [ObservableProperty]
+    private string _pushProgress = string.Empty;
+
+    // Progress reporting — cancellation support
+    [ObservableProperty]
+    private bool _isCancelling;
+
+    private CancellationTokenSource? _extractionCts;
+    private CancellationTokenSource? _pushCts;
 
     // Extraction state
     [ObservableProperty]
@@ -212,12 +262,15 @@ public partial class BOQViewModel : ObservableObject
     partial void OnIsAutoCADConnectedChanged(bool value)
     {
         ExtractBOQCommand.NotifyCanExecuteChanged();
+        ClearAllIdsCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnTotalItemsChanged(int value)
     {
         OnPropertyChanged(nameof(HasData));
         OnPropertyChanged(nameof(HasNoData));
+        PushToOdooCommand.NotifyCanExecuteChanged();
+        ValidateCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnIsValidatingChanged(bool value)
@@ -253,12 +306,13 @@ public partial class BOQViewModel : ObservableObject
     private async Task ExtractBOQAsync()
     {
         IsExtracting = true;
+        IsCancelling = false;
+        _extractionCts = new CancellationTokenSource();
         ExtractionStatus = "Getting layouts...";
         ExtractionProgress = 0;
         BoqItems.Clear();
         _layoutDataMap.Clear();
         _failedWritebacks.Clear();
-        _validationCompleted = false;
         HasValidationErrors = false;
         LastPushResult = string.Empty;
         PushStatusText = string.Empty;
@@ -295,6 +349,13 @@ public partial class BOQViewModel : ObservableObject
             // Step 2: For each layout, extract parameters
             for (var i = 0; i < layoutNames.Count; i++)
             {
+                if (_extractionCts.Token.IsCancellationRequested)
+                {
+                    ExtractionStatus = "Extraction cancelled";
+                    _logService.Log("BOQ: Extraction cancelled by user", "BOQ", AppLogLevel.Warning);
+                    break;
+                }
+
                 var layoutName = layoutNames[i];
                 CurrentLayoutIndex = i + 1;
                 ExtractionStatus = $"Extracting layout {CurrentLayoutIndex}/{TotalLayouts}: {layoutName}";
@@ -322,10 +383,12 @@ public partial class BOQViewModel : ObservableObject
                     _layoutDataMap[layoutName] = layoutData;
 
                     // Generate BOQ entries from layout data
+                    // ValidateProducts = false during extraction: product validation is done
+                    // in the separate Validate step. Extraction should always populate items.
                     var options = new BOQGenerationOptions
                     {
                         IncludeAutoCADData = true,
-                        ValidateProducts = _odooService.IsConnected
+                        ValidateProducts = false
                     };
 
                     var result = await _boqProcessor.GenerateBOQAsync(layoutData, options);
@@ -401,6 +464,9 @@ public partial class BOQViewModel : ObservableObject
         finally
         {
             IsExtracting = false;
+            IsCancelling = false;
+            _extractionCts?.Dispose();
+            _extractionCts = null;
         }
     }
 
@@ -489,8 +555,8 @@ public partial class BOQViewModel : ObservableObject
             }
 
             HasValidationErrors = errorCount > 0;
-            _validationCompleted = true;
             UpdateSummary();
+            PopulateValidationErrors();
 
             PushToOdooCommand.NotifyCanExecuteChanged();
 
@@ -519,7 +585,11 @@ public partial class BOQViewModel : ObservableObject
     private async Task PushToOdooAsync()
     {
         IsPushing = true;
+        IsCancelling = false;
+        _pushCts = new CancellationTokenSource();
         PushStatusText = "Preparing push...";
+        PushProgressPercent = 0;
+        PushProgress = string.Empty;
         LastPushResult = string.Empty;
         _failedWritebacks.Clear();
 
@@ -580,6 +650,8 @@ public partial class BOQViewModel : ObservableObject
             }
 
             // Call API
+            PushProgressPercent = 0.3;
+            PushProgress = $"Pushing {request.All.Count} layouts...";
             PushStatusText = $"Pushing {request.All.Count} layouts to Odoo...";
             _logService.Log($"BOQ: Pushing {request.All.Count} layouts via import2boq_v2...", "BOQ");
 
@@ -595,15 +667,23 @@ public partial class BOQViewModel : ObservableObject
             }
 
             // Build writeback data from response
+            PushProgressPercent = 0.6;
+            PushProgress = "Building writeback data...";
             var writebackData = BuildWritebackData(response);
 
             // Execute writeback to AutoCAD
+            PushProgressPercent = 0.7;
+            PushProgress = "Writing IDs back to AutoCAD...";
             PushStatusText = "Writing IDs back to AutoCAD...";
             await ExecuteWritebackAsync(writebackData);
 
             // Update display items with returned IDs
+            PushProgressPercent = 0.9;
+            PushProgress = "Updating display...";
             UpdateDisplayItemIds(response);
 
+            PushProgressPercent = 1.0;
+            PushProgress = "Complete";
             LastPushTime = DateTime.Now;
             var failedCount = _failedWritebacks.Count;
             if (failedCount > 0)
@@ -632,12 +712,15 @@ public partial class BOQViewModel : ObservableObject
         finally
         {
             IsPushing = false;
+            IsCancelling = false;
+            _pushCts?.Dispose();
+            _pushCts = null;
         }
     }
 
     private bool CanPushToOdoo() =>
         !HasValidationErrors && !IsPushing && TotalItems > 0 &&
-        IsOdooConnected && _validationCompleted;
+        IsOdooConnected;
 
     internal BoqImportRequest BuildImportRequest()
     {
@@ -814,6 +897,166 @@ public partial class BOQViewModel : ObservableObject
     }
 
     private bool CanRetryWriteback() => HasFailedWritebacks && !IsWritingBack;
+
+    #endregion
+
+    #region Clear All IDs Command
+
+    [RelayCommand(CanExecute = nameof(CanClearAllIds))]
+    private async Task ClearAllIdsAsync()
+    {
+        // Confirmation is expected to be shown by the UI (code-behind MessageBox)
+        // This command is invoked only after user confirms.
+        _logService.Log("BOQ: Clearing all table IDs from AutoCAD...", "BOQ");
+
+        try
+        {
+            var result = await _guiProxy.ExecuteInGuiAsync(
+                "autocad_clear_all_table_ids", null, timeout: 30000);
+
+            if (result.Success)
+            {
+                // Clear DetailId on all display items
+                foreach (var item in BoqItems)
+                {
+                    item.DetailId = null;
+                }
+                _logService.Log("BOQ: All table IDs cleared successfully", "BOQ");
+            }
+            else
+            {
+                _logService.Log($"BOQ: Clear IDs failed — {result.ErrorMessage}", "BOQ", AppLogLevel.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logService.Log($"BOQ: Clear IDs error — {ex.Message}", "BOQ", AppLogLevel.Error);
+            _logger?.LogError(ex, "Clear all IDs error");
+        }
+    }
+
+    private bool CanClearAllIds() => IsAutoCADConnected && !IsExtracting && !IsPushing;
+
+    #endregion
+
+    #region Validation Panel Commands
+
+    [RelayCommand]
+    private void NavigateToError(BOQValidationErrorItem? error)
+    {
+        if (error == null || error.RowIndex < 0) return;
+
+        if (error.RowIndex < BoqItems.Count)
+        {
+            SelectedBoqItem = BoqItems[error.RowIndex];
+        }
+    }
+
+    [RelayCommand]
+    private void IgnoreValidationError(BOQValidationErrorItem? error)
+    {
+        if (error == null) return;
+
+        // Remove warning from list
+        ValidationErrors.Remove(error);
+
+        // If the corresponding item has Warning severity, mark as Valid
+        if (error.RowIndex >= 0 && error.RowIndex < BoqItems.Count && error.Severity == "Warning")
+        {
+            var item = BoqItems[error.RowIndex];
+            if (item.ValidationStatus == "Warning")
+            {
+                item.ValidationStatus = "Valid";
+                item.ValidationMessage = string.Empty;
+            }
+        }
+
+        UpdateValidationCounts();
+        UpdateSummary();
+    }
+
+    [RelayCommand]
+    private void MapProduct(BOQValidationErrorItem? error)
+    {
+        if (error == null) return;
+        // Navigate to the error item so user sees the context
+        NavigateToError(error);
+        // The actual dialog will be opened by code-behind or a dialog service.
+        // We expose the error's product name so the dialog knows what to map.
+        _pendingMapError = error;
+        OnPropertyChanged(nameof(PendingMapProductName));
+    }
+
+    private BOQValidationErrorItem? _pendingMapError;
+    public string PendingMapProductName => _pendingMapError?.ProductName ?? string.Empty;
+
+    /// <summary>
+    /// Called by code-behind after the ProductMappingDialog returns OK.
+    /// Re-validates the mapped item and refreshes validation panel.
+    /// </summary>
+    public void OnProductMapped(string autocadName, int odooProductId)
+    {
+        if (_pendingMapError != null && _pendingMapError.RowIndex >= 0 && _pendingMapError.RowIndex < BoqItems.Count)
+        {
+            var item = BoqItems[_pendingMapError.RowIndex];
+            item.ValidationStatus = "Valid";
+            item.ValidationMessage = string.Empty;
+            ValidationErrors.Remove(_pendingMapError);
+            _pendingMapError = null;
+            UpdateValidationCounts();
+            UpdateSummary();
+
+            HasValidationErrors = ValidationErrors.Any(e => e.Severity == "Error");
+            PushToOdooCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    /// <summary>
+    /// Opens the manage mappings mode. Called by code-behind.
+    /// </summary>
+    public void OnManageMappingsRequested()
+    {
+        // No-op in ViewModel; the code-behind handles dialog display.
+    }
+
+    [RelayCommand]
+    private void CancelOperation()
+    {
+        IsCancelling = true;
+        _extractionCts?.Cancel();
+        _pushCts?.Cancel();
+    }
+
+    private void PopulateValidationErrors()
+    {
+        ValidationErrors.Clear();
+
+        for (int i = 0; i < BoqItems.Count; i++)
+        {
+            var item = BoqItems[i];
+            if (item.ValidationStatus is "Error" or "Warning")
+            {
+                ValidationErrors.Add(new BOQValidationErrorItem
+                {
+                    Severity = item.ValidationStatus == "Error" ? "Error" : "Warning",
+                    Message = item.ValidationMessage,
+                    LayoutName = item.LayoutName,
+                    RowIndex = i,
+                    ActionType = item.ValidationStatus == "Error" && item.ValidationMessage.Contains("Product not found") ? "Map" : "Ignore",
+                    ProductName = item.ProductName
+                });
+            }
+        }
+
+        UpdateValidationCounts();
+        IsValidationPanelVisible = ValidationErrors.Count > 0;
+    }
+
+    private void UpdateValidationCounts()
+    {
+        ValidationErrorCount = ValidationErrors.Count(e => e.Severity == "Error");
+        ValidationWarningCount = ValidationErrors.Count(e => e.Severity == "Warning");
+    }
 
     #endregion
 

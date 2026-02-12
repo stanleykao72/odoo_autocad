@@ -129,4 +129,11 @@ public interface IBOQProcessor
     /// <param name="autocadName">AutoCAD product name.</param>
     /// <param name="odooProductId">Odoo product ID.</param>
     void SetProductMapping(string autocadName, int odooProductId);
+
+    /// <summary>
+    /// Removes a product mapping rule.
+    /// </summary>
+    /// <param name="autocadName">AutoCAD product name to remove.</param>
+    /// <returns>True if the mapping was found and removed.</returns>
+    bool RemoveProductMapping(string autocadName);
 }

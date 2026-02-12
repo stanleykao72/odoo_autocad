@@ -286,15 +286,15 @@ public class BOQViewModelTests
     #region Push Command Tests
 
     [Fact]
-    public void PushCommand_WhenNotValidated_CannotExecute()
+    public void PushCommand_WithDataAndOdooConnected_CanExecute()
     {
         _mockOdoo.Setup(s => s.IsConnected).Returns(true);
         var sut = CreateSUT();
         sut.BoqItems.Add(new BOQDisplayItem { LayoutName = "L1" });
         sut.UpdateSummary();
 
-        // _validationCompleted is false
-        sut.PushToOdooCommand.CanExecute(null).Should().BeFalse();
+        // Push is enabled after extraction — validation is optional
+        sut.PushToOdooCommand.CanExecute(null).Should().BeTrue();
     }
 
     [Fact]
@@ -527,6 +527,148 @@ public class BOQViewModelTests
 
         BOQViewModel.FindDetailId(details, "NOTFOUND").Should().BeNull();
         BOQViewModel.FindDetailId(details, "").Should().BeNull();
+    }
+
+    #endregion
+
+    #region Validation Panel Tests
+
+    [Fact]
+    public async Task ValidateCommand_PopulatesValidationErrors()
+    {
+        _mockBoqProcessor
+            .Setup(p => p.MapProductAsync("Good"))
+            .ReturnsAsync(new OdooProduct(1, "Good", null, null, null, null, null));
+        _mockBoqProcessor
+            .Setup(p => p.MapProductAsync("Bad"))
+            .ReturnsAsync((OdooProduct?)null);
+
+        var sut = CreateSUT();
+        sut.BoqItems.Add(new BOQDisplayItem
+        {
+            LayoutName = "L1", ProductName = "Good", Quantity = 10
+        });
+        sut.BoqItems.Add(new BOQDisplayItem
+        {
+            LayoutName = "L1", ProductName = "Bad", Quantity = 5
+        });
+        sut.BoqItems.Add(new BOQDisplayItem
+        {
+            LayoutName = "L2", ProductName = "Good", Quantity = 0
+        });
+        sut.UpdateSummary();
+
+        await sut.ValidateCommand.ExecuteAsync(null);
+
+        sut.ValidationErrors.Should().HaveCount(2); // 1 error + 1 warning
+        sut.ValidationErrorCount.Should().Be(1);
+        sut.ValidationWarningCount.Should().Be(1);
+        sut.IsValidationPanelVisible.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ValidateCommand_NoErrors_HidesPanel()
+    {
+        _mockBoqProcessor
+            .Setup(p => p.MapProductAsync(It.IsAny<string>()))
+            .ReturnsAsync(new OdooProduct(1, "Test", null, null, null, null, null));
+
+        var sut = CreateSUT();
+        sut.BoqItems.Add(new BOQDisplayItem
+        {
+            LayoutName = "L1", ProductName = "Widget", Quantity = 5
+        });
+        sut.UpdateSummary();
+
+        await sut.ValidateCommand.ExecuteAsync(null);
+
+        sut.ValidationErrors.Should().BeEmpty();
+        sut.IsValidationPanelVisible.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IgnoreValidationError_RemovesWarningAndUpdatesItem()
+    {
+        var sut = CreateSUT();
+        sut.BoqItems.Add(new BOQDisplayItem
+        {
+            LayoutName = "L1", ProductName = "Test", ValidationStatus = "Warning",
+            ValidationMessage = "Zero quantity"
+        });
+
+        var error = new BOQValidationErrorItem
+        {
+            Severity = "Warning", Message = "Zero quantity",
+            LayoutName = "L1", RowIndex = 0, ProductName = "Test"
+        };
+        sut.ValidationErrors.Add(error);
+
+        sut.IgnoreValidationErrorCommand.Execute(error);
+
+        sut.ValidationErrors.Should().BeEmpty();
+        sut.BoqItems[0].ValidationStatus.Should().Be("Valid");
+    }
+
+    #endregion
+
+    #region Clear All IDs Tests
+
+    [Fact]
+    public async Task ClearAllIds_ClearsDetailIds()
+    {
+        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockGuiProxy
+            .Setup(p => p.ExecuteInGuiAsync("autocad_clear_all_table_ids", null, 30000))
+            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", null));
+
+        var sut = CreateSUT();
+        sut.BoqItems.Add(new BOQDisplayItem { LayoutName = "L1", DetailId = "42" });
+        sut.BoqItems.Add(new BOQDisplayItem { LayoutName = "L1", DetailId = "43" });
+
+        await sut.ClearAllIdsCommand.ExecuteAsync(null);
+
+        sut.BoqItems.Should().OnlyContain(i => i.DetailId == null);
+    }
+
+    [Fact]
+    public void ClearAllIds_WhenDisconnected_CannotExecute()
+    {
+        _mockAutoCAD.Setup(s => s.IsConnected).Returns(false);
+        var sut = CreateSUT();
+
+        sut.ClearAllIdsCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ClearAllIds_WhenConnected_CanExecute()
+    {
+        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        var sut = CreateSUT();
+
+        sut.ClearAllIdsCommand.CanExecute(null).Should().BeTrue();
+    }
+
+    #endregion
+
+    #region Progress Tests
+
+    [Fact]
+    public void CancelOperation_SetsCancelling()
+    {
+        var sut = CreateSUT();
+        sut.IsCancelling.Should().BeFalse();
+
+        sut.CancelOperationCommand.Execute(null);
+
+        sut.IsCancelling.Should().BeTrue();
+    }
+
+    [Fact]
+    public void PushProgress_DefaultsToEmpty()
+    {
+        var sut = CreateSUT();
+        sut.PushProgressPercent.Should().Be(0);
+        sut.PushProgress.Should().BeEmpty();
     }
 
     #endregion

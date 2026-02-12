@@ -10,6 +10,7 @@
         <converters:PRStateToIconConverter x:Key="StateToIcon"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
         <converters:StringToVisibilityConverter x:Key="StringToVisibility"/>
+        <converters:StatusMessageToColorConverter x:Key="StatusMsgToColor"/>
     </Page.Resources>
 
     <Grid Margin="24">
@@ -86,128 +87,256 @@
             </Grid>
         </Border>
 
-        <!-- Row 2: DataGrid with empty-state overlay -->
+        <!-- Row 2: Master-Detail Layout -->
         <Grid Grid.Row="2" Margin="0,0,0,8">
-            <DataGrid ItemsSource="{Binding PrItems}"
-                      SelectedItem="{Binding SelectedPR, Mode=TwoWay}"
-                      AutoGenerateColumns="False"
-                      IsReadOnly="True"
-                      MinHeight="120"
-                      BorderThickness="1"
-                      BorderBrush="{StaticResource BorderBrush}"
-                      Background="White"
-                      GridLinesVisibility="Horizontal"
-                      HorizontalGridLinesBrush="{StaticResource BorderBrush}"
-                      RowHeaderWidth="0"
-                      FontFamily="{StaticResource AppFontFamily}"
-                      FontSize="12"
-                      VirtualizingStackPanel.IsVirtualizing="True"
-                      VirtualizingStackPanel.VirtualizationMode="Recycling"
-                      CanUserSortColumns="True"
-                      SelectionMode="Single">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="300"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="*" MinWidth="250"/>
+            </Grid.ColumnDefinitions>
 
-                <DataGrid.Columns>
-                    <!-- State Icon -->
-                    <DataGridTemplateColumn Header="" Width="30" CanUserSort="False">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding State, Converter={StaticResource StateToIcon}}"
-                                           Foreground="{Binding State, Converter={StaticResource StateToColor}}"
-                                           HorizontalAlignment="Center"
-                                           FontSize="14"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+            <!-- Left: Filter/Sort + PR List -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-                    <!-- Reference -->
-                    <DataGridTextColumn Header="Reference" Binding="{Binding Reference}" Width="*"/>
-
-                    <!-- State Text -->
-                    <DataGridTemplateColumn Header="State" Width="100">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding State}"
-                                           Foreground="{Binding State, Converter={StaticResource StateToColor}}"
-                                           FontWeight="SemiBold"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
-                    <!-- Line Count -->
-                    <DataGridTextColumn Header="Lines" Binding="{Binding LineCount}" Width="60"/>
-
-                    <!-- Created Date -->
-                    <DataGridTextColumn Header="Created" Binding="{Binding CreatedAt, StringFormat=yyyy-MM-dd HH:mm}" Width="140"/>
-                </DataGrid.Columns>
-            </DataGrid>
-
-            <!-- Empty-state overlay -->
-            <TextBlock Text="No Purchase Requisitions. Click 'Convert BOQ to PR' to begin."
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center"
-                       FontSize="14"
-                       Foreground="{StaticResource TextSecondaryBrush}"
-                       IsHitTestVisible="False"
-                       Visibility="{Binding HasNoData, Converter={StaticResource BoolToVisibility}}"/>
-        </Grid>
-
-        <!-- Row 3: Submit Controls -->
-        <Border Grid.Row="3" Style="{StaticResource CardPanel}" Margin="0,0,0,8">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Submit Button -->
-                <Button Grid.Column="0"
-                        Command="{Binding SubmitPRCommand}"
-                        Style="{StaticResource PrimaryButton}"
-                        Padding="16,8"
-                        MinWidth="180">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Submit for Approval" VerticalAlignment="Center"/>
-                        <TextBlock Text=" ..."
-                                   VerticalAlignment="Center"
-                                   Visibility="{Binding IsSubmitting, Converter={StaticResource BoolToVisibility}}"/>
-                    </StackPanel>
-                </Button>
-
-                <!-- Submit Status -->
-                <StackPanel Grid.Column="1" Margin="16,0" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding SubmitStatusText}"
-                               FontSize="12"
-                               Foreground="{StaticResource TextSecondaryBrush}"
-                               TextTrimming="CharacterEllipsis"/>
-                    <ProgressBar IsIndeterminate="True"
-                                 Height="4"
-                                 Margin="0,4,0,0"
-                                 Foreground="{StaticResource PrimaryBrush}"
-                                 Visibility="{Binding IsSubmitting, Converter={StaticResource BoolToVisibility}}"/>
+                <!-- Filter/Sort Bar -->
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
+                    <TextBlock Text="Filter:" FontSize="12" VerticalAlignment="Center"
+                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,4,0"/>
+                    <ComboBox SelectedItem="{Binding SelectedStateFilter, Mode=TwoWay}"
+                              Width="100" FontSize="12" Margin="0,0,12,0">
+                        <sys:String xmlns:sys="clr-namespace:System;assembly=mscorlib">All</sys:String>
+                        <sys:String xmlns:sys="clr-namespace:System;assembly=mscorlib">Draft</sys:String>
+                        <sys:String xmlns:sys="clr-namespace:System;assembly=mscorlib">Submitted</sys:String>
+                        <sys:String xmlns:sys="clr-namespace:System;assembly=mscorlib">Approved</sys:String>
+                        <sys:String xmlns:sys="clr-namespace:System;assembly=mscorlib">Rejected</sys:String>
+                    </ComboBox>
+                    <TextBlock Text="Sort:" FontSize="12" VerticalAlignment="Center"
+                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,4,0"/>
+                    <ComboBox SelectedItem="{Binding SelectedSortOrder, Mode=TwoWay}"
+                              Width="140" FontSize="12">
+                        <sys:String xmlns:sys="clr-namespace:System;assembly=mscorlib">Newest First</sys:String>
+                        <sys:String xmlns:sys="clr-namespace:System;assembly=mscorlib">Oldest First</sys:String>
+                        <sys:String xmlns:sys="clr-namespace:System;assembly=mscorlib">Reference A-Z</sys:String>
+                        <sys:String xmlns:sys="clr-namespace:System;assembly=mscorlib">Reference Z-A</sys:String>
+                    </ComboBox>
                 </StackPanel>
 
-                <!-- Selected PR Info -->
-                <TextBlock Grid.Column="2"
-                           VerticalAlignment="Center"
-                           FontSize="12"
-                           Foreground="{StaticResource TextSecondaryBrush}">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="Text" Value="Select a draft PR to submit"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding SelectedPR}" Value="{x:Null}">
-                                    <Setter Property="Text" Value="Select a draft PR to submit"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
-            </Grid>
-        </Border>
+                <!-- PR List DataGrid -->
+                <Grid Grid.Row="1">
+                    <DataGrid ItemsSource="{Binding FilteredPRs}"
+                              SelectedItem="{Binding SelectedPR, Mode=TwoWay}"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              MinHeight="120"
+                              BorderThickness="1"
+                              BorderBrush="{StaticResource BorderBrush}"
+                              Background="White"
+                              GridLinesVisibility="Horizontal"
+                              HorizontalGridLinesBrush="{StaticResource BorderBrush}"
+                              RowHeaderWidth="0"
+                              FontFamily="{StaticResource AppFontFamily}"
+                              FontSize="12"
+                              VirtualizingStackPanel.IsVirtualizing="True"
+                              VirtualizingStackPanel.VirtualizationMode="Recycling"
+                              CanUserSortColumns="True"
+                              SelectionMode="Single">
 
-        <!-- Row 4: Summary Panel -->
-        <Border Grid.Row="4"
+                        <DataGrid.Columns>
+                            <!-- State Badge -->
+                            <DataGridTemplateColumn Header="State" Width="90" CanUserSort="False">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="8"
+                                                Padding="6,2"
+                                                HorizontalAlignment="Center"
+                                                Background="{Binding State, Converter={StaticResource StateToColor}}">
+                                            <TextBlock Text="{Binding State}"
+                                                       Foreground="White"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- Reference -->
+                            <DataGridTextColumn Header="Reference" Binding="{Binding Reference}" Width="*"/>
+
+                            <!-- Line Count -->
+                            <DataGridTextColumn Header="Lines" Binding="{Binding LineCount}" Width="50"/>
+
+                            <!-- Created Date -->
+                            <DataGridTextColumn Header="Created" Binding="{Binding CreatedAt, StringFormat=yyyy-MM-dd}" Width="90"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <!-- Empty-state overlay -->
+                    <TextBlock Text="No Purchase Requisitions. Click 'Convert BOQ to PR' to begin."
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="14"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               IsHitTestVisible="False"
+                               Visibility="{Binding HasNoData, Converter={StaticResource BoolToVisibility}}"/>
+                </Grid>
+            </Grid>
+
+            <!-- Splitter -->
+            <GridSplitter Grid.Column="1" Width="4"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Stretch"
+                          Background="{StaticResource BorderBrush}"/>
+
+            <!-- Right: Detail Panel -->
+            <Border Grid.Column="2"
+                    BorderThickness="1"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    Background="White"
+                    CornerRadius="4"
+                    Padding="12">
+                <Grid>
+                    <!-- Placeholder when no PR selected -->
+                    <TextBlock Text="Select a PR to view details"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="14"
+                               Foreground="{StaticResource TextSecondaryBrush}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SelectedPR}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+
+                    <!-- Detail Content (visible when PR selected) -->
+                    <Grid>
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SelectedPR}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Detail Header -->
+                        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding SelectedPR.Reference}"
+                                           FontSize="18" FontWeight="Bold"
+                                           Foreground="{StaticResource TextPrimaryBrush}"/>
+                                <Border CornerRadius="8" Padding="8,2" Margin="12,0,0,0"
+                                        VerticalAlignment="Center"
+                                        Background="{Binding SelectedPR.State, Converter={StaticResource StateToColor}}">
+                                    <TextBlock Text="{Binding SelectedPR.State}"
+                                               Foreground="White" FontSize="11" FontWeight="SemiBold"/>
+                                </Border>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                <TextBlock Text="{Binding SelectedPR.CreatedAt, StringFormat='Created: {0:yyyy-MM-dd HH:mm}'}"
+                                           FontSize="12"
+                                           Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <TextBlock Text="{Binding SelectedPR.LineCount, StringFormat=' | {0} line(s)'}"
+                                           FontSize="12"
+                                           Foreground="{StaticResource TextSecondaryBrush}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- PR Lines DataGrid -->
+                        <DataGrid Grid.Row="1"
+                                  ItemsSource="{Binding SelectedPRLines}"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  BorderThickness="1"
+                                  BorderBrush="{StaticResource BorderBrush}"
+                                  GridLinesVisibility="Horizontal"
+                                  HorizontalGridLinesBrush="{StaticResource BorderBrush}"
+                                  RowHeaderWidth="0"
+                                  FontSize="12"
+                                  CanUserSortColumns="True"
+                                  SelectionMode="Single">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Product" Binding="{Binding ProductName}" Width="*"/>
+                                <DataGridTemplateColumn Header="Qty" Width="60">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Quantity, StringFormat=N2}">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Quantity}" Value="0">
+                                                                <Setter Property="Background" Value="#FFF3E0"/>
+                                                                <Setter Property="Foreground" Value="#E65100"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="UoM" Binding="{Binding UnitOfMeasure}" Width="60"/>
+                                <DataGridTextColumn Header="Unit Price" Binding="{Binding UnitPrice, StringFormat=N2}" Width="80"/>
+                                <DataGridTextColumn Header="Total" Binding="{Binding LineTotal, StringFormat=N2}" Width="80"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <!-- Total -->
+                        <Border Grid.Row="2" Margin="0,8,0,0" Padding="0,4"
+                                BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <TextBlock Text="Total:" FontWeight="SemiBold" FontSize="13"
+                                           Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding SelectedPRTotal, StringFormat=N2}"
+                                           FontWeight="Bold" FontSize="13"
+                                           Foreground="{StaticResource PrimaryBrush}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Submit Button for selected PR -->
+                        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Command="{Binding SubmitPRCommand}"
+                                    Style="{StaticResource PrimaryButton}"
+                                    Padding="16,6">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Submit for Approval" VerticalAlignment="Center"/>
+                                    <TextBlock Text=" ..."
+                                               VerticalAlignment="Center"
+                                               Visibility="{Binding IsSubmitting, Converter={StaticResource BoolToVisibility}}"/>
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Text="{Binding SubmitStatusText}"
+                                       FontSize="12"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="12,0,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Row 3: Summary Panel -->
+        <Border Grid.Row="3"
                 Style="{StaticResource CardPanel}"
                 Margin="0,0,0,8">
             <Grid>
@@ -268,14 +397,24 @@
             </Grid>
         </Border>
 
-        <!-- Row 5: Convert Result -->
-        <Border Grid.Row="5"
+        <!-- Row 4: Convert Result with styled feedback -->
+        <Border Grid.Row="4"
                 Style="{StaticResource CardPanel}"
+                Margin="0,0,0,8"
                 Visibility="{Binding LastConvertResult, Converter={StaticResource StringToVisibility}}">
-            <TextBlock Text="{Binding LastConvertResult}"
-                       FontSize="13"
-                       Foreground="{StaticResource TextPrimaryBrush}"
-                       TextWrapping="Wrap"/>
+            <StackPanel>
+                <TextBlock Text="{Binding LastConvertResult}"
+                           FontSize="13"
+                           Foreground="{Binding StatusMessageType, Converter={StaticResource StatusMsgToColor}}"
+                           TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding LastConversionTime, StringFormat='Last conversion: {0:yyyy-MM-dd HH:mm:ss}'}"
+                           FontSize="11"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           Margin="0,4,0,0"
+                           Visibility="{Binding LastConversionTime, Converter={StaticResource StringToVisibility}}"/>
+            </StackPanel>
         </Border>
+
+        <!-- Row 5: (reserved for future use) -->
     </Grid>
 </Page>

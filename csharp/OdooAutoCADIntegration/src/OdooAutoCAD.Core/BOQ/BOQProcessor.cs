@@ -236,6 +236,14 @@ public class BOQProcessor : IBOQProcessor
         _logger?.LogDebug("Product mapping set: {AutoCADName} -> {OdooProductId}", autocadName, odooProductId);
     }
 
+    public bool RemoveProductMapping(string autocadName)
+    {
+        var removed = _productMappings.Remove(autocadName);
+        if (removed)
+            _logger?.LogDebug("Product mapping removed: {AutoCADName}", autocadName);
+        return removed;
+    }
+
     #region Private Helper Methods
 
     private List<ExtractedItem> ExtractItemsFromLayout(LayoutData layoutData)
@@ -359,13 +367,18 @@ public class BOQProcessor : IBOQProcessor
 
     private async Task<BOQEntry?> ProcessItemAsync(ExtractedItem item, BOQGenerationOptions options)
     {
-        // Try to map to Odoo product
-        var product = await MapProductAsync(item.Name);
+        OdooProduct? product = null;
 
-        if (product == null && options.ValidateProducts)
+        if (options.ValidateProducts)
         {
-            _logger?.LogWarning("No product mapping found for: {ItemName}", item.Name);
-            return null;
+            // Only map to Odoo product during validation, not extraction
+            product = await MapProductAsync(item.Name);
+
+            if (product == null)
+            {
+                _logger?.LogWarning("No product mapping found for: {ItemName}", item.Name);
+                return null;
+            }
         }
 
         return new BOQEntry

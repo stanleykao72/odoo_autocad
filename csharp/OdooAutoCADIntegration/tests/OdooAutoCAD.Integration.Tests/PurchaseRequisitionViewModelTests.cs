@@ -393,4 +393,245 @@ public class PurchaseRequisitionViewModelTests
     }
 
     #endregion
+
+    #region Filter/Sort Tests
+
+    [Fact]
+    public void FilteredPRs_DefaultAll_ShowsAllItems()
+    {
+        var sut = CreateSUT();
+        sut.PrItems.Add(new PRDisplayItem { State = "draft", Reference = "PR001", CreatedAt = DateTime.Now });
+        sut.PrItems.Add(new PRDisplayItem { State = "submitted", Reference = "PR002", CreatedAt = DateTime.Now });
+        sut.PrItems.Add(new PRDisplayItem { State = "approved", Reference = "PR003", CreatedAt = DateTime.Now });
+
+        sut.UpdateSummary();
+
+        sut.FilteredPRs.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public void FilteredPRs_FilterByDraft_ShowsOnlyDraft()
+    {
+        var sut = CreateSUT();
+        sut.PrItems.Add(new PRDisplayItem { State = "draft", Reference = "PR001", CreatedAt = DateTime.Now });
+        sut.PrItems.Add(new PRDisplayItem { State = "submitted", Reference = "PR002", CreatedAt = DateTime.Now });
+        sut.PrItems.Add(new PRDisplayItem { State = "draft", Reference = "PR003", CreatedAt = DateTime.Now });
+
+        sut.UpdateSummary();
+        sut.SelectedStateFilter = "Draft";
+
+        sut.FilteredPRs.Should().HaveCount(2);
+        sut.FilteredPRs.Should().OnlyContain(p => p.State == "draft");
+    }
+
+    [Fact]
+    public void FilteredPRs_SortByReferenceAZ_SortsCorrectly()
+    {
+        var sut = CreateSUT();
+        sut.PrItems.Add(new PRDisplayItem { State = "draft", Reference = "PR003", CreatedAt = DateTime.Now });
+        sut.PrItems.Add(new PRDisplayItem { State = "draft", Reference = "PR001", CreatedAt = DateTime.Now });
+        sut.PrItems.Add(new PRDisplayItem { State = "draft", Reference = "PR002", CreatedAt = DateTime.Now });
+
+        sut.UpdateSummary();
+        sut.SelectedSortOrder = "Reference A-Z";
+
+        sut.FilteredPRs[0].Reference.Should().Be("PR001");
+        sut.FilteredPRs[1].Reference.Should().Be("PR002");
+        sut.FilteredPRs[2].Reference.Should().Be("PR003");
+    }
+
+    #endregion
+
+    #region Detail View Tests
+
+    [Fact]
+    public void SelectPR_PopulatesLines()
+    {
+        var sut = CreateSUT();
+        var entry = new PREntry
+        {
+            Id = 1, Reference = "PR/001", State = "draft"
+        };
+        entry.Lines.Add(new PRLine
+        {
+            ProductName = "Widget", Quantity = 10, UnitOfMeasure = "pcs", UnitPrice = 5.0m
+        });
+        entry.Lines.Add(new PRLine
+        {
+            ProductName = "Bolt", Quantity = 100, UnitOfMeasure = "pcs", UnitPrice = 0.5m
+        });
+
+        var pr = new PRDisplayItem { Id = 1, Reference = "PR/001", State = "draft", OriginalEntry = entry };
+        sut.PrItems.Add(pr);
+
+        sut.SelectedPR = pr;
+
+        sut.SelectedPRLines.Should().HaveCount(2);
+        sut.SelectedPRLines[0].ProductName.Should().Be("Widget");
+        sut.SelectedPRLines[1].ProductName.Should().Be("Bolt");
+        sut.SelectedPRTotal.Should().Be(10 * 5.0m + 100 * 0.5m);
+    }
+
+    [Fact]
+    public void SelectPR_NullSelection_ClearsLines()
+    {
+        var sut = CreateSUT();
+        var entry = new PREntry { Id = 1, Reference = "PR/001", State = "draft" };
+        entry.Lines.Add(new PRLine { ProductName = "Widget", Quantity = 10, UnitOfMeasure = "pcs", UnitPrice = 5.0m });
+
+        var pr = new PRDisplayItem { Id = 1, OriginalEntry = entry };
+        sut.PrItems.Add(pr);
+        sut.SelectedPR = pr;
+        sut.SelectedPRLines.Should().HaveCount(1);
+
+        sut.SelectedPR = null;
+
+        sut.SelectedPRLines.Should().BeEmpty();
+        sut.SelectedPRTotal.Should().Be(0);
+    }
+
+    [Fact]
+    public void PRLineDisplayItem_ComputesLineTotal()
+    {
+        var line = new PRLineDisplayItem
+        {
+            ProductName = "Widget", Quantity = 10, UnitPrice = 2.5m
+        };
+
+        line.LineTotal.Should().Be(25.0m);
+    }
+
+    [Fact]
+    public void PRLineDisplayItem_NullUnitPrice_LineTotalIsZero()
+    {
+        var line = new PRLineDisplayItem
+        {
+            ProductName = "Widget", Quantity = 10, UnitPrice = null
+        };
+
+        line.LineTotal.Should().Be(0);
+    }
+
+    #endregion
+
+    #region Feedback Tests
+
+    [Fact]
+    public async Task Convert_Success_SetsStatusMessageTypeSuccess()
+    {
+        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockOdoo.Setup(s => s.IsConnected).Returns(true);
+        _mockGuiProxy
+            .Setup(p => p.ExecuteInGuiAsync("autocad_get_header_ids", null, 15000))
+            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", new List<string> { "H001" }));
+        _mockSettingsService
+            .Setup(s => s.LoadServerConfigsAsync())
+            .ReturnsAsync(new Dictionary<string, string?>
+            {
+                ["odoo_swagger_url"] = "https://example.com/api/v1/boq_import_api/swagger.json?token=tok123&db=testdb",
+                ["odoo_user_token"] = "tok123"
+            });
+        _mockSettingsService
+            .Setup(s => s.GetAppSettings())
+            .Returns(new AppSettings());
+        _mockOdoo
+            .Setup(s => s.ConvertBOQToPRViaApiAsync(
+                It.IsAny<List<string>>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(new Boq2PrResponse
+            {
+                Success = true,
+                All = new List<Boq2PrResult>
+                {
+                    new() { PrId = 10, Reference = "PR/001", State = "draft", Lines = new List<Boq2PrLine>() }
+                }
+            });
+
+        var sut = CreateSUT();
+        await sut.ConvertBOQToPRCommand.ExecuteAsync(null);
+
+        sut.StatusMessageType.Should().Be("success");
+        sut.LastConversionTime.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Convert_ApiError_SetsStatusMessageTypeError()
+    {
+        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockOdoo.Setup(s => s.IsConnected).Returns(true);
+        _mockGuiProxy
+            .Setup(p => p.ExecuteInGuiAsync("autocad_get_header_ids", null, 15000))
+            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", new List<string> { "H001" }));
+        _mockSettingsService
+            .Setup(s => s.LoadServerConfigsAsync())
+            .ReturnsAsync(new Dictionary<string, string?>
+            {
+                ["odoo_swagger_url"] = "https://example.com/api/v1/boq_import_api/swagger.json?token=tok123&db=testdb",
+                ["odoo_user_token"] = "tok123"
+            });
+        _mockSettingsService
+            .Setup(s => s.GetAppSettings())
+            .Returns(new AppSettings());
+        _mockOdoo
+            .Setup(s => s.ConvertBOQToPRViaApiAsync(
+                It.IsAny<List<string>>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(new Boq2PrResponse
+            {
+                Success = false,
+                ErrorCode = "ERR",
+                ErrorMessage = "Something failed"
+            });
+
+        var sut = CreateSUT();
+        await sut.ConvertBOQToPRCommand.ExecuteAsync(null);
+
+        sut.StatusMessageType.Should().Be("error");
+        sut.LastConversionTime.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Convert_EmptyResult_SetsStatusMessageTypeInfo()
+    {
+        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockOdoo.Setup(s => s.IsConnected).Returns(true);
+        _mockGuiProxy
+            .Setup(p => p.ExecuteInGuiAsync("autocad_get_header_ids", null, 15000))
+            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", new List<string> { "H001" }));
+        _mockSettingsService
+            .Setup(s => s.LoadServerConfigsAsync())
+            .ReturnsAsync(new Dictionary<string, string?>
+            {
+                ["odoo_swagger_url"] = "https://example.com/api/v1/boq_import_api/swagger.json?token=tok123&db=testdb",
+                ["odoo_user_token"] = "tok123"
+            });
+        _mockSettingsService
+            .Setup(s => s.GetAppSettings())
+            .Returns(new AppSettings());
+        _mockOdoo
+            .Setup(s => s.ConvertBOQToPRViaApiAsync(
+                It.IsAny<List<string>>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(new Boq2PrResponse
+            {
+                Success = true,
+                All = new List<Boq2PrResult>() // empty
+            });
+
+        var sut = CreateSUT();
+        await sut.ConvertBOQToPRCommand.ExecuteAsync(null);
+
+        sut.StatusMessageType.Should().Be("info");
+        sut.PrItems.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void StatusMessageType_DefaultsToEmpty()
+    {
+        var sut = CreateSUT();
+        sut.StatusMessageType.Should().BeEmpty();
+        sut.LastConversionTime.Should().BeNull();
+    }
+
+    #endregion
 }
