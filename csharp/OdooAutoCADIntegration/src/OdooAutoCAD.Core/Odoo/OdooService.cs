@@ -417,7 +417,7 @@ public class OdooService : IOdooService, IDisposable
             var resolvedPath = endpointPath.Replace("{method_name}", "get_product_list");
             var apiEndpoint = $"{baseUrl.TrimEnd('/')}{resolvedPath}";
 
-            var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint);
+            var request = new HttpRequestMessage(HttpMethod.Patch, apiEndpoint);
             request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
             request.Content = new StringContent(
                 JsonSerializer.Serialize(new { kwargs = new { user_token = userToken }, context = new { } }),
@@ -588,7 +588,7 @@ public class OdooService : IOdooService, IDisposable
                 context = new { }
             };
 
-            var httpRequest = new HttpRequestMessage(HttpMethod.Post, apiEndpoint);
+            var httpRequest = new HttpRequestMessage(HttpMethod.Patch, apiEndpoint);
             httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
             httpRequest.Content = new StringContent(
                 JsonSerializer.Serialize(body),
@@ -808,7 +808,7 @@ public class OdooService : IOdooService, IDisposable
                 context = new { }
             };
 
-            var httpRequest = new HttpRequestMessage(HttpMethod.Post, apiEndpoint);
+            var httpRequest = new HttpRequestMessage(HttpMethod.Patch, apiEndpoint);
             httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
             httpRequest.Content = new StringContent(
                 JsonSerializer.Serialize(body),
@@ -916,7 +916,7 @@ public class OdooService : IOdooService, IDisposable
                 context = new { }
             };
 
-            var httpRequest = new HttpRequestMessage(HttpMethod.Post, apiEndpoint);
+            var httpRequest = new HttpRequestMessage(HttpMethod.Patch, apiEndpoint);
             httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
             httpRequest.Content = new StringContent(
                 JsonSerializer.Serialize(body),
