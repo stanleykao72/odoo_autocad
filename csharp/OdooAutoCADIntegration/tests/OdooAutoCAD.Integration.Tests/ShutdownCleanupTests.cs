@@ -2,7 +2,11 @@
 // Verify shutdown sequence: GUIProxy cleanup, MCP server stop, port release
 
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Moq;
+using OdooAutoCAD.Core.AutoCAD;
+using OdooAutoCAD.Core.BOQ;
+using OdooAutoCAD.Core.Odoo;
 using OdooAutoCAD.Core.Threading;
 using OdooAutoCAD.MCP.Server;
 using OdooAutoCAD.MCP.Tools;
@@ -47,7 +51,7 @@ public class ShutdownCleanupTests
     {
         // Arrange - server not started
         var mockProxy = new Mock<IGUIProxy>();
-        var mockRegistry = new Mock<MCPToolRegistry>(mockProxy.Object, null, null, null, null);
+        var mockRegistry = new Mock<MCPToolRegistry>(mockProxy.Object, null!, null!, null!, null!);
         var server = new MCPSSEServer(mockRegistry.Object, port: 0);
 
         // Act & Assert

@@ -1,8 +1,10 @@
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Moq;
 using OdooAutoCAD.App.Services;
 using OdooAutoCAD.App.ViewModels;
 using OdooAutoCAD.Core.AutoCAD;
+using OdooAutoCAD.Core.BOQ;
 using OdooAutoCAD.Core.Odoo;
 using OdooAutoCAD.Core.Threading;
 using OdooAutoCAD.MCP.Server;
@@ -31,7 +33,7 @@ public class MainViewModelTests
         _mockOdoo = new Mock<IOdooService>();
 
         // Create a real MCPSSEServer with mock registry (not started)
-        var mockRegistry = new Mock<MCPToolRegistry>(_mockGuiProxy.Object, null, null, null, null);
+        var mockRegistry = new Mock<MCPToolRegistry>(_mockGuiProxy.Object, null!, null!, null!, null!);
         _mcpServer = new MCPSSEServer(mockRegistry.Object, port: 0);
     }
 

@@ -707,7 +707,7 @@ public class AutoCADService : IAutoCADService, IDisposable
 
         try
         {
-            string appName = _acadApp.Name;
+            string appName = _acadApp!.Name;
             string version = _acadApp.Version;
             string? currentDoc = _acadDoc?.Name;
             string? documentPath = null;

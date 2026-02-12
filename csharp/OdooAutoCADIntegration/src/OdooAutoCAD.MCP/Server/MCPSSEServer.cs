@@ -62,12 +62,12 @@ public class MCPSSEServer
     /// <summary>
     /// Starts the MCP SSE server.
     /// </summary>
-    public async Task StartAsync()
+    public Task StartAsync()
     {
         if (IsRunning)
         {
             _logger?.LogWarning("MCP SSE Server is already running");
-            return;
+            return Task.CompletedTask;
         }
 
         _serverCts = new CancellationTokenSource();
@@ -92,6 +92,7 @@ public class MCPSSEServer
         _serverTask = _app.RunAsync($"http://localhost:{Port}");
 
         _logger?.LogInformation("MCP SSE Server started on port {Port}", Port);
+        return Task.CompletedTask;
     }
 
     /// <summary>

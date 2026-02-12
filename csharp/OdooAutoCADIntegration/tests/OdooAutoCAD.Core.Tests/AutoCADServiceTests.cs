@@ -107,7 +107,7 @@ public class AutoCADServiceTests
     }
 
     [Fact]
-    public void Constructor_ShouldRegisterAll10Handlers()
+    public void Constructor_ShouldRegisterAll15Handlers()
     {
         // Arrange
         var mockGUIProxy = new Mock<IGUIProxy>();
@@ -131,10 +131,15 @@ public class AutoCADServiceTests
             "autocad_extract_parameters",
             "autocad_open_document",
             "autocad_save_document",
-            "autocad_close_document"
+            "autocad_close_document",
+            "autocad_get_header_ids",
+            "autocad_write_table_ids",
+            "autocad_get_pr_number",
+            "autocad_clear_table_ids",
+            "autocad_clear_all_table_ids"
         };
 
-        registeredActions.Should().HaveCount(10);
+        registeredActions.Should().HaveCount(15);
         registeredActions.Should().BeEquivalentTo(expectedActions);
     }
 }

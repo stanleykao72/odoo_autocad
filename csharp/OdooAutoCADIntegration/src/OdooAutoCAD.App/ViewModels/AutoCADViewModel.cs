@@ -149,6 +149,12 @@ public partial class AutoCADViewModel : ObservableObject
         ExtractParametersCommand.NotifyCanExecuteChanged();
     }
 
+    partial void OnSelectedLayoutChanged(LayoutInfo? value)
+    {
+        ExtractParametersCommand.NotifyCanExecuteChanged();
+        SelectLayoutCommand.NotifyCanExecuteChanged();
+    }
+
     public AutoCADViewModel(
         IAutoCADService autoCADService,
         IDwgReaderService dwgReader,
@@ -458,20 +464,49 @@ public partial class AutoCADViewModel : ObservableObject
                 try
                 {
                     var configs = await _settingsService.LoadServerConfigsAsync();
-                    configs.TryGetValue("odoo_url", out var baseUrl);
-                    configs.TryGetValue("odoo_base_path", out var basePath);
-                    configs.TryGetValue("odoo_db", out var database);
+                    configs.TryGetValue("odoo_swagger_url", out var swaggerUrl);
                     configs.TryGetValue("odoo_user_token", out var userToken);
 
-                    if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(database) || string.IsNullOrWhiteSpace(userToken))
+                    if (string.IsNullOrEmpty(swaggerUrl))
+                    {
+                        var appSettings = _settingsService.GetAppSettings();
+                        swaggerUrl = appSettings.Odoo.SwaggerUrl;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(swaggerUrl) || string.IsNullOrWhiteSpace(userToken))
                     {
                         ProjectLookupStatus = "Odoo connection not configured (check Settings)";
-                        _logService.Log("Odoo lookup skipped: missing connection settings", "AutoCAD", AppLogLevel.Warning);
+                        _logService.Log("Odoo lookup skipped: missing Swagger URL or user token", "AutoCAD", AppLogLevel.Warning);
                         return;
                     }
 
+                    var parsed = OdooConnectionViewModel.ParseSwaggerUrl(swaggerUrl!);
+                    if (parsed == null)
+                    {
+                        ProjectLookupStatus = "Invalid Swagger URL (check Settings)";
+                        _logService.Log("Odoo lookup skipped: invalid Swagger URL", "AutoCAD", AppLogLevel.Warning);
+                        return;
+                    }
+
+                    var (baseUrl, database, apiToken) = parsed.Value;
+
+                    // Fetch basePath from swagger spec (best-effort, fallback)
+                    var basePath = "/api/v1/boq_import_api";
+                    try
+                    {
+                        using var httpClient = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                        var specJson = await httpClient.GetStringAsync(swaggerUrl);
+                        var doc = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(specJson);
+                        if (doc.TryGetProperty("basePath", out var bp))
+                            basePath = bp.GetString() ?? basePath;
+                    }
+                    catch
+                    {
+                        // Use default basePath
+                    }
+
                     var projectInfo = await _odooService.GetProjectViaApiAsync(
-                        prNum, baseUrl!, basePath ?? "/api/v2", database!, userToken!);
+                        prNum, baseUrl, basePath, database, userToken!);
 
                     if (projectInfo != null)
                     {
