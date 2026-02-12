@@ -72,6 +72,11 @@ class UtilTransferBoqToPr:
 - Success response: `{'all': [pr_data_list]}` -- returns list of PR data
 - Error response: `{'error_code': ..., 'error_message': ...}` -- returns error string
 
+**C# equivalent** (`OdooService.ConvertBOQToPRViaApiAsync`):
+- Uses **HTTP PATCH** with BasicAuth (Base64 of `db_name:token`)
+- Endpoint resolved from Swagger spec, `{method_name}` substituted with `boq2pr_v2`
+- `method_name` is a URL path parameter (not in request body)
+
 ### Python Sidebar Button
 - Label: "Transfer BOQ to PR"
 - Color: Brown (#5D4037 fg, #3E2723 hover)

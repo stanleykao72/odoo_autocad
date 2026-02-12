@@ -469,8 +469,10 @@ The core BOQ workflow must preserve the exact sequence from the Python reference
    - Build `BOQLayoutGroup` and `BOQEntryRow` collections from the returned `LayoutData`.
 
 2. **Push** (`odoo_util.import2boq(layout_dict)` equivalent):
-   - Call `IBOQProcessor.PushToOdooAsync(entries)` which internally validates then calls `IOdooService.ImportToBOQAsync(entries)`.
-   - The Odoo API endpoint `job_working_plan_boq.import2boq_v2` returns a list with `header_id` and `detail` items per layout.
+   - Call `IOdooService.ImportToBOQViaApiAsync(request, baseUrl, endpointPath, database, userToken)`.
+   - The endpoint path is resolved from the Swagger spec and `{method_name}` is substituted with `import2boq_v2`.
+   - Uses **HTTP PATCH** with BasicAuth (Base64 of `db_name:token`), matching the Odoo OpenAPI module route.
+   - The API returns a list with `header_id` and `detail` items per layout.
    - Parse the response to build the writeback list.
 
 3. **ID Writeback** (`autocad_util.set_layouts_tables_id(boq_list)` equivalent):

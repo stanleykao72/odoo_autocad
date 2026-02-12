@@ -134,12 +134,31 @@ public partial class AutoCADViewModel : ObservableObject
         {
             ComStatusText = "Connected";
             StartMonitoring();
+            // Fetch info + layouts regardless of how connection was established
+            _ = FetchAutoCADDetailsAsync();
         }
         else
         {
             ComStatusText = "Disconnected";
             DocumentPath = "N/A";
             StopMonitoring();
+        }
+    }
+
+    /// <summary>
+    /// Fetches AutoCAD version/document info and layouts after connection is detected.
+    /// Fire-and-forget from OnIsConnectedChanged — exceptions are logged, not thrown.
+    /// </summary>
+    private async Task FetchAutoCADDetailsAsync()
+    {
+        try
+        {
+            await UpdateAutoCADInfoAsync();
+            await RefreshLayoutsAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to fetch AutoCAD details after connection");
         }
     }
 
@@ -223,11 +242,7 @@ public partial class AutoCADViewModel : ObservableObject
                 _logService.Log("AutoCAD connection established", "AutoCAD");
                 _logger?.LogInformation("AutoCAD connection established");
 
-                // Fetch AutoCAD details
-                await UpdateAutoCADInfoAsync();
-
-                // Load layouts automatically
-                await RefreshLayoutsAsync();
+                // Info + layouts are fetched via OnIsConnectedChanged → FetchAutoCADDetailsAsync
             }
             else
             {

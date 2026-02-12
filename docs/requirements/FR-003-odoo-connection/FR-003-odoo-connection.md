@@ -11,7 +11,7 @@ The Odoo Integration Page provides the primary interface for connecting the desk
 
 The Python implementation (`utility/util_odoo.py`) communicates with Odoo through a Bravado/Swagger client that consumes a Swagger JSON endpoint. Authentication uses HTTP Basic Auth where the credentials are a Base64-encoded string of `{db_name}:{token}`. All API calls route through a single Swagger operation (`job_working_plan_boq.callMethodForJobWorkingPlanBoqModel`) with a `method_name` parameter to dispatch to specific server-side methods.
 
-The C# implementation (`IOdooService.cs`, 262 lines) replaces the Swagger/Bravado client with `HttpClient` and Odoo's standard JSON-RPC protocol (`/web/dataset/call_kw`). Authentication shifts from token-based Basic Auth to session-based login via `/web/session/authenticate`. Configuration is loaded from `appsettings.json` instead of YAML files. The interface exposes structured async methods for connection management, project operations, product operations, BOQ operations, Purchase Requisition operations, and general synchronization.
+The C# implementation (`IOdooService.cs` / `OdooService.cs`) uses a dual-protocol approach: **JSON-RPC** for session authentication (`/web/session/authenticate`) and standard CRUD operations (`/web/dataset/call_kw`), plus the **Swagger/OpenAPI gateway** for business-logic methods (`import2boq_v2`, `boq2pr_v2`, `get_product_list`, `get_project_v2`). The Swagger gateway calls use **HTTP PATCH** with Basic Auth (Base64 of `{db_name}:{token}`), matching the Odoo OpenAPI module's route configuration (`openapi/controllers/api.py`, `methods=["PATCH"]`). The endpoint path is resolved at runtime from the Swagger spec JSON by matching the `callMethodForJobWorkingPlanBoqModel` operationId to its actual URL path (e.g. `/api/v1/boq_import_api/job.working.plan.boq/call/{method_name}`), and `{method_name}` is substituted as a URL path parameter (not sent in the request body). Configuration is loaded from `appsettings.json` instead of YAML files.
 
 ## 2. User Stories
 
@@ -90,6 +90,32 @@ self.odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel(
     _request_options=self.requestOptions
 ).response().incoming_response.json()
 ```
+
+### C# API Call Pattern (Swagger/OpenAPI Gateway)
+The C# implementation calls the same server-side methods via **HTTP PATCH** with BasicAuth:
+```csharp
+// 1. Resolve endpoint path from Swagger spec (operationId → URL path)
+var endpointPath = OdooConnectionViewModel.ResolveSwaggerEndpoint(specJson);
+// e.g. "/api/v1/boq_import_api/job.working.plan.boq/call/{method_name}"
+
+// 2. Substitute {method_name} as a URL path parameter
+var resolvedPath = endpointPath.Replace("{method_name}", "import2boq_v2");
+var apiEndpoint = $"{baseUrl.TrimEnd('/')}{resolvedPath}";
+
+// 3. PATCH request with BasicAuth (Base64 of "db_name:token")
+var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{database}:{userToken}"));
+var request = new HttpRequestMessage(HttpMethod.Patch, apiEndpoint);
+request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+request.Content = new StringContent(
+    JsonSerializer.Serialize(new {
+        args = new object[] { /* positional args */ },
+        kwargs = new { user_token = userToken },
+        context = new { }
+    }),
+    Encoding.UTF8, "application/json");
+```
+
+**Available Swagger methods:** `get_product_list`, `import2boq_v2`, `boq2pr_v2`, `get_project_v2`
 
 ## 4. Functional Requirements
 
