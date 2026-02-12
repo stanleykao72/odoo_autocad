@@ -1139,10 +1139,47 @@ public class AutoCADService : IAutoCADService, IDisposable
                 {
                     string entityType = entity.EntityName;
 
-                    // Check if it's a block reference with attributes
+                    // Check if it's a block reference
                     if (entityType == "AcDbBlockReference")
                     {
-                        if (entity.HasAttributes)
+                        string blockName = entity.Name;
+
+                        // Special case: "pr_no" block stores value as AcDbText inside block def,
+                        // not as an attribute (matches Python get_pr_no() pattern)
+                        if (string.Equals(blockName, "pr_no", StringComparison.OrdinalIgnoreCase)
+                            && !attributes.ContainsKey("pr_no"))
+                        {
+                            try
+                            {
+                                string effectiveName = entity.EffectiveName;
+                                dynamic blocks = _acadDoc.Blocks;
+                                dynamic blockDef = blocks.Item(effectiveName);
+                                foreach (dynamic item in blockDef)
+                                {
+                                    try
+                                    {
+                                        string itemType = item.ObjectName;
+                                        if (itemType == "AcDbText")
+                                        {
+                                            string text = LM_UnFormat(item.TextString);
+                                            if (!string.IsNullOrWhiteSpace(text))
+                                            {
+                                                attributes["pr_no"] = text;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    catch { /* skip unreadable block items */ }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger?.LogWarning(ex, "Failed to read pr_no block text");
+                            }
+                        }
+
+                        // Read standard block attributes
+                        if ((bool)entity.HasAttributes)
                         {
                             foreach (dynamic attr in entity.GetAttributes())
                             {

@@ -770,6 +770,8 @@ public partial class BOQViewModel : ObservableObject
                 ColorNo = GetParam(layoutData, "color_no")
             };
 
+            _logService.Log($"BOQ BuildImportRequest: {layoutName} — pr_no='{importLayout.PrNo}', header_id='{importLayout.HeaderId}', project='{importLayout.ProjectName}', params=[{string.Join(", ", layoutData.Parameters.Keys)}]", "BOQ");
+
             // Build detail rows from table data
             // Row 0 = title (contains header_id at col 8), Row 1 = column headers, Row 2+ = data
             if (layoutData.Tables.Count > 0)
