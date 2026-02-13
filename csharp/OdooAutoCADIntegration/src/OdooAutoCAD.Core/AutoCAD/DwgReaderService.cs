@@ -28,7 +28,9 @@ public class DwgReaderService : IDwgReaderService
     private static readonly HashSet<string> KnownAttributeTags = new(StringComparer.OrdinalIgnoreCase)
     {
         "pr_no", "project_name", "job_working_plan_name",
-        "product_name", "spec", "color_name",
+        "product_name", "product_catelog", "spec",
+        "surface_treatment", "operation_flow",
+        "color_name", "color_no",
         "unit", "remarks", "block_name", "quantity"
     };
 
@@ -111,12 +113,52 @@ public class DwgReaderService : IDwgReaderService
         var parameters = new Dictionary<string, object>();
         var tableRows = new List<List<string>>();
 
+        // Diagnostic: collect info about all Insert blocks in the layout
+        var insertDiag = new List<string>();
+
         foreach (var entity in block.Entities)
         {
             if (entity is Insert insert)
             {
+                var blockName = insert.Block?.Name ?? "(null)";
+                var attrCount = insert.Attributes?.Count ?? 0;
+                var attrTags = attrCount > 0
+                    ? string.Join(", ", insert.Attributes!.Select(a => $"{a.Tag}"))
+                    : "none";
+
+                // Also check block definition for AttributeDefinitions (default values)
+                var attrDefTags = new List<string>();
+                if (insert.Block != null)
+                {
+                    foreach (var be in insert.Block.Entities)
+                    {
+                        if (be is AttributeDefinition attrDef)
+                            attrDefTags.Add(attrDef.Tag ?? "?");
+                    }
+                }
+                var defInfo = attrDefTags.Count > 0 ? $" defs=[{string.Join(",", attrDefTags)}]" : "";
+                insertDiag.Add($"'{blockName}' attrs({attrCount})=[{attrTags}]{defInfo}");
+
+                // Special case: "pr_no" block stores value as Text inside its block definition
+                // (not as an attribute). Matches COM path and Python get_block_text() pattern.
+                if (string.Equals(insert.Block?.Name, "pr_no", StringComparison.OrdinalIgnoreCase)
+                    && !parameters.ContainsKey("pr_no"))
+                {
+                    var prText = ExtractBlockDefinitionText(insert);
+                    if (!string.IsNullOrWhiteSpace(prText))
+                    {
+                        parameters["pr_no"] = prText;
+                    }
+                }
+
                 ExtractInsertAttributes(insert, parameters, tableRows);
             }
+        }
+
+        // Store diagnostic info in parameters for UI logging
+        if (insertDiag.Count > 0)
+        {
+            parameters["_diag_blocks"] = string.Join(" | ", insertDiag);
         }
 
         result.Parameters = parameters;
@@ -159,6 +201,14 @@ public class DwgReaderService : IDwgReaderService
     }
 
     /// <summary>
+    /// Regex to strip AutoCAD duplicate-attribute suffixes like _001, _002 etc.
+    /// When a block has multiple attribute definitions with the same tag,
+    /// AutoCAD appends _NNN to make them unique in the DWG file.
+    /// The COM API normalizes these back; we do the same here.
+    /// </summary>
+    private static readonly Regex AttributeSuffixPattern = new(@"_\d{3}$", RegexOptions.Compiled);
+
+    /// <summary>
     /// Extracts attributes from an Insert entity.
     /// Known attribute tags go into the parameters dictionary.
     /// All attributes from a single insert are also collected as a table row.
@@ -181,10 +231,13 @@ public class DwgReaderService : IDwgReaderService
             if (string.IsNullOrEmpty(tag))
                 continue;
 
-            // Store known parameters (first occurrence wins)
-            if (KnownAttributeTags.Contains(tag) && !parameters.ContainsKey(tag))
+            // Normalize tag: strip _NNN suffix (e.g. project_name_001 → project_name)
+            var normalizedTag = AttributeSuffixPattern.Replace(tag, "");
+
+            // Store known parameters using normalized tag name (first occurrence wins)
+            if (KnownAttributeTags.Contains(normalizedTag) && !parameters.ContainsKey(normalizedTag))
             {
-                parameters[tag] = value;
+                parameters[normalizedTag] = value;
             }
 
             rowValues.Add(value);
@@ -194,6 +247,38 @@ public class DwgReaderService : IDwgReaderService
         {
             tableRows.Add(rowValues);
         }
+    }
+
+    /// <summary>
+    /// Reads text from inside a block definition referenced by an Insert entity.
+    /// Matches the COM path (AutoCADService.GetAttributeValues) and Python get_block_text():
+    /// find the first AcDbText entity inside the block definition and return its text.
+    /// Used for special blocks like "pr_no" that store values as text, not attributes.
+    /// </summary>
+    private string? ExtractBlockDefinitionText(Insert insert)
+    {
+        try
+        {
+            var blockDef = insert.Block;
+            if (blockDef == null) return null;
+
+            foreach (var entity in blockDef.Entities)
+            {
+                if (entity is TextEntity textEntity)
+                {
+                    var text = StripMTextFormatting(textEntity.Value ?? string.Empty);
+                    if (!string.IsNullOrWhiteSpace(text))
+                        return text;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to read block definition text for Insert '{BlockName}'",
+                insert.Block?.Name);
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -207,38 +292,35 @@ public class DwgReaderService : IDwgReaderService
 
         var result = text;
 
-        // \P (paragraph break) → space
-        result = Regex.Replace(result, @"\\P", " ");
+        // \P or \p (paragraph break) → space
+        result = Regex.Replace(result, @"\\[Pp]", " ");
 
-        // \C# (color)
-        result = Regex.Replace(result, @"\\C\d+;", "");
+        // \C# or \c# (color)
+        result = Regex.Replace(result, @"\\[Cc]\d+;", "");
 
-        // \F (font)
-        result = Regex.Replace(result, @"\\F[^;]*;", "");
+        // \F or \f (font, e.g. \fPMingLiU;)
+        result = Regex.Replace(result, @"\\[Ff][^;]*;", "");
 
-        // \H (height)
-        result = Regex.Replace(result, @"\\H[^;]*;", "");
+        // \H or \h (height)
+        result = Regex.Replace(result, @"\\[Hh][^;]*;", "");
 
-        // \S (stacking)
-        result = Regex.Replace(result, @"\\S[^;]*;", "");
+        // \S or \s (stacking)
+        result = Regex.Replace(result, @"\\[Ss][^;]*;", "");
 
-        // \Q (obliquing angle)
-        result = Regex.Replace(result, @"\\Q\d+;", "");
+        // \Q or \q (obliquing angle)
+        result = Regex.Replace(result, @"\\[Qq]\d+;", "");
 
-        // \T (tracking)
-        result = Regex.Replace(result, @"\\T\d+;", "");
+        // \T or \t (tracking)
+        result = Regex.Replace(result, @"\\[Tt]\d+;", "");
 
-        // \W (width factor)
-        result = Regex.Replace(result, @"\\W\d+\.?\d*;", "");
+        // \W or \w (width factor)
+        result = Regex.Replace(result, @"\\[Ww]\d+\.?\d*;", "");
 
-        // \A (alignment)
-        result = Regex.Replace(result, @"\\A\d+;", "");
+        // \A or \a (alignment)
+        result = Regex.Replace(result, @"\\[Aa]\d+;", "");
 
         // Toggle codes
-        result = result.Replace("\\L", "");
-        result = result.Replace("\\l", "");
-        result = result.Replace("\\O", "");
-        result = result.Replace("\\o", "");
+        result = Regex.Replace(result, @"\\[LlOo]", "");
 
         // \~ (non-breaking space) → space
         result = result.Replace("\\~", " ");

@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using OdooAutoCAD.App.Services;
 using OdooAutoCAD.Configuration;
+using OdooAutoCAD.Core.AutoCAD;
 
 namespace OdooAutoCAD.App.ViewModels;
 
@@ -16,6 +17,7 @@ public partial class SettingsViewModel : ObservableObject
 {
     private readonly ISettingsService _settingsService;
     private readonly IAppLogService _logService;
+    private readonly DrawingDataServiceDispatcher _dispatcher;
     private readonly ILogger<SettingsViewModel>? _logger;
     private bool _isLoading;
 
@@ -43,6 +45,39 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private int _autoCADRetryAttempts = 3;
+
+    [ObservableProperty]
+    private string _autoCADMode = "COM";
+
+    /// <summary>
+    /// True when COM mode is selected. Used for RadioButton binding.
+    /// </summary>
+    public bool IsComMode
+    {
+        get => AutoCADMode == "COM";
+        set
+        {
+            if (value) AutoCADMode = "COM";
+        }
+    }
+
+    /// <summary>
+    /// True when File mode is selected. Used for RadioButton binding.
+    /// </summary>
+    public bool IsFileMode
+    {
+        get => AutoCADMode == "File";
+        set
+        {
+            if (value) AutoCADMode = "File";
+        }
+    }
+
+    partial void OnAutoCADModeChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsComMode));
+        OnPropertyChanged(nameof(IsFileMode));
+    }
 
     // --- MCP ---
 
@@ -86,10 +121,12 @@ public partial class SettingsViewModel : ObservableObject
     public SettingsViewModel(
         ISettingsService settingsService,
         IAppLogService logService,
+        DrawingDataServiceDispatcher dispatcher,
         ILogger<SettingsViewModel>? logger = null)
     {
         _settingsService = settingsService;
         _logService = logService;
+        _dispatcher = dispatcher;
         _logger = logger;
     }
 
@@ -109,6 +146,10 @@ public partial class SettingsViewModel : ObservableObject
             AutoCADProgId = appSettings.AutoCAD.ProgId;
             AutoCADConnectionTimeout = appSettings.AutoCAD.ConnectionTimeoutSeconds;
             AutoCADRetryAttempts = appSettings.AutoCAD.RetryAttempts;
+
+            // Load AutoCAD mode from user preferences
+            var savedMode = await _settingsService.GetPreferenceAsync("autocad_mode", "COM");
+            AutoCADMode = savedMode == "File" ? "File" : "COM";
 
             McpPort = appSettings.MCP.Port;
             McpAutoStart = appSettings.MCP.AutoStart;
@@ -186,6 +227,15 @@ public partial class SettingsViewModel : ObservableObject
                 ["mcp_heartbeat_interval"] = McpHeartbeatInterval.ToString()
             });
 
+            // Save AutoCAD mode to user preferences
+            await _settingsService.SetPreferenceAsync("autocad_mode", AutoCADMode);
+
+            // Apply mode switch immediately at runtime
+            var targetMode = AutoCADMode == "File"
+                ? AutoCADOperationMode.File
+                : AutoCADOperationMode.COM;
+            await _dispatcher.SwitchModeAsync(targetMode);
+
             TakeSnapshot();
             HasUnsavedChanges = false;
             StatusMessage = "Settings saved successfully";
@@ -244,6 +294,7 @@ public partial class SettingsViewModel : ObservableObject
             [nameof(OdooTimeoutSeconds)] = OdooTimeoutSeconds.ToString(),
             [nameof(AutoCADConnectionTimeout)] = AutoCADConnectionTimeout.ToString(),
             [nameof(AutoCADRetryAttempts)] = AutoCADRetryAttempts.ToString(),
+            [nameof(AutoCADMode)] = AutoCADMode,
             [nameof(McpPort)] = McpPort.ToString(),
             [nameof(McpAutoStart)] = McpAutoStart.ToString(),
             [nameof(McpHeartbeatInterval)] = McpHeartbeatInterval.ToString()
@@ -265,6 +316,8 @@ public partial class SettingsViewModel : ObservableObject
                 AutoCADConnectionTimeout = int.TryParse(acTimeout, out var act) ? act : 10;
             if (_originalValues.TryGetValue(nameof(AutoCADRetryAttempts), out var retry))
                 AutoCADRetryAttempts = int.TryParse(retry, out var r) ? r : 3;
+            if (_originalValues.TryGetValue(nameof(AutoCADMode), out var mode))
+                AutoCADMode = mode == "File" ? "File" : "COM";
             if (_originalValues.TryGetValue(nameof(McpPort), out var port))
                 McpPort = int.TryParse(port, out var p) ? p : 8084;
             if (_originalValues.TryGetValue(nameof(McpAutoStart), out var autoStart))

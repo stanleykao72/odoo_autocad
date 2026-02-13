@@ -172,9 +172,11 @@ public class BoqImportResponseTests
         var mockProxy = new Moq.Mock<OdooAutoCAD.Core.Threading.IGUIProxy>();
         var mockLog = new Moq.Mock<OdooAutoCAD.App.Services.IAppLogService>();
         var mockSettings = new Moq.Mock<OdooAutoCAD.App.Services.ISettingsService>();
+        var mockDrawingData = new Moq.Mock<IDrawingDataService>();
 
         return new BOQViewModel(
             mockBoq.Object, mockAcad.Object, mockOdoo.Object,
-            mockProxy.Object, mockLog.Object, mockSettings.Object);
+            mockProxy.Object, mockLog.Object, mockSettings.Object,
+            mockDrawingData.Object);
     }
 }

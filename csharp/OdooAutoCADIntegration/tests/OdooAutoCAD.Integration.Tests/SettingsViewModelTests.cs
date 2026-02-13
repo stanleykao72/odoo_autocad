@@ -3,6 +3,8 @@ using Moq;
 using OdooAutoCAD.App.Services;
 using OdooAutoCAD.App.ViewModels;
 using OdooAutoCAD.Configuration;
+using OdooAutoCAD.Core.AutoCAD;
+using OdooAutoCAD.Core.Threading;
 using Xunit;
 
 namespace OdooAutoCAD.Integration.Tests;
@@ -14,12 +16,20 @@ public class SettingsViewModelTests
 {
     private readonly Mock<ISettingsService> _mockSettings;
     private readonly Mock<IAppLogService> _mockLogService;
+    private readonly DrawingDataServiceDispatcher _dispatcher;
     private readonly SettingsViewModel _sut;
 
     public SettingsViewModelTests()
     {
         _mockSettings = new Mock<ISettingsService>();
         _mockLogService = new Mock<IAppLogService>();
+
+        var mockAutoCAD = new Mock<IAutoCADService>();
+        var mockProxy = new Mock<IGUIProxy>();
+        var mockDwgFile = new Mock<IDwgFileService>();
+        var comService = new ComDrawingDataService(mockAutoCAD.Object, mockProxy.Object);
+        var fileService = new FileDrawingDataService(mockDwgFile.Object, new SidecarIdStore());
+        _dispatcher = new DrawingDataServiceDispatcher(comService, fileService);
 
         // Default AppSettings
         _mockSettings.Setup(s => s.GetAppSettings()).Returns(new AppSettings
@@ -49,7 +59,7 @@ public class SettingsViewModelTests
         _mockSettings.Setup(s => s.LoadServerConfigsAsync())
             .ReturnsAsync(new Dictionary<string, string?>());
 
-        _sut = new SettingsViewModel(_mockSettings.Object, _mockLogService.Object);
+        _sut = new SettingsViewModel(_mockSettings.Object, _mockLogService.Object, _dispatcher);
     }
 
     // --- LoadSettings ---
@@ -311,5 +321,116 @@ public class SettingsViewModelTests
         _sut.CancelChangesCommand.Execute(null);
 
         _sut.StatusMessage.Should().Be("Changes cancelled");
+    }
+
+    // --- AutoCAD Mode ---
+
+    [Fact]
+    public void AutoCADMode_DefaultsToCOM()
+    {
+        _sut.AutoCADMode.Should().Be("COM");
+        _sut.IsComMode.Should().BeTrue();
+        _sut.IsFileMode.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task LoadSettings_LoadsModePrefFromDatabase()
+    {
+        _mockSettings.Setup(s => s.GetPreferenceAsync("autocad_mode", "COM"))
+            .ReturnsAsync("File");
+
+        await _sut.LoadSettingsCommand.ExecuteAsync(null);
+
+        _sut.AutoCADMode.Should().Be("File");
+        _sut.IsFileMode.Should().BeTrue();
+        _sut.IsComMode.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task LoadSettings_DefaultsCOM_WhenNoPrefSaved()
+    {
+        _mockSettings.Setup(s => s.GetPreferenceAsync("autocad_mode", "COM"))
+            .ReturnsAsync("COM");
+
+        await _sut.LoadSettingsCommand.ExecuteAsync(null);
+
+        _sut.AutoCADMode.Should().Be("COM");
+    }
+
+    [Fact]
+    public async Task SaveSettings_PersistsAutoCADMode()
+    {
+        await _sut.LoadSettingsCommand.ExecuteAsync(null);
+        _sut.AutoCADMode = "File";
+
+        await _sut.SaveSettingsCommand.ExecuteAsync(null);
+
+        _mockSettings.Verify(s => s.SetPreferenceAsync("autocad_mode", "File", "string"), Times.Once);
+    }
+
+    [Fact]
+    public void IsComMode_Set_ChangesAutoCADMode()
+    {
+        _sut.AutoCADMode = "File";
+        _sut.IsFileMode.Should().BeTrue();
+
+        _sut.IsComMode = true;
+        _sut.AutoCADMode.Should().Be("COM");
+    }
+
+    [Fact]
+    public void IsFileMode_Set_ChangesAutoCADMode()
+    {
+        _sut.AutoCADMode.Should().Be("COM");
+
+        _sut.IsFileMode = true;
+        _sut.AutoCADMode.Should().Be("File");
+    }
+
+    [Fact]
+    public async Task CancelChanges_RestoresAutoCADMode()
+    {
+        await _sut.LoadSettingsCommand.ExecuteAsync(null);
+        _sut.AutoCADMode.Should().Be("COM");
+
+        _sut.AutoCADMode = "File";
+        _sut.CancelChangesCommand.Execute(null);
+
+        _sut.AutoCADMode.Should().Be("COM");
+    }
+
+    [Fact]
+    public async Task ModeChange_SetsHasUnsavedChanges()
+    {
+        await _sut.LoadSettingsCommand.ExecuteAsync(null);
+        _sut.HasUnsavedChanges.Should().BeFalse();
+
+        _sut.AutoCADMode = "File";
+
+        _sut.HasUnsavedChanges.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SaveSettings_SwitchesDispatcherMode_ToFile()
+    {
+        await _sut.LoadSettingsCommand.ExecuteAsync(null);
+        _sut.AutoCADMode = "File";
+
+        await _sut.SaveSettingsCommand.ExecuteAsync(null);
+
+        _dispatcher.Mode.Should().Be(AutoCADOperationMode.File);
+    }
+
+    [Fact]
+    public async Task SaveSettings_SwitchesDispatcherMode_ToCOM()
+    {
+        // Start in File mode
+        await _dispatcher.SwitchModeAsync(AutoCADOperationMode.File);
+        await _sut.LoadSettingsCommand.ExecuteAsync(null);
+        _sut.AutoCADMode = "COM";
+
+        await _sut.SaveSettingsCommand.ExecuteAsync(null);
+
+        _dispatcher.Mode.Should().Be(AutoCADOperationMode.COM);
     }
 }

@@ -31,6 +31,7 @@ public partial class AutoCADViewModel : ObservableObject
     private readonly IOdooService _odooService;
     private readonly ISettingsService _settingsService;
     private readonly IAppLogService _logService;
+    private readonly IDrawingDataService _drawingDataService;
     private readonly ILogger<AutoCADViewModel>? _logger;
     private DispatcherTimer? _healthTimer;
 
@@ -121,6 +122,11 @@ public partial class AutoCADViewModel : ObservableObject
     /// </summary>
     public bool HasDataSource => IsConnected || IsDwgFileLoaded;
 
+    /// <summary>
+    /// True when the drawing data service is in File mode.
+    /// </summary>
+    public bool IsFileMode => _drawingDataService.Mode == AutoCADOperationMode.File;
+
     partial void OnIsConnectedChanged(bool value)
     {
         OnPropertyChanged(nameof(HasDataSource));
@@ -181,6 +187,7 @@ public partial class AutoCADViewModel : ObservableObject
         IOdooService odooService,
         ISettingsService settingsService,
         IAppLogService logService,
+        IDrawingDataService drawingDataService,
         ILogger<AutoCADViewModel>? logger = null)
     {
         _autoCADService = autoCADService ?? throw new ArgumentNullException(nameof(autoCADService));
@@ -189,10 +196,70 @@ public partial class AutoCADViewModel : ObservableObject
         _odooService = odooService ?? throw new ArgumentNullException(nameof(odooService));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
+        _drawingDataService = drawingDataService ?? throw new ArgumentNullException(nameof(drawingDataService));
         _logger = logger;
 
-        // Initialize connection status
-        UpdateConnectionStatus();
+        // Initialize connection status from unified service
+        InitializeFromServiceState();
+    }
+
+    /// <summary>
+    /// Initializes ViewModel state from the unified IDrawingDataService.
+    /// Handles both COM (existing connection) and File (already loaded DWG).
+    /// </summary>
+    private void InitializeFromServiceState()
+    {
+        if (_drawingDataService.Mode == AutoCADOperationMode.File)
+        {
+            // File mode: check if a DWG is already loaded
+            if (_drawingDataService.IsReady)
+            {
+                IsDwgFileLoaded = true;
+                DwgFilePath = _drawingDataService.CurrentSource ?? string.Empty;
+                CurrentDocument = Path.GetFileName(DwgFilePath);
+                StatusMessage = $"File loaded: {CurrentDocument}";
+                ConnectButtonText = "Disconnect";
+
+                // Populate layouts from the loaded file
+                _ = PopulateFromLoadedFileAsync();
+            }
+            else
+            {
+                StatusMessage = "File mode: Click 'Open DWG File...' to load a drawing";
+                ConnectButtonText = "Connect to AutoCAD";
+            }
+        }
+        else
+        {
+            // COM mode: check IAutoCADService
+            UpdateConnectionStatus();
+        }
+    }
+
+    /// <summary>
+    /// Populates layouts and info from an already-loaded file in the unified service.
+    /// </summary>
+    private async Task PopulateFromLoadedFileAsync()
+    {
+        try
+        {
+            var layouts = await _drawingDataService.GetLayoutsAsync();
+            var filteredLayouts = layouts.Where(l => !l.IsModelSpace).ToList();
+
+            Layouts.Clear();
+            foreach (var layout in filteredLayouts)
+                Layouts.Add(layout);
+
+            var status = await _drawingDataService.GetStatusAsync();
+            AutoCADVersion = status.Version ?? "N/A";
+            DocumentPath = status.DocumentPath ?? DwgFilePath;
+
+            StatusMessage = $"Loaded {filteredLayouts.Count} layouts from {CurrentDocument}";
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to populate from loaded file");
+        }
     }
 
     #region Connection Management
@@ -332,10 +399,10 @@ public partial class AutoCADViewModel : ObservableObject
     {
         try
         {
-            // Get AutoCAD status through GUI proxy
-            var response = await _guiProxy.ExecuteInGuiAsync("autocad_get_status", null, timeout: 5000);
+            // Get status through IDrawingDataService (COM or File mode)
+            var status = await _drawingDataService.GetStatusAsync();
 
-            if (response.Success && response.Result is AutoCADStatus status)
+            if (status.IsConnected)
             {
                 AutoCADVersion = status.Version ?? "Unknown";
                 CurrentDocument = status.CurrentDocument ?? "No document open";
@@ -470,9 +537,9 @@ public partial class AutoCADViewModel : ObservableObject
 
         try
         {
-            var response = await _guiProxy.ExecuteInGuiAsync("autocad_get_pr_number", null, timeout: 10000);
+            var prNum = await _drawingDataService.GetPRNumberAsync();
 
-            if (response.Success && response.Result is string prNum && !string.IsNullOrWhiteSpace(prNum))
+            if (!string.IsNullOrWhiteSpace(prNum))
             {
                 PrNumber = prNum;
                 _logService.Log($"PR number extracted: {prNum}", "AutoCAD");
@@ -653,7 +720,7 @@ public partial class AutoCADViewModel : ObservableObject
     /// Opens a DWG file and loads its layouts via ACadSharp (no COM needed).
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanOpenDwgFile))]
-    private void OpenDwgFile()
+    private async Task OpenDwgFileAsync()
     {
         var dialog = new OpenFileDialog
         {
@@ -671,29 +738,41 @@ public partial class AutoCADViewModel : ObservableObject
         {
             _logger?.LogInformation("Opening DWG file: {FilePath}", filePath);
 
-            if (!_dwgReader.IsValidDwgFile(filePath))
+            // Load through unified service so all pages see the file
+            var loaded = await _drawingDataService.ConnectOrLoadAsync(filePath);
+
+            if (!loaded)
             {
-                StatusMessage = "Selected file is not a valid DWG file.";
-                _logService.Log($"Invalid DWG file: {filePath}", "AutoCAD", AppLogLevel.Warning);
+                StatusMessage = "Failed to load DWG file. It may not be a valid DWG.";
+                _logService.Log($"Failed to load DWG file: {filePath}", "AutoCAD", AppLogLevel.Warning);
                 return;
             }
 
-            var layouts = _dwgReader.GetLayouts(filePath);
+            // Get layouts through the unified service
+            var layouts = await _drawingDataService.GetLayoutsAsync();
+            var filteredLayouts = layouts.Where(l => !l.IsModelSpace).ToList();
 
             Layouts.Clear();
-            foreach (var layout in layouts)
+            foreach (var layout in filteredLayouts)
             {
                 Layouts.Add(layout);
             }
 
             DwgFilePath = filePath;
             IsDwgFileLoaded = true;
+            IsConnected = false; // File mode, not COM connected
             SelectedLayout = null;
             CurrentDocument = Path.GetFileName(filePath);
-            StatusMessage = $"Loaded {layouts.Count} layouts from {Path.GetFileName(filePath)}";
 
-            _logService.Log($"Opened DWG file: {Path.GetFileName(filePath)} ({layouts.Count} layouts)", "AutoCAD");
-            _logger?.LogInformation("DWG file loaded: {Count} layouts", layouts.Count);
+            // Update info from the service status
+            var status = await _drawingDataService.GetStatusAsync();
+            AutoCADVersion = status.Version ?? "N/A";
+            DocumentPath = status.DocumentPath ?? filePath;
+
+            StatusMessage = $"Loaded {filteredLayouts.Count} layouts from {Path.GetFileName(filePath)}";
+
+            _logService.Log($"Opened DWG file: {Path.GetFileName(filePath)} ({filteredLayouts.Count} layouts)", "AutoCAD");
+            _logger?.LogInformation("DWG file loaded: {Count} layouts", filteredLayouts.Count);
         }
         catch (Exception ex)
         {
@@ -726,9 +805,9 @@ public partial class AutoCADViewModel : ObservableObject
         {
             _logger?.LogInformation("Refreshing layouts");
 
-            var response = await _guiProxy.ExecuteInGuiAsync("autocad_get_layouts", null, timeout: 5000);
+            var layouts = await _drawingDataService.GetLayoutsAsync();
 
-            if (response.Success && response.Result is List<LayoutInfo> layouts)
+            if (layouts.Count > 0)
             {
                 // Exclude "Model" layout
                 var filteredLayouts = layouts.Where(l => !l.IsModelSpace).ToList();
@@ -739,11 +818,14 @@ public partial class AutoCADViewModel : ObservableObject
                     Layouts.Add(layout);
                 }
 
-                // Get active layout
-                var activeResponse = await _guiProxy.ExecuteInGuiAsync("autocad_get_active_layout", null, timeout: 3000);
-                if (activeResponse.Success && activeResponse.Result is string activeLayout)
+                // Get active layout (COM mode only)
+                if (_drawingDataService.Mode == AutoCADOperationMode.COM)
                 {
-                    ActiveLayoutName = activeLayout;
+                    var activeResponse = await _guiProxy.ExecuteInGuiAsync("autocad_get_active_layout", null, timeout: 3000);
+                    if (activeResponse.Success && activeResponse.Result is string activeLayout)
+                    {
+                        ActiveLayoutName = activeLayout;
+                    }
                 }
 
                 _logService.Log($"Loaded {Layouts.Count} layouts", "AutoCAD");
@@ -751,8 +833,8 @@ public partial class AutoCADViewModel : ObservableObject
             }
             else
             {
-                StatusMessage = response.ErrorMessage ?? "Failed to load layouts";
-                _logger?.LogWarning("Failed to refresh layouts: {Error}", response.ErrorMessage);
+                StatusMessage = "No layouts found";
+                _logger?.LogWarning("No layouts found in drawing");
             }
         }
         catch (Exception ex)
@@ -832,31 +914,8 @@ public partial class AutoCADViewModel : ObservableObject
 
             LayoutData? data = null;
 
-            if (IsDwgFileLoaded)
-            {
-                // File-based extraction via ACadSharp (no COM)
-                data = await Task.Run(() => _dwgReader.ExtractParameters(DwgFilePath, SelectedLayout.Name));
-            }
-            else if (IsConnected)
-            {
-                // COM-based extraction via GUIProxy
-                var parameters = new Dictionary<string, object?>
-                {
-                    ["layoutName"] = SelectedLayout.Name
-                };
-                var response = await _guiProxy.ExecuteInGuiAsync("autocad_extract_parameters", parameters, timeout: 30000);
-
-                if (response.Success && response.Result is LayoutData comData)
-                {
-                    data = comData;
-                }
-                else
-                {
-                    ExtractionStatus = response.ErrorMessage ?? "Extraction failed";
-                    _logger?.LogWarning("Parameter extraction failed: {Error}", response.ErrorMessage);
-                    return;
-                }
-            }
+            // Unified extraction via IDrawingDataService (dispatches to COM or File backend)
+            data = await _drawingDataService.ExtractParametersAsync(SelectedLayout.Name);
 
             if (data != null)
             {
@@ -886,10 +945,9 @@ public partial class AutoCADViewModel : ObservableObject
         LayoutAttributes = data.Parameters;
 
         TableData.Clear();
-        if (data.Tables.Count > 0)
+        // Process ALL tables (a layout may have multiple 9-column tables)
+        foreach (var table in data.Tables)
         {
-            var table = data.Tables[0];
-
             foreach (var row in table.Cells.Skip(1)) // Skip header row
             {
                 if (row.Count >= 9)
@@ -910,10 +968,16 @@ public partial class AutoCADViewModel : ObservableObject
             }
         }
 
-        ExtractionStatus = $"Extracted {data.Parameters.Count} parameters, {TableData.Count} rows from {SelectedLayout!.Name}";
-        _logService.Log($"Extracted {data.Parameters.Count} params, {TableData.Count} rows from {SelectedLayout.Name}", "AutoCAD");
-        _logger?.LogInformation("Successfully extracted {ParamCount} params, {RowCount} rows",
-            data.Parameters.Count, TableData.Count);
+        var paramCount = data.Parameters.Count;
+        if (data.Parameters.ContainsKey("_diagnostic_entities"))
+            paramCount--;
+
+        ExtractionStatus = $"Extracted {paramCount} parameters, {TableData.Count} rows from {SelectedLayout!.Name}";
+        _logService.Log(
+            $"Extracted {paramCount} params, {TableData.Count} rows from {SelectedLayout.Name}" +
+            $" ({data.Tables.Count} tables)", "AutoCAD");
+        _logger?.LogInformation("Successfully extracted {ParamCount} params, {RowCount} rows from {TableCount} tables",
+            paramCount, TableData.Count, data.Tables.Count);
     }
 
     #endregion

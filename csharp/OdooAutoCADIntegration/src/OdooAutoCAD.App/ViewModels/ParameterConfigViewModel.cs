@@ -22,6 +22,7 @@ public partial class ParameterConfigViewModel : ObservableObject
     private readonly IGUIProxy _guiProxy;
     private readonly ISettingsService _settingsService;
     private readonly IAppLogService _logService;
+    private readonly IDrawingDataService _drawingDataService;
     private readonly ILogger<ParameterConfigViewModel>? _logger;
 
     // Dropdown collections
@@ -58,7 +59,15 @@ public partial class ParameterConfigViewModel : ObservableObject
     [ObservableProperty]
     private string _colorNo = string.Empty;
 
-    // Layout info
+    // Layout selection
+    public ObservableCollection<string> Layouts { get; } = new();
+
+    [ObservableProperty]
+    private string? _selectedLayout;
+
+    [ObservableProperty]
+    private bool _applyToAllLayouts;
+
     [ObservableProperty]
     private string _activeLayoutName = string.Empty;
 
@@ -78,8 +87,9 @@ public partial class ParameterConfigViewModel : ObservableObject
     [ObservableProperty]
     private string _lastSubmitResult = string.Empty;
 
-    public bool IsAutoCADConnected => _autoCADService.IsConnected;
+    public bool IsAutoCADConnected => _drawingDataService.IsReady;
     public bool IsOdooConnected => _odooService.IsApiAuthenticated || _odooService.IsConnected;
+    public bool IsFileMode => _drawingDataService.Mode == AutoCADOperationMode.File;
 
     public bool AllFieldsFilled =>
         SelectedProduct != null &&
@@ -98,6 +108,7 @@ public partial class ParameterConfigViewModel : ObservableObject
         IGUIProxy guiProxy,
         ISettingsService settingsService,
         IAppLogService logService,
+        IDrawingDataService drawingDataService,
         ILogger<ParameterConfigViewModel>? logger = null)
     {
         _autoCADService = autoCADService;
@@ -105,6 +116,7 @@ public partial class ParameterConfigViewModel : ObservableObject
         _guiProxy = guiProxy;
         _settingsService = settingsService;
         _logService = logService;
+        _drawingDataService = drawingDataService;
         _logger = logger;
     }
 
@@ -149,6 +161,25 @@ public partial class ParameterConfigViewModel : ObservableObject
     partial void OnIsSubmittingChanged(bool value)
     {
         OnPropertyChanged(nameof(CanSubmit));
+    }
+
+    partial void OnSelectedLayoutChanged(string? value)
+    {
+        UpdateLayoutSummary();
+    }
+
+    partial void OnApplyToAllLayoutsChanged(bool value)
+    {
+        UpdateLayoutSummary();
+    }
+
+    private void UpdateLayoutSummary()
+    {
+        LayoutSummary = ApplyToAllLayouts
+            ? "Will update: All layouts"
+            : !string.IsNullOrEmpty(SelectedLayout)
+                ? $"Will update: {SelectedLayout}"
+                : "No layout selected";
     }
 
     [RelayCommand]
@@ -210,9 +241,8 @@ public partial class ParameterConfigViewModel : ObservableObject
             int projectId = 0;
             try
             {
-                StatusMessage = "Reading PR number from AutoCAD...";
-                var prResponse = await _guiProxy.ExecuteInGuiAsync("autocad_get_pr_number", null, timeout: 5000);
-                var prNumber = prResponse.Result as string ?? "";
+                StatusMessage = "Reading PR number from drawing...";
+                var prNumber = await _drawingDataService.GetPRNumberAsync();
                 if (!string.IsNullOrEmpty(prNumber))
                 {
                     _logService.Log($"PR number: {prNumber}", "ParamConfig");
@@ -231,16 +261,28 @@ public partial class ParameterConfigViewModel : ObservableObject
                 _logService.Log($"Project lookup failed: {ex.Message}", "ParamConfig", AppLogLevel.Warning);
             }
 
-            // Step 3b: Fetch active layout name
+            // Step 3b: Fetch layouts and active layout
             try
             {
-                var activeResponse = await _guiProxy.ExecuteInGuiAsync("autocad_get_active_layout", null, timeout: 5000);
-                ActiveLayoutName = activeResponse.Result as string ?? "";
+                var layouts = await _drawingDataService.GetLayoutsAsync();
+                Layouts.Clear();
+                foreach (var l in layouts)
+                    Layouts.Add(l.Name);
 
-                LayoutSummary = !string.IsNullOrEmpty(ActiveLayoutName)
-                    ? $"Current layout: {ActiveLayoutName}  —  Submit will update this layout only"
-                    : "No active layout found";
-                _logService.Log(LayoutSummary, "ParamConfig");
+                // In COM mode, try to get active layout name
+                if (!IsFileMode)
+                {
+                    var activeResponse = await _guiProxy.ExecuteInGuiAsync("autocad_get_active_layout", null, timeout: 5000);
+                    ActiveLayoutName = activeResponse.Result as string ?? "";
+                }
+
+                // Set mode-appropriate defaults
+                ApplyToAllLayouts = IsFileMode; // File mode defaults to all, COM to single
+                SelectedLayout = !string.IsNullOrEmpty(ActiveLayoutName)
+                    ? ActiveLayoutName
+                    : Layouts.FirstOrDefault();
+
+                _logService.Log($"Layouts: {Layouts.Count} found, selected: {SelectedLayout}", "ParamConfig");
             }
             catch (Exception ex)
             {
@@ -349,33 +391,39 @@ public partial class ParameterConfigViewModel : ObservableObject
                 ["color_no"] = ColorNo
             };
 
-            // Re-read current active layout at submit time
-            var currentLayoutResp = await _guiProxy.ExecuteInGuiAsync("autocad_get_active_layout", null, timeout: 5000);
-            var currentLayout = currentLayoutResp.Result as string ?? ActiveLayoutName;
-            if (!string.IsNullOrEmpty(currentLayout))
-                ActiveLayoutName = currentLayout;
-
-            var response = await _guiProxy.ExecuteInGuiAsync("autocad_set_attribute_values",
-                new Dictionary<string, object?>
+            // Determine target layout
+            string? targetLayout = null;
+            if (!ApplyToAllLayouts)
+            {
+                // Re-read current active layout at submit time (COM only, if no explicit selection)
+                if (!IsFileMode && string.IsNullOrEmpty(SelectedLayout))
                 {
-                    ["attributes"] = attributes,
-                    ["layout_name"] = ActiveLayoutName
-                },
-                timeout: 10000);
+                    var currentLayoutResp = await _guiProxy.ExecuteInGuiAsync("autocad_get_active_layout", null, timeout: 5000);
+                    targetLayout = currentLayoutResp.Result as string ?? ActiveLayoutName;
+                }
+                else
+                {
+                    targetLayout = SelectedLayout ?? ActiveLayoutName;
+                }
+            }
+            // null targetLayout means "apply to all layouts"
 
-            if (response.Success && response.Result is List<string> results)
+            var results = await _drawingDataService.SetAttributeValuesAsync(attributes, targetLayout);
+
+            var targetDesc = targetLayout ?? "All layouts";
+            if (results.Count > 0)
             {
                 var summary = string.Join("\n", results);
-                LastSubmitResult = $"Success: [{ActiveLayoutName}] updated";
+                LastSubmitResult = $"Success: [{targetDesc}] updated";
                 StatusMessage = LastSubmitResult;
-                _logService.Log($"Parameters written to layout {ActiveLayoutName}", "ParamConfig");
+                _logService.Log($"Parameters written to {targetDesc}", "ParamConfig");
                 _logger?.LogInformation("Parameter submit results: {Results}", summary);
             }
             else
             {
-                LastSubmitResult = $"Failed: {response.ErrorMessage ?? "Unknown error"}";
+                LastSubmitResult = "Failed: No attributes written";
                 StatusMessage = LastSubmitResult;
-                _logService.Log($"Submit failed: {response.ErrorMessage}", "ParamConfig", AppLogLevel.Error);
+                _logService.Log("Submit failed: No attributes written", "ParamConfig", AppLogLevel.Error);
             }
         }
         catch (Exception ex)
@@ -403,6 +451,8 @@ public partial class ParameterConfigViewModel : ObservableObject
         Unit = string.Empty;
         ColorNo = string.Empty;
         LastSubmitResult = string.Empty;
+        SelectedLayout = Layouts.FirstOrDefault();
+        ApplyToAllLayouts = IsFileMode;
         StatusMessage = "Selections cleared";
     }
 }

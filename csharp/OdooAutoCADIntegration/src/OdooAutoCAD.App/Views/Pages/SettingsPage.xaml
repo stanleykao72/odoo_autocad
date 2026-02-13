@@ -112,6 +112,25 @@
                                        Foreground="{StaticResource TextPrimaryBrush}"
                                        Margin="0,0,0,16"/>
 
+                            <!-- Operation Mode -->
+                            <TextBlock Text="Operation Mode" Style="{StaticResource SettingsLabel}"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,12">
+                                <RadioButton Content="COM (Full AutoCAD)"
+                                             IsChecked="{Binding IsComMode, Mode=TwoWay}"
+                                             GroupName="AutoCADMode"
+                                             Margin="0,0,24,0"
+                                             FontFamily="{StaticResource AppFontFamily}"/>
+                                <RadioButton Content="File (AutoCAD LT / Offline)"
+                                             IsChecked="{Binding IsFileMode, Mode=TwoWay}"
+                                             GroupName="AutoCADMode"
+                                             FontFamily="{StaticResource AppFontFamily}"/>
+                            </StackPanel>
+                            <TextBlock Text="COM mode requires running AutoCAD. File mode reads DWG files directly via ACadSharp (no AutoCAD needed)."
+                                       FontSize="11"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,16"/>
+
                             <!-- ProgId (read-only) -->
                             <TextBlock Text="ProgId" Style="{StaticResource SettingsLabel}"/>
                             <TextBox Text="{Binding AutoCADProgId, Mode=OneWay}"

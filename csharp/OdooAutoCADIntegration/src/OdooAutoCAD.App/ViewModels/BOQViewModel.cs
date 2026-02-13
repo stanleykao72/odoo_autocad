@@ -138,6 +138,7 @@ public partial class BOQViewModel : ObservableObject
     private readonly IGUIProxy _guiProxy;
     private readonly IAppLogService _logService;
     private readonly ISettingsService _settingsService;
+    private readonly IDrawingDataService _drawingDataService;
     private readonly ILogger<BOQViewModel>? _logger;
 
     /// <summary>
@@ -269,6 +270,7 @@ public partial class BOQViewModel : ObservableObject
         IGUIProxy guiProxy,
         IAppLogService logService,
         ISettingsService settingsService,
+        IDrawingDataService drawingDataService,
         ILogger<BOQViewModel>? logger = null)
     {
         _boqProcessor = boqProcessor;
@@ -277,6 +279,7 @@ public partial class BOQViewModel : ObservableObject
         _guiProxy = guiProxy;
         _logService = logService;
         _settingsService = settingsService;
+        _drawingDataService = drawingDataService;
         _logger = logger;
 
         // Initial connection check
@@ -350,19 +353,14 @@ public partial class BOQViewModel : ObservableObject
 
         try
         {
-            // Step 1: Get layouts via GUIProxy
-            _logService.Log("BOQ: Getting AutoCAD layouts...", "BOQ");
-            var layoutResponse = await _guiProxy.ExecuteInGuiAsync("autocad_get_layouts", null, timeout: 10000);
+            // Step 1: Get layouts via IDrawingDataService (COM or File mode)
+            _logService.Log("BOQ: Getting layouts...", "BOQ");
+            var layouts = await _drawingDataService.GetLayoutsAsync();
 
-            // Handler returns List<LayoutInfo> — extract layout names
             List<string> layoutNames;
-            if (layoutResponse.Success && layoutResponse.Result is IList<LayoutInfo> layoutInfos && layoutInfos.Count > 0)
+            if (layouts.Count > 0)
             {
-                layoutNames = layoutInfos.Select(l => l.Name).ToList();
-            }
-            else if (layoutResponse.Success && layoutResponse.Result is IList<string> stringLayouts && stringLayouts.Count > 0)
-            {
-                layoutNames = stringLayouts.ToList();
+                layoutNames = layouts.Select(l => l.Name).ToList();
             }
             else
             {
@@ -394,22 +392,30 @@ public partial class BOQViewModel : ObservableObject
 
                 _logService.Log($"BOQ: Extracting layout '{layoutName}'...", "BOQ");
 
-                var extractParams = new Dictionary<string, object?>
+                LayoutData layoutData;
+                try
                 {
-                    ["layoutName"] = layoutName
-                };
-
-                var extractResponse = await _guiProxy.ExecuteInGuiAsync(
-                    "autocad_extract_parameters", extractParams, timeout: 30000);
-
-                if (!extractResponse.Success)
+                    layoutData = await _drawingDataService.ExtractParametersAsync(layoutName);
+                }
+                catch (Exception ex)
                 {
-                    _logService.Log($"BOQ: Failed to extract '{layoutName}': {extractResponse.ErrorMessage}", "BOQ", AppLogLevel.Warning);
+                    _logService.Log($"BOQ: Failed to extract '{layoutName}': {ex.Message}", "BOQ", AppLogLevel.Warning);
                     continue;
                 }
 
-                if (extractResponse.Result is LayoutData layoutData)
+                if (layoutData != null)
                 {
+                    // Log block diagnostic for first layout only (to help debug missing attributes)
+                    if (layoutData.Parameters.TryGetValue("_diag_blocks", out var diagBlocks) && i == 0)
+                    {
+                        _logService.Log($"BOQ: Layout '{layoutName}' blocks: {diagBlocks}", "BOQ");
+                        layoutData.Parameters.Remove("_diag_blocks");
+                    }
+                    else if (layoutData.Parameters.ContainsKey("_diag_blocks"))
+                    {
+                        layoutData.Parameters.Remove("_diag_blocks");
+                    }
+
                     // Store raw LayoutData for push payload
                     _layoutDataMap[layoutName] = layoutData;
 
@@ -425,6 +431,8 @@ public partial class BOQViewModel : ObservableObject
                     var result = await _boqProcessor.GenerateBOQAsync(layoutData, options);
 
                     // Build display items, also populating detail fields from table data
+                    // Flatten data rows from ALL tables once (lazy init below)
+                    List<List<string>>? allDataRows = null;
                     int detailIndex = 0;
                     foreach (var entry in result.Entries)
                     {
@@ -456,22 +464,30 @@ public partial class BOQViewModel : ObservableObject
                         };
 
                         // Populate detail fields from table data if available
-                        if (layoutData.Tables.Count > 0)
+                        // Flatten data rows from ALL tables (skip header row 0 in each)
+                        if (layoutData.Tables.Count > 0 && allDataRows == null)
                         {
-                            var table = layoutData.Tables[0];
-                            // detailIndex+1 because row 0 is header in Cells
-                            int dataRow = detailIndex + 1;
-                            if (dataRow < table.Cells.Count)
+                            allDataRows = new List<List<string>>();
+                            foreach (var tbl in layoutData.Tables)
                             {
-                                var cells = table.Cells[dataRow];
-                                displayItem.Position = cells.Count > 0 ? cells[0] : "";
-                                displayItem.ProductCode = cells.Count > 1 ? cells[1] : "";
-                                displayItem.Width = cells.Count > 2 ? cells[2] : "";
-                                displayItem.Height = cells.Count > 3 ? cells[3] : "";
-                                displayItem.Length = cells.Count > 4 ? cells[4] : "";
-                                displayItem.Thickness = cells.Count > 5 ? cells[5] : "";
-                                displayItem.DetailId = cells.Count > 8 ? cells[8] : null;
+                                foreach (var row in tbl.Cells.Skip(1)) // skip header row
+                                {
+                                    if (row.Count >= 9)
+                                        allDataRows.Add(row);
+                                }
                             }
+                        }
+
+                        if (allDataRows != null && detailIndex < allDataRows.Count)
+                        {
+                            var cells = allDataRows[detailIndex];
+                            displayItem.Position = cells.Count > 0 ? cells[0] : "";
+                            displayItem.ProductCode = cells.Count > 1 ? cells[1] : "";
+                            displayItem.Width = cells.Count > 2 ? cells[2] : "";
+                            displayItem.Height = cells.Count > 3 ? cells[3] : "";
+                            displayItem.Length = cells.Count > 4 ? cells[4] : "";
+                            displayItem.Thickness = cells.Count > 5 ? cells[5] : "";
+                            displayItem.DetailId = cells.Count > 8 ? cells[8] : null;
                         }
 
                         allItems.Add(displayItem);
@@ -772,15 +788,10 @@ public partial class BOQViewModel : ObservableObject
 
             _logService.Log($"BOQ BuildImportRequest: {layoutName} — pr_no='{importLayout.PrNo}', header_id='{importLayout.HeaderId}', project='{importLayout.ProjectName}', params=[{string.Join(", ", layoutData.Parameters.Keys)}]", "BOQ");
 
-            // Build detail rows from table data
-            // Row 0 = title (contains header_id at col 8), Row 1 = column headers, Row 2+ = data
-            if (layoutData.Tables.Count > 0)
+            // Build detail rows from table data (iterate ALL tables)
+            // Each table: Cells[0] = header row, Cells[1+] = data rows
+            foreach (var table in layoutData.Tables)
             {
-                var table = layoutData.Tables[0];
-
-                // C# extraction adds a manual header row at Cells[0] — no title row exists.
-                // Header_id comes from GetTableData (stored in row dict), not from Cells[0].
-                // Data rows start at index 1 (skip only the header row at index 0).
                 for (int i = 1; i < table.Cells.Count; i++)
                 {
                     var cells = table.Cells[i];
@@ -854,21 +865,14 @@ public partial class BOQViewModel : ObservableObject
             {
                 try
                 {
-                    var parameters = new Dictionary<string, object?>
-                    {
-                        ["layout_name"] = wb.LayoutName,
-                        ["header_id"] = wb.HeaderId ?? "",
-                        ["details"] = wb.Details
-                    };
-
-                    var result = await _guiProxy.ExecuteInGuiAsync(
-                        "autocad_write_table_ids", parameters, timeout: 30000);
+                    var result = await _drawingDataService.WriteTableIdsAsync(
+                        wb.LayoutName, wb.HeaderId ?? "", wb.Details);
 
                     if (!result.Success)
                     {
                         _failedWritebacks.Add(wb);
                         _logService.Log(
-                            $"BOQ: Writeback failed for '{wb.LayoutName}': {result.ErrorMessage}",
+                            $"BOQ: Writeback failed for '{wb.LayoutName}': {result.Message}",
                             "BOQ", AppLogLevel.Warning);
                     }
                 }
@@ -894,7 +898,16 @@ public partial class BOQViewModel : ObservableObject
         foreach (var layout in response.All)
         {
             var items = BoqItems.Where(i =>
-                string.Equals(i.LayoutName, layout.LayoutName, StringComparison.OrdinalIgnoreCase));
+                string.Equals(i.LayoutName, layout.LayoutName, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            // Update header_id on all items in this layout
+            if (!string.IsNullOrWhiteSpace(layout.HeaderId))
+            {
+                foreach (var item in items)
+                {
+                    item.HeaderId = layout.HeaderId;
+                }
+            }
 
             foreach (var detail in layout.Detail)
             {
@@ -974,7 +987,7 @@ public partial class BOQViewModel : ObservableObject
         }
     }
 
-    private bool CanClearAllIds() => IsAutoCADConnected && !IsExtracting && !IsPushing;
+    private bool CanClearAllIds() => IsAutoCADConnected && !IsFileMode && !IsExtracting && !IsPushing;
 
     #endregion
 
@@ -1104,9 +1117,15 @@ public partial class BOQViewModel : ObservableObject
     [RelayCommand]
     private void RefreshConnectionStatus()
     {
-        IsAutoCADConnected = _autoCADService.IsConnected;
+        IsAutoCADConnected = _drawingDataService.IsReady;
         IsOdooConnected = _odooService.IsConnected;
     }
+
+    /// <summary>
+    /// True when the active backend is file-based (ACadSharp, no COM).
+    /// Used by UI to show file-mode banners and disable COM-only features.
+    /// </summary>
+    public bool IsFileMode => _drawingDataService.Mode == AutoCADOperationMode.File;
 
     internal void UpdateSummary()
     {

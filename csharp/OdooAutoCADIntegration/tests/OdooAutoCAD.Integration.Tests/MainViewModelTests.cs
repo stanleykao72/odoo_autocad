@@ -23,6 +23,7 @@ public class MainViewModelTests
     private readonly Mock<IGUIProxy> _mockGuiProxy;
     private readonly Mock<IAutoCADService> _mockAutoCAD;
     private readonly Mock<IOdooService> _mockOdoo;
+    private readonly Mock<IDrawingDataService> _mockDrawingDataService;
     private readonly MCPSSEServer _mcpServer;
 
     public MainViewModelTests()
@@ -31,6 +32,7 @@ public class MainViewModelTests
         _mockGuiProxy = new Mock<IGUIProxy>();
         _mockAutoCAD = new Mock<IAutoCADService>();
         _mockOdoo = new Mock<IOdooService>();
+        _mockDrawingDataService = new Mock<IDrawingDataService>();
 
         // Create a real MCPSSEServer with mock registry (not started)
         var mockRegistry = new Mock<MCPToolRegistry>(_mockGuiProxy.Object, null!, null!, null!, null!);
@@ -44,14 +46,15 @@ public class MainViewModelTests
             _mockGuiProxy.Object,
             _mcpServer,
             _mockAutoCAD.Object,
-            _mockOdoo.Object);
+            _mockOdoo.Object,
+            _mockDrawingDataService.Object);
     }
 
     [StaFact]
     public void UpdateAutoCADStatus_WhenConnected_ShowsGreen()
     {
         // Arrange
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
         var sut = CreateSUT();
 
         // Assert (constructor calls UpdateAllStatus)
@@ -63,12 +66,30 @@ public class MainViewModelTests
     public void UpdateAutoCADStatus_WhenDisconnected_ShowsGray()
     {
         // Arrange
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(false);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(false);
         var sut = CreateSUT();
 
         // Assert
         sut.AutoCADStatusText.Should().Be("Disconnected");
         sut.AutoCADStatusColor.Should().Be(Brushes.Gray);
+    }
+
+    [StaFact]
+    public void AutoCADModeText_WhenCOM_ShowsCOM()
+    {
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.COM);
+        var sut = CreateSUT();
+
+        sut.AutoCADModeText.Should().Be("(COM)");
+    }
+
+    [StaFact]
+    public void AutoCADModeText_WhenFile_ShowsFile()
+    {
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.File);
+        var sut = CreateSUT();
+
+        sut.AutoCADModeText.Should().Be("(File)");
     }
 
     [StaFact]

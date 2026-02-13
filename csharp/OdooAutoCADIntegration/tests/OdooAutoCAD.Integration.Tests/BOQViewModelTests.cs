@@ -19,6 +19,7 @@ public class BOQViewModelTests
     private readonly Mock<IGUIProxy> _mockGuiProxy;
     private readonly Mock<IAppLogService> _mockLogService;
     private readonly Mock<ISettingsService> _mockSettingsService;
+    private readonly Mock<IDrawingDataService> _mockDrawingDataService;
 
     public BOQViewModelTests()
     {
@@ -28,6 +29,7 @@ public class BOQViewModelTests
         _mockGuiProxy = new Mock<IGUIProxy>();
         _mockLogService = new Mock<IAppLogService>();
         _mockSettingsService = new Mock<ISettingsService>();
+        _mockDrawingDataService = new Mock<IDrawingDataService>();
     }
 
     private BOQViewModel CreateSUT()
@@ -38,7 +40,8 @@ public class BOQViewModelTests
             _mockOdoo.Object,
             _mockGuiProxy.Object,
             _mockLogService.Object,
-            _mockSettingsService.Object);
+            _mockSettingsService.Object,
+            _mockDrawingDataService.Object);
     }
 
     #region Existing Tests
@@ -68,7 +71,7 @@ public class BOQViewModelTests
     [Fact]
     public void CanExtract_WhenAutoCADConnected_ReturnsTrue()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
         var sut = CreateSUT();
 
         sut.ExtractBOQCommand.CanExecute(null).Should().BeTrue();
@@ -77,10 +80,10 @@ public class BOQViewModelTests
     [Fact]
     public async Task ExtractBOQ_NoLayouts_SetsStatusMessage()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
-        _mockGuiProxy
-            .Setup(p => p.ExecuteInGuiAsync("autocad_get_layouts", null, 10000))
-            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", new List<LayoutInfo>()));
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
+        _mockDrawingDataService
+            .Setup(s => s.GetLayoutsAsync())
+            .ReturnsAsync(new List<LayoutInfo>());
 
         var sut = CreateSUT();
         await sut.ExtractBOQCommand.ExecuteAsync(null);
@@ -93,29 +96,27 @@ public class BOQViewModelTests
     [Fact]
     public async Task ExtractBOQ_WithLayouts_PopulatesItems()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
 
         var layouts = new List<LayoutInfo>
         {
             new("Layout1", 1, false, ""),
             new("Layout2", 2, false, "")
         };
-        _mockGuiProxy
-            .Setup(p => p.ExecuteInGuiAsync("autocad_get_layouts", null, 10000))
-            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", layouts));
+        _mockDrawingDataService
+            .Setup(s => s.GetLayoutsAsync())
+            .ReturnsAsync(layouts);
 
         var layoutData1 = new LayoutData { LayoutName = "Layout1" };
         var layoutData2 = new LayoutData { LayoutName = "Layout2" };
 
-        _mockGuiProxy
-            .Setup(p => p.ExecuteInGuiAsync("autocad_extract_parameters",
-                It.Is<Dictionary<string, object?>>(d => d["layoutName"] as string == "Layout1"), 30000))
-            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req2", layoutData1));
+        _mockDrawingDataService
+            .Setup(s => s.ExtractParametersAsync("Layout1"))
+            .ReturnsAsync(layoutData1);
 
-        _mockGuiProxy
-            .Setup(p => p.ExecuteInGuiAsync("autocad_extract_parameters",
-                It.Is<Dictionary<string, object?>>(d => d["layoutName"] as string == "Layout2"), 30000))
-            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req3", layoutData2));
+        _mockDrawingDataService
+            .Setup(s => s.ExtractParametersAsync("Layout2"))
+            .ReturnsAsync(layoutData2);
 
         var result1 = new BOQGenerationResult
         {
@@ -445,18 +446,17 @@ public class BOQViewModelTests
     [Fact]
     public async Task ExtractBOQ_StoresLayoutData()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
 
         var layouts = new List<LayoutInfo> { new("TestLayout", 1, false, "") };
-        _mockGuiProxy
-            .Setup(p => p.ExecuteInGuiAsync("autocad_get_layouts", null, 10000))
-            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", layouts));
+        _mockDrawingDataService
+            .Setup(s => s.GetLayoutsAsync())
+            .ReturnsAsync(layouts);
 
         var layoutData = new LayoutData { LayoutName = "TestLayout" };
-        _mockGuiProxy
-            .Setup(p => p.ExecuteInGuiAsync("autocad_extract_parameters",
-                It.IsAny<Dictionary<string, object?>>(), 30000))
-            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req2", layoutData));
+        _mockDrawingDataService
+            .Setup(s => s.ExtractParametersAsync("TestLayout"))
+            .ReturnsAsync(layoutData);
 
         _mockBoqProcessor
             .Setup(p => p.GenerateBOQAsync(layoutData, It.IsAny<BOQGenerationOptions>()))
@@ -580,7 +580,8 @@ public class BOQViewModelTests
     [Fact]
     public async Task ClearAllIds_ClearsDetailIds()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.COM);
         _mockGuiProxy
             .Setup(p => p.ExecuteInGuiAsync("autocad_clear_all_table_ids", null, 30000))
             .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", null));
@@ -606,7 +607,8 @@ public class BOQViewModelTests
     [Fact]
     public void ClearAllIds_WhenConnected_CanExecute()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.COM);
         var sut = CreateSUT();
 
         sut.ClearAllIdsCommand.CanExecute(null).Should().BeTrue();
@@ -633,6 +635,70 @@ public class BOQViewModelTests
         var sut = CreateSUT();
         sut.PushProgressPercent.Should().Be(0);
         sut.PushProgress.Should().BeEmpty();
+    }
+
+    #endregion
+
+    #region Dual-Mode (COM vs File) Tests
+
+    [Fact]
+    public void IsFileMode_WhenCOM_ReturnsFalse()
+    {
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.COM);
+        var sut = CreateSUT();
+
+        sut.IsFileMode.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsFileMode_WhenFile_ReturnsTrue()
+    {
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.File);
+        var sut = CreateSUT();
+
+        sut.IsFileMode.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ClearAllIds_InFileMode_CannotExecute()
+    {
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.File);
+        var sut = CreateSUT();
+
+        sut.ClearAllIdsCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExtractBOQ_InFileMode_UsesDrawingDataService()
+    {
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.File);
+        _mockOdoo.Setup(s => s.IsConnected).Returns(true);
+
+        var layoutData = new LayoutData { LayoutName = "FileLayout1" };
+        _mockDrawingDataService.Setup(s => s.GetLayoutsAsync())
+            .ReturnsAsync(new List<LayoutInfo> { new("FileLayout1", 100, false, "") });
+        _mockDrawingDataService.Setup(s => s.ExtractParametersAsync("FileLayout1"))
+            .ReturnsAsync(layoutData);
+
+        var result = new BOQGenerationResult
+        {
+            Success = true,
+            Entries = new List<BOQEntry>
+            {
+                new() { ProductName = "Widget", Quantity = 10, UnitOfMeasure = "pcs" }
+            }
+        };
+        _mockBoqProcessor
+            .Setup(p => p.GenerateBOQAsync(layoutData, It.IsAny<BOQGenerationOptions>()))
+            .ReturnsAsync(result);
+
+        var sut = CreateSUT();
+        await sut.ExtractBOQCommand.ExecuteAsync(null);
+
+        sut.BoqItems.Should().HaveCount(1);
+        sut.BoqItems[0].LayoutName.Should().Be("FileLayout1");
     }
 
     #endregion

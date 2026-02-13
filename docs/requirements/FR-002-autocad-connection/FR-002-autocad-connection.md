@@ -321,3 +321,11 @@ Index 8: Detail ID   -> "detail_id" (hidden, used for Odoo sync)
 - Python `Dispatch` — C# `Activator.CreateInstance(Type.GetTypeFromProgID(...))`
 - Python has no COM message filter — C# registers `OleMessageFilter` for `RPC_E_CALL_REJECTED` retry
 - Python uses `Thread.Sleep` for retry — C# uses `await Task.Delay` to keep UI responsive
+
+### Dual-Mode Support (Sprint 10 — FR-010)
+
+Starting with Sprint 10, AutoCAD operations are abstracted through `IDrawingDataService` which supports two backends:
+- **COM mode** (default): Real-time connection to running AutoCAD via COM/IGUIProxy (this FR's scope)
+- **File mode**: Offline DWG file reading via ACadSharp library (see [FR-010](../FR-010-dual-mode-autocad/FR-010-dual-mode-autocad.md))
+
+ViewModels consume `IDrawingDataService` instead of calling `IGUIProxy` directly. The COM backend (`ComDrawingDataService`) wraps the existing `IAutoCADService` + `IGUIProxy` infrastructure without changing COM behavior. All thread safety patterns (Pure STA Mode, OleMessageFilter, IDispatch QI warmup) remain unchanged.

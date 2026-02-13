@@ -27,6 +27,7 @@ public partial class MainViewModel : ObservableObject
     private readonly MCPSSEServer _mcpServer;
     private readonly IAutoCADService _autoCADService;
     private readonly IOdooService _odooService;
+    private readonly IDrawingDataService _drawingDataService;
     private readonly DispatcherTimer _statusTimer;
 
     [ObservableProperty]
@@ -44,6 +45,9 @@ public partial class MainViewModel : ObservableObject
     // AutoCAD Status
     [ObservableProperty]
     private string _autoCADStatusText = "Disconnected";
+
+    [ObservableProperty]
+    private string _autoCADModeText = "";
 
     [ObservableProperty]
     private Brush _autoCADStatusColor = Brushes.Gray;
@@ -68,6 +72,7 @@ public partial class MainViewModel : ObservableObject
         MCPSSEServer mcpServer,
         IAutoCADService autoCADService,
         IOdooService odooService,
+        IDrawingDataService drawingDataService,
         ILogger<MainViewModel>? logger = null)
     {
         _navigationService = navigationService;
@@ -75,6 +80,7 @@ public partial class MainViewModel : ObservableObject
         _mcpServer = mcpServer;
         _autoCADService = autoCADService;
         _odooService = odooService;
+        _drawingDataService = drawingDataService;
         _logger = logger;
 
         // Setup status update timer
@@ -132,7 +138,8 @@ public partial class MainViewModel : ObservableObject
 
     private void UpdateAutoCADStatus()
     {
-        if (_autoCADService.IsConnected)
+        var isReady = _drawingDataService.IsReady;
+        if (isReady)
         {
             AutoCADStatusText = "Connected";
             AutoCADStatusColor = Brushes.Green;
@@ -142,6 +149,9 @@ public partial class MainViewModel : ObservableObject
             AutoCADStatusText = "Disconnected";
             AutoCADStatusColor = Brushes.Gray;
         }
+
+        AutoCADModeText = _drawingDataService.Mode == AutoCADOperationMode.COM
+            ? "(COM)" : "(File)";
     }
 
     private void UpdateOdooStatus()

@@ -8,7 +8,7 @@
 
 This directory contains comprehensive feature requirement documents and granular user stories for every page and feature in the C# v6.0 WPF application. Each FR document maps Python v5.1 functionality to C# implementation targets, and each US file provides actionable acceptance criteria with implementation tasks.
 
-**Total**: 8 Feature Requirements | 78 User Stories | 237 Functional Requirements
+**Total**: 11 Feature Requirements | 87 User Stories | 279 Functional Requirements
 
 ## Document Structure
 
@@ -22,7 +22,10 @@ docs/requirements/
 ├── FR-005-purchase-requisition/          (8 user stories)
 ├── FR-006-ai-assistant/                  (12 user stories)
 ├── FR-007-settings/                      (13 user stories)
-└── FR-008-ui-framework/                  (10 user stories)
+├── FR-008-ui-framework/                  (10 user stories)
+├── FR-009-parameter-config/              (3 user stories)
+├── FR-010-dual-mode-autocad/             (4 user stories)
+└── FR-011-table-entity-writer/           (2 user stories)
 ```
 
 ## Feature Requirements
@@ -37,6 +40,9 @@ docs/requirements/
 | FR-006 | [FR-006-ai-assistant.md](FR-006-ai-assistant/FR-006-ai-assistant.md) | AI Assistant (MCP) Page | 12 | Not Started | P3 |
 | FR-007 | [FR-007-settings.md](FR-007-settings/FR-007-settings.md) | Settings Page | 13 | Not Started | P2 |
 | FR-008 | [FR-008-ui-framework.md](FR-008-ui-framework/FR-008-ui-framework.md) | UI Framework & Navigation | 10 | Not Started | P1 |
+| FR-009 | [FR-009-parameter-config.md](FR-009-parameter-config/FR-009-parameter-config.md) | Odoo Parameter Configuration | 3 | Not Started | P2 |
+| FR-010 | [FR-010-dual-mode-autocad.md](FR-010-dual-mode-autocad/FR-010-dual-mode-autocad.md) | Dual-Mode AutoCAD Support | 4 | Not Started | P1 |
+| FR-011 | [FR-011-table-entity-writer.md](FR-011-table-entity-writer/FR-011-table-entity-writer.md) | TABLE Entity Writer | 2 | Not Started | P1 |
 
 ---
 
@@ -160,6 +166,30 @@ docs/requirements/
 | [US-008-09](FR-008-ui-framework/US-008-09-clean-shutdown.md) | Clean Shutdown | P1 | US-008-01 |
 | [US-008-10](FR-008-ui-framework/US-008-10-cjk-font-rendering.md) | CJK Font Rendering | P1 | US-008-01 |
 
+### FR-009: Odoo Parameter Configuration (3 stories)
+
+| ID | Title | Priority | Depends On |
+|----|-------|----------|------------|
+| [US-009-01](FR-009-parameter-config/US-009-01-fetch-odoo-parameters.md) | Fetch Odoo Parameters | P2 | US-003-02, US-003-05 |
+| [US-009-02](FR-009-parameter-config/US-009-02-parameter-form-ui.md) | Parameter Form UI | P2 | US-009-01 |
+| [US-009-03](FR-009-parameter-config/US-009-03-write-parameters-to-autocad.md) | Write Parameters to AutoCAD | P2 | US-009-02, US-002-01 |
+
+### FR-010: Dual-Mode AutoCAD Support (4 stories)
+
+| ID | Title | Priority | Depends On |
+|----|-------|----------|------------|
+| [US-010-01](FR-010-dual-mode-autocad/US-010-01-select-operation-mode.md) | Select Operation Mode | P1 | US-007-01, US-002-01 |
+| [US-010-02](FR-010-dual-mode-autocad/US-010-02-file-based-extraction.md) | File-Based Data Extraction | P1 | US-010-01 |
+| [US-010-03](FR-010-dual-mode-autocad/US-010-03-file-based-writeback.md) | File-Based Writeback | P1 | US-010-02 |
+| [US-010-04](FR-010-dual-mode-autocad/US-010-04-mode-switch-runtime.md) | Runtime Mode Switching | P1 | US-010-01, US-010-02, US-010-03 |
+
+### FR-011: TABLE Entity Writer (2 stories)
+
+| ID | Title | Priority | Depends On |
+|----|-------|----------|------------|
+| [US-011-01](FR-011-table-entity-writer/US-011-01-dxf-table-writer.md) | DXF TABLE Entity Writer | P1 | US-010-03 |
+| [US-011-02](FR-011-table-entity-writer/US-011-02-dwg-table-writer.md) | DWG TABLE Entity Writer | P2 | US-011-01 |
+
 ---
 
 ## Implementation Priority
@@ -175,8 +205,12 @@ docs/requirements/
 6. **FR-005** Purchase Requisition - secondary business workflow
 7. **FR-007** Settings - configuration management
 
-### Phase 3 - Advanced Features (P3)
-8. **FR-006** AI Assistant (MCP) - AI integration features
+### Phase 3.5 - Dual-Mode & TABLE Writing (P1)
+8. **FR-010** Dual-Mode AutoCAD - COM + File mode support
+9. **FR-011** TABLE Entity Writer - native ID writeback in File mode
+
+### Phase 4 - Advanced Features (P3)
+10. **FR-006** AI Assistant (MCP) - AI integration features
 
 ### Recommended Sprint Order (P1 stories)
 
@@ -218,6 +252,8 @@ csharp/OdooAutoCADIntegration/src/
 │   └── Services/NavigationService.cs     → FR-008
 ├── OdooAutoCAD.Core/          # Business Logic
 │   ├── AutoCAD/IAutoCADService.cs        → FR-002
+│   ├── AutoCAD/IDrawingDataService.cs   → FR-010
+│   ├── AutoCAD/IDwgFileService.cs       → FR-010
 │   ├── Odoo/IOdooService.cs              → FR-003
 │   ├── BOQ/IBOQProcessor.cs              → FR-004
 │   └── Threading/IGUIProxy.cs            → FR-006, FR-008

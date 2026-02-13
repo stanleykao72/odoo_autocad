@@ -21,6 +21,7 @@ public class AutoCADViewModelExtendedTests
     private readonly Mock<IOdooService> _mockOdoo;
     private readonly Mock<ISettingsService> _mockSettings;
     private readonly Mock<IAppLogService> _mockLogService;
+    private readonly Mock<IDrawingDataService> _mockDrawingDataService;
 
     public AutoCADViewModelExtendedTests()
     {
@@ -30,6 +31,7 @@ public class AutoCADViewModelExtendedTests
         _mockOdoo = new Mock<IOdooService>();
         _mockSettings = new Mock<ISettingsService>();
         _mockLogService = new Mock<IAppLogService>();
+        _mockDrawingDataService = new Mock<IDrawingDataService>();
 
         _mockSettings.Setup(s => s.LoadServerConfigsAsync())
             .ReturnsAsync(new Dictionary<string, string?>());
@@ -43,7 +45,8 @@ public class AutoCADViewModelExtendedTests
             _mockGuiProxy.Object,
             _mockOdoo.Object,
             _mockSettings.Object,
-            _mockLogService.Object);
+            _mockLogService.Object,
+            _mockDrawingDataService.Object);
     }
 
     #region US-002-04: Document Path
@@ -129,6 +132,28 @@ public class AutoCADViewModelExtendedTests
         var sut = CreateSUT();
 
         sut.ClearAllTableIdsCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    #endregion
+
+    #region Dual-Mode
+
+    [Fact]
+    public void IsFileMode_WhenCOM_ReturnsFalse()
+    {
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.COM);
+        var sut = CreateSUT();
+
+        sut.IsFileMode.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsFileMode_WhenFile_ReturnsTrue()
+    {
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.File);
+        var sut = CreateSUT();
+
+        sut.IsFileMode.Should().BeTrue();
     }
 
     #endregion

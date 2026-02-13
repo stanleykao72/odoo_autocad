@@ -1,0 +1,3 @@
+[submodule "csharp/libs/ACadSharp"]
+	path = csharp/libs/ACadSharp
+	url = https://github.com/DomCR/ACadSharp.git

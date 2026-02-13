@@ -37,6 +37,33 @@
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    Margin="0,0,0,4"/>
 
+                        <!-- Mode badge -->
+                        <Border CornerRadius="3" Padding="6,2" Margin="0,0,0,4"
+                                HorizontalAlignment="Left">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="#E3F2FD"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding AutoCADModeText}" Value="File Mode">
+                                            <Setter Property="Background" Value="#FFF3E0"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="{Binding AutoCADModeText}" FontSize="11">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="#1565C0"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding AutoCADModeText}" Value="File Mode">
+                                                <Setter Property="Foreground" Value="#E65100"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Border>
+
                         <!-- Document name (visible when connected) -->
                         <TextBlock Text="{Binding AutoCADDocumentName}"
                                    FontSize="13"

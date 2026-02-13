@@ -18,6 +18,7 @@ public class PurchaseRequisitionViewModelTests
     private readonly Mock<IGUIProxy> _mockGuiProxy;
     private readonly Mock<IAppLogService> _mockLogService;
     private readonly Mock<ISettingsService> _mockSettingsService;
+    private readonly Mock<IDrawingDataService> _mockDrawingDataService;
 
     public PurchaseRequisitionViewModelTests()
     {
@@ -26,6 +27,7 @@ public class PurchaseRequisitionViewModelTests
         _mockGuiProxy = new Mock<IGUIProxy>();
         _mockLogService = new Mock<IAppLogService>();
         _mockSettingsService = new Mock<ISettingsService>();
+        _mockDrawingDataService = new Mock<IDrawingDataService>();
     }
 
     private PurchaseRequisitionViewModel CreateSUT()
@@ -35,7 +37,8 @@ public class PurchaseRequisitionViewModelTests
             _mockOdoo.Object,
             _mockGuiProxy.Object,
             _mockLogService.Object,
-            _mockSettingsService.Object);
+            _mockSettingsService.Object,
+            _mockDrawingDataService.Object);
     }
 
     #region Constructor Tests
@@ -70,7 +73,7 @@ public class PurchaseRequisitionViewModelTests
     [Fact]
     public void CanConvert_WhenAutoCADDisconnected_ReturnsFalse()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(false);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(false);
         _mockOdoo.Setup(s => s.IsConnected).Returns(true);
         var sut = CreateSUT();
 
@@ -80,7 +83,7 @@ public class PurchaseRequisitionViewModelTests
     [Fact]
     public void CanConvert_WhenOdooDisconnected_ReturnsFalse()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
         _mockOdoo.Setup(s => s.IsConnected).Returns(false);
         var sut = CreateSUT();
 
@@ -90,7 +93,7 @@ public class PurchaseRequisitionViewModelTests
     [Fact]
     public void CanConvert_WhenBothConnected_ReturnsTrue()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
         _mockOdoo.Setup(s => s.IsConnected).Returns(true);
         var sut = CreateSUT();
 
@@ -104,11 +107,10 @@ public class PurchaseRequisitionViewModelTests
     [Fact]
     public async Task Convert_NoHeaderIds_SetsErrorStatus()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
         _mockOdoo.Setup(s => s.IsConnected).Returns(true);
-        _mockGuiProxy
-            .Setup(p => p.ExecuteInGuiAsync("autocad_get_header_ids", null, 15000))
-            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", new List<string>()));
+        _mockDrawingDataService.Setup(s => s.GetHeaderIdsAsync())
+            .ReturnsAsync(new List<string>());
 
         var sut = CreateSUT();
         await sut.ConvertBOQToPRCommand.ExecuteAsync(null);
@@ -120,11 +122,10 @@ public class PurchaseRequisitionViewModelTests
     [Fact]
     public async Task Convert_MissingSwaggerConfig_SetsConfigError()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
         _mockOdoo.Setup(s => s.IsConnected).Returns(true);
-        _mockGuiProxy
-            .Setup(p => p.ExecuteInGuiAsync("autocad_get_header_ids", null, 15000))
-            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", new List<string> { "H001" }));
+        _mockDrawingDataService.Setup(s => s.GetHeaderIdsAsync())
+            .ReturnsAsync(new List<string> { "H001" });
         _mockSettingsService
             .Setup(s => s.LoadServerConfigsAsync())
             .ReturnsAsync(new Dictionary<string, string?>());
@@ -141,11 +142,10 @@ public class PurchaseRequisitionViewModelTests
     [Fact]
     public async Task Convert_ApiError_SetsErrorStatus()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
         _mockOdoo.Setup(s => s.IsConnected).Returns(true);
-        _mockGuiProxy
-            .Setup(p => p.ExecuteInGuiAsync("autocad_get_header_ids", null, 15000))
-            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", new List<string> { "H001" }));
+        _mockDrawingDataService.Setup(s => s.GetHeaderIdsAsync())
+            .ReturnsAsync(new List<string> { "H001" });
         _mockSettingsService
             .Setup(s => s.LoadServerConfigsAsync())
             .ReturnsAsync(new Dictionary<string, string?>
@@ -177,11 +177,10 @@ public class PurchaseRequisitionViewModelTests
     [Fact]
     public async Task Convert_Success_PopulatesPRItems()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
         _mockOdoo.Setup(s => s.IsConnected).Returns(true);
-        _mockGuiProxy
-            .Setup(p => p.ExecuteInGuiAsync("autocad_get_header_ids", null, 15000))
-            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", new List<string> { "H001", "H002" }));
+        _mockDrawingDataService.Setup(s => s.GetHeaderIdsAsync())
+            .ReturnsAsync(new List<string> { "H001", "H002" });
         _mockSettingsService
             .Setup(s => s.LoadServerConfigsAsync())
             .ReturnsAsync(new Dictionary<string, string?>
@@ -227,11 +226,10 @@ public class PurchaseRequisitionViewModelTests
     [Fact]
     public async Task Convert_Success_UpdatesSummary()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
         _mockOdoo.Setup(s => s.IsConnected).Returns(true);
-        _mockGuiProxy
-            .Setup(p => p.ExecuteInGuiAsync("autocad_get_header_ids", null, 15000))
-            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", new List<string> { "H001" }));
+        _mockDrawingDataService.Setup(s => s.GetHeaderIdsAsync())
+            .ReturnsAsync(new List<string> { "H001" });
         _mockSettingsService
             .Setup(s => s.LoadServerConfigsAsync())
             .ReturnsAsync(new Dictionary<string, string?>
@@ -519,11 +517,10 @@ public class PurchaseRequisitionViewModelTests
     [Fact]
     public async Task Convert_Success_SetsStatusMessageTypeSuccess()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
         _mockOdoo.Setup(s => s.IsConnected).Returns(true);
-        _mockGuiProxy
-            .Setup(p => p.ExecuteInGuiAsync("autocad_get_header_ids", null, 15000))
-            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", new List<string> { "H001" }));
+        _mockDrawingDataService.Setup(s => s.GetHeaderIdsAsync())
+            .ReturnsAsync(new List<string> { "H001" });
         _mockSettingsService
             .Setup(s => s.LoadServerConfigsAsync())
             .ReturnsAsync(new Dictionary<string, string?>
@@ -557,11 +554,10 @@ public class PurchaseRequisitionViewModelTests
     [Fact]
     public async Task Convert_ApiError_SetsStatusMessageTypeError()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
         _mockOdoo.Setup(s => s.IsConnected).Returns(true);
-        _mockGuiProxy
-            .Setup(p => p.ExecuteInGuiAsync("autocad_get_header_ids", null, 15000))
-            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", new List<string> { "H001" }));
+        _mockDrawingDataService.Setup(s => s.GetHeaderIdsAsync())
+            .ReturnsAsync(new List<string> { "H001" });
         _mockSettingsService
             .Setup(s => s.LoadServerConfigsAsync())
             .ReturnsAsync(new Dictionary<string, string?>
@@ -593,11 +589,10 @@ public class PurchaseRequisitionViewModelTests
     [Fact]
     public async Task Convert_EmptyResult_SetsStatusMessageTypeInfo()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
         _mockOdoo.Setup(s => s.IsConnected).Returns(true);
-        _mockGuiProxy
-            .Setup(p => p.ExecuteInGuiAsync("autocad_get_header_ids", null, 15000))
-            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", new List<string> { "H001" }));
+        _mockDrawingDataService.Setup(s => s.GetHeaderIdsAsync())
+            .ReturnsAsync(new List<string> { "H001" });
         _mockSettingsService
             .Setup(s => s.LoadServerConfigsAsync())
             .ReturnsAsync(new Dictionary<string, string?>
@@ -631,6 +626,66 @@ public class PurchaseRequisitionViewModelTests
         var sut = CreateSUT();
         sut.StatusMessageType.Should().BeEmpty();
         sut.LastConversionTime.Should().BeNull();
+    }
+
+    #endregion
+
+    #region Dual-Mode Tests
+
+    [Fact]
+    public void IsFileMode_WhenCOM_ReturnsFalse()
+    {
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.COM);
+        var sut = CreateSUT();
+
+        sut.IsFileMode.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsFileMode_WhenFile_ReturnsTrue()
+    {
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.File);
+        var sut = CreateSUT();
+
+        sut.IsFileMode.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Convert_InFileMode_UsesDrawingDataService()
+    {
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.File);
+        _mockOdoo.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.GetHeaderIdsAsync())
+            .ReturnsAsync(new List<string> { "FH-001" });
+        _mockSettingsService
+            .Setup(s => s.LoadServerConfigsAsync())
+            .ReturnsAsync(new Dictionary<string, string?>
+            {
+                ["odoo_swagger_url"] = "https://example.com/api/v1/boq_import_api/swagger.json?token=tok123&db=testdb",
+                ["odoo_user_token"] = "tok123"
+            });
+        _mockSettingsService
+            .Setup(s => s.GetAppSettings())
+            .Returns(new AppSettings());
+        _mockOdoo
+            .Setup(s => s.ConvertBOQToPRViaApiAsync(
+                It.IsAny<List<string>>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(new Boq2PrResponse
+            {
+                Success = true,
+                All = new List<Boq2PrResult>
+                {
+                    new() { PrId = 100, Reference = "PR/FILE/001", State = "draft" }
+                }
+            });
+
+        var sut = CreateSUT();
+        await sut.ConvertBOQToPRCommand.ExecuteAsync(null);
+
+        sut.PrItems.Should().HaveCount(1);
+        sut.PrItems[0].Reference.Should().Be("PR/FILE/001");
     }
 
     #endregion

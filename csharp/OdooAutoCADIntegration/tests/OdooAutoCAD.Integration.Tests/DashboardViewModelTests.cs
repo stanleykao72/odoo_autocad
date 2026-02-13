@@ -25,6 +25,7 @@ public class DashboardViewModelTests
     private readonly Mock<ISettingsService> _mockSettings;
     private readonly Mock<IConfiguration> _mockConfiguration;
     private readonly Mock<IAppLogService> _mockLogService;
+    private readonly Mock<IDrawingDataService> _mockDrawingDataService;
 
     public DashboardViewModelTests()
     {
@@ -35,9 +36,11 @@ public class DashboardViewModelTests
         _mockSettings = new Mock<ISettingsService>();
         _mockConfiguration = new Mock<IConfiguration>();
         _mockLogService = new Mock<IAppLogService>();
+        _mockDrawingDataService = new Mock<IDrawingDataService>();
 
         // Default: both disconnected
         _mockAutoCAD.Setup(s => s.IsConnected).Returns(false);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(false);
         _mockOdoo.Setup(s => s.IsConnected).Returns(false);
 
         // Default empty server configs
@@ -62,7 +65,8 @@ public class DashboardViewModelTests
             _mockNav.Object,
             _mockSettings.Object,
             _mockConfiguration.Object,
-            _mockLogService.Object);
+            _mockLogService.Object,
+            _mockDrawingDataService.Object);
     }
 
     [Fact]
@@ -89,9 +93,8 @@ public class DashboardViewModelTests
         _mockAutoCAD.Setup(s => s.ConnectAsync()).ReturnsAsync(true);
 
         var status = new AutoCADStatus(true, "AutoCAD", "2025", "Drawing1.dwg", null, null);
-        _mockGuiProxy
-            .Setup(p => p.ExecuteInGuiAsync("autocad_get_status", null, 5000))
-            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req2", status));
+        _mockDrawingDataService.Setup(s => s.GetStatusAsync())
+            .ReturnsAsync(status);
 
         var sut = CreateSUT();
 
@@ -182,7 +185,7 @@ public class DashboardViewModelTests
     public void CanConnectAutoCAD_WhenAlreadyConnected_ReturnsFalse()
     {
         // Arrange
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
         var sut = CreateSUT();
         // Force the connected state via UpdateStatusFromServices
         sut.UpdateStatusFromServices();
@@ -235,7 +238,7 @@ public class DashboardViewModelTests
         sut.IsAutoCADConnected.Should().BeFalse();
 
         // Act - simulate service becoming connected
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
         _mockOdoo.Setup(s => s.IsConnected).Returns(true);
         sut.UpdateStatusFromServices();
 
@@ -258,4 +261,77 @@ public class DashboardViewModelTests
         // Assert
         _mockNav.Verify(n => n.NavigateTo("AutoCAD"), Times.Once);
     }
+
+    #region Dual-Mode Tests
+
+    [StaFact]
+    public void UpdateStatusFromServices_InFileMode_ReflectsDrawingDataServiceReady()
+    {
+        // Arrange — File mode ready
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
+        _mockAutoCAD.Setup(s => s.IsConnected).Returns(false); // COM not connected
+
+        var sut = CreateSUT();
+        sut.UpdateStatusFromServices();
+
+        // Assert — should show connected because DrawingDataService is ready
+        sut.IsAutoCADConnected.Should().BeTrue();
+        sut.AutoCADStatusText.Should().Be("Connected");
+    }
+
+    [StaFact]
+    public void UpdateStatusFromServices_DrawingDataServiceNotReady_ShowsDisconnected()
+    {
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(false);
+        var sut = CreateSUT();
+        sut.UpdateStatusFromServices();
+
+        sut.IsAutoCADConnected.Should().BeFalse();
+        sut.AutoCADStatusText.Should().Be("Disconnected");
+    }
+
+    [StaFact]
+    public void UpdateStatusFromServices_COMMode_ShowsCOMMode()
+    {
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.COM);
+        var sut = CreateSUT();
+        sut.UpdateStatusFromServices();
+
+        sut.AutoCADModeText.Should().Be("COM Mode");
+    }
+
+    [StaFact]
+    public void UpdateStatusFromServices_FileMode_ShowsFileMode()
+    {
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.File);
+        var sut = CreateSUT();
+        sut.UpdateStatusFromServices();
+
+        sut.AutoCADModeText.Should().Be("File Mode");
+    }
+
+    [StaFact]
+    public void AutoCADModeText_DefaultsToEmpty()
+    {
+        var sut = CreateSUT();
+        // Before UpdateStatusFromServices, mode text should be set from constructor's initial call
+        // Default mock returns COM (0)
+        sut.AutoCADModeText.Should().Be("COM Mode");
+    }
+
+    [StaFact]
+    public void UpdateStatusFromServices_ModeSwitchUpdatesText()
+    {
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.COM);
+        var sut = CreateSUT();
+        sut.UpdateStatusFromServices();
+        sut.AutoCADModeText.Should().Be("COM Mode");
+
+        // Switch to File mode
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.File);
+        sut.UpdateStatusFromServices();
+        sut.AutoCADModeText.Should().Be("File Mode");
+    }
+
+    #endregion
 }

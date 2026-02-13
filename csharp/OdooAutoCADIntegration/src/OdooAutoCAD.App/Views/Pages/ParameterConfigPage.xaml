@@ -13,6 +13,7 @@
     <Page.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
         <converters:StringToVisibilityConverter x:Key="StringToVisibility"/>
+        <converters:InverseBoolConverter x:Key="InverseBoolConverter"/>
         <Style x:Key="FieldLabel" TargetType="TextBlock">
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -92,12 +93,39 @@
             </Grid>
         </Border>
 
-        <!-- Row 1: Layout info + last result -->
+        <!-- Row 1: Layout selection + last result -->
         <StackPanel Grid.Row="1" Margin="0,0,0,4">
-            <Border Padding="10,5" Background="#FFF8E1" CornerRadius="3"
-                    BorderBrush="#FFE082" BorderThickness="1" Margin="0,0,0,4"
-                    Visibility="{Binding LayoutSummary, Converter={StaticResource StringToVisibility}, FallbackValue=Collapsed}">
-                <TextBlock Text="{Binding LayoutSummary}" FontSize="13" Foreground="#F57F17"/>
+            <Border Padding="10,6" Background="#F0F4FF" CornerRadius="3"
+                    BorderBrush="#D0D8E8" BorderThickness="1" Margin="0,0,0,4">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="200"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="Target Layout:" FontSize="13"
+                               FontWeight="SemiBold" VerticalAlignment="Center"
+                               Margin="0,0,8,0"/>
+
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding Layouts}"
+                              SelectedItem="{Binding SelectedLayout, Mode=TwoWay}"
+                              IsEnabled="{Binding ApplyToAllLayouts, Converter={StaticResource InverseBoolConverter}}"
+                              Height="28" FontSize="13" Padding="6,3"
+                              VerticalContentAlignment="Center"/>
+
+                    <CheckBox Grid.Column="2" Content="Apply to all layouts"
+                              IsChecked="{Binding ApplyToAllLayouts, Mode=TwoWay}"
+                              VerticalAlignment="Center" Margin="12,0,0,0"
+                              FontSize="13"/>
+
+                    <TextBlock Grid.Column="3" Text="{Binding LayoutSummary}"
+                               FontSize="12" Foreground="Gray"
+                               VerticalAlignment="Center" HorizontalAlignment="Right"
+                               TextTrimming="CharacterEllipsis"/>
+                </Grid>
             </Border>
             <TextBlock Text="{Binding LastSubmitResult}" FontSize="13"
                        Foreground="#2E7D32" TextWrapping="Wrap"

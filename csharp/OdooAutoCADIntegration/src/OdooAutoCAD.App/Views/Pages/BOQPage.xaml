@@ -39,6 +39,21 @@
             <TextBlock Text="Extract Bill of Quantities from AutoCAD drawings, validate, and push to Odoo"
                        FontSize="14" Margin="0,8,0,0"
                        Foreground="{StaticResource TextSecondaryBrush}"/>
+
+            <!-- File Mode Info Banner (visible only in File mode) -->
+            <Border Margin="0,8,0,0"
+                    CornerRadius="6" Padding="12,8"
+                    Background="#FFF3E0" BorderBrush="#FFB74D" BorderThickness="1"
+                    Visibility="{Binding IsFileMode, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#x26A0;" FontSize="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="檔案模式：ID 將寫入 DWG/DXF 匯出檔案（同時備份至 sidecar JSON）"
+                               FontSize="12" TextWrapping="Wrap"
+                               Foreground="#E65100"
+                               FontFamily="{StaticResource AppFontFamily}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
         </StackPanel>
 
         <!-- Row 1: Action Bar — Extract + Validate + Refresh -->

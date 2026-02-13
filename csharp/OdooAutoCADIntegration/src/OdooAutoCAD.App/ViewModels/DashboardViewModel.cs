@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Win32;
 using OdooAutoCAD.App.Services;
 using OdooAutoCAD.Core.AutoCAD;
 using OdooAutoCAD.Core.Odoo;
@@ -27,6 +28,7 @@ public partial class DashboardViewModel : ObservableObject
     private readonly ISettingsService _settingsService;
     private readonly IConfiguration _configuration;
     private readonly IAppLogService _logService;
+    private readonly IDrawingDataService _drawingDataService;
     private readonly ILogger<DashboardViewModel>? _logger;
     private readonly DispatcherTimer _statusTimer;
 
@@ -42,6 +44,9 @@ public partial class DashboardViewModel : ObservableObject
 
     [ObservableProperty]
     private string _autoCADErrorMessage = string.Empty;
+
+    [ObservableProperty]
+    private string _autoCADModeText = "";
 
     [ObservableProperty]
     private Brush _autoCADStatusColor = Brushes.Gray;
@@ -83,6 +88,7 @@ public partial class DashboardViewModel : ObservableObject
         ISettingsService settingsService,
         IConfiguration configuration,
         IAppLogService logService,
+        IDrawingDataService drawingDataService,
         ILogger<DashboardViewModel>? logger = null)
     {
         _autoCADService = autoCADService;
@@ -92,6 +98,7 @@ public partial class DashboardViewModel : ObservableObject
         _settingsService = settingsService;
         _configuration = configuration;
         _logService = logService;
+        _drawingDataService = drawingDataService;
         _logger = logger;
 
         // Status polling timer (2s interval)
@@ -110,6 +117,28 @@ public partial class DashboardViewModel : ObservableObject
 
         // Initial status check
         UpdateStatusFromServices();
+
+        // Set initial button text based on mode
+        UpdateAutoCADButtonText();
+    }
+
+    /// <summary>
+    /// Updates the AutoCAD connect button text based on current mode and state.
+    /// </summary>
+    private void UpdateAutoCADButtonText()
+    {
+        if (IsAutoCADConnected)
+        {
+            ConnectAutoCADButtonText = "Connected";
+        }
+        else if (_drawingDataService.Mode == AutoCADOperationMode.File)
+        {
+            ConnectAutoCADButtonText = "Open DWG File...";
+        }
+        else
+        {
+            ConnectAutoCADButtonText = "Connect";
+        }
     }
 
     private void OnStatusTimerTick(object? sender, EventArgs e)
@@ -122,14 +151,18 @@ public partial class DashboardViewModel : ObservableObject
     /// </summary>
     internal void UpdateStatusFromServices()
     {
-        // AutoCAD
-        var acConnected = _autoCADService.IsConnected;
+        // AutoCAD — check both COM IsConnected and unified IsReady (file mode)
+        var acConnected = _drawingDataService.IsReady;
         if (acConnected != IsAutoCADConnected)
         {
             IsAutoCADConnected = acConnected;
         }
         AutoCADStatusText = acConnected ? "Connected" : "Disconnected";
         AutoCADStatusColor = acConnected ? Brushes.Green : Brushes.Gray;
+        AutoCADModeText = _drawingDataService.Mode == AutoCADOperationMode.COM
+            ? "COM Mode" : "File Mode";
+
+        UpdateAutoCADButtonText();
 
         // Odoo
         var odooConnected = _odooService.IsConnected;
@@ -145,7 +178,7 @@ public partial class DashboardViewModel : ObservableObject
 
     partial void OnIsAutoCADConnectedChanged(bool value)
     {
-        ConnectAutoCADButtonText = value ? "Connected" : "Connect";
+        UpdateAutoCADButtonText();
         if (!value)
         {
             AutoCADDocumentName = string.Empty;
@@ -183,6 +216,70 @@ public partial class DashboardViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanConnectAutoCAD))]
     private async Task ConnectAutoCADAsync()
     {
+        if (_drawingDataService.Mode == AutoCADOperationMode.File)
+        {
+            await ConnectAutoCADFileAsync();
+        }
+        else
+        {
+            await ConnectAutoCADComAsync();
+        }
+    }
+
+    /// <summary>
+    /// File mode: open a file dialog and load DWG through the unified service.
+    /// </summary>
+    private async Task ConnectAutoCADFileAsync()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Open DWG File",
+            Filter = "AutoCAD Drawing (*.dwg)|*.dwg|All Files (*.*)|*.*",
+            DefaultExt = ".dwg"
+        };
+
+        if (dialog.ShowDialog() != true)
+            return;
+
+        IsConnectingAutoCAD = true;
+        ConnectAutoCADButtonText = "Loading...";
+        AutoCADErrorMessage = string.Empty;
+
+        try
+        {
+            var loaded = await _drawingDataService.ConnectOrLoadAsync(dialog.FileName);
+            if (loaded)
+            {
+                IsAutoCADConnected = true;
+                AutoCADErrorMessage = string.Empty;
+                var status = await _drawingDataService.GetStatusAsync();
+                AutoCADDocumentName = status.CurrentDocument ?? string.Empty;
+                _logService.Log($"DWG file loaded from Dashboard: {AutoCADDocumentName}", "Dashboard");
+            }
+            else
+            {
+                IsAutoCADConnected = false;
+                AutoCADErrorMessage = "Failed to load DWG file.";
+                _logService.Log("DWG file load failed from Dashboard", "Dashboard", AppLogLevel.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            IsAutoCADConnected = false;
+            AutoCADErrorMessage = $"Failed to load file: {ex.Message}";
+            _logger?.LogError(ex, "Dashboard: DWG file load error");
+        }
+        finally
+        {
+            IsConnectingAutoCAD = false;
+        }
+    }
+
+    /// <summary>
+    /// COM mode: connect to running AutoCAD instance.
+    /// </summary>
+    private async Task ConnectAutoCADComAsync()
+    {
         IsConnectingAutoCAD = true;
         ConnectAutoCADButtonText = "Connecting...";
         AutoCADErrorMessage = string.Empty;
@@ -203,8 +300,8 @@ public partial class DashboardViewModel : ObservableObject
                 _logService.Log("AutoCAD connected from Dashboard", "Dashboard");
 
                 // Fetch document name
-                var statusResponse = await _guiProxy.ExecuteInGuiAsync("autocad_get_status", null, timeout: 5000);
-                if (statusResponse.Success && statusResponse.Result is AutoCADStatus status)
+                var status = await _drawingDataService.GetStatusAsync();
+                if (status.IsConnected)
                 {
                     AutoCADDocumentName = status.CurrentDocument ?? string.Empty;
                 }

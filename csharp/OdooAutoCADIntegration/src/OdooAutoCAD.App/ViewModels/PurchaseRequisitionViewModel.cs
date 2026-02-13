@@ -61,6 +61,7 @@ public partial class PurchaseRequisitionViewModel : ObservableObject
     private readonly IGUIProxy _guiProxy;
     private readonly IAppLogService _logService;
     private readonly ISettingsService _settingsService;
+    private readonly IDrawingDataService _drawingDataService;
     private readonly ILogger<PurchaseRequisitionViewModel>? _logger;
 
     public ObservableCollection<PRDisplayItem> PrItems { get; } = new();
@@ -143,6 +144,7 @@ public partial class PurchaseRequisitionViewModel : ObservableObject
         IGUIProxy guiProxy,
         IAppLogService logService,
         ISettingsService settingsService,
+        IDrawingDataService drawingDataService,
         ILogger<PurchaseRequisitionViewModel>? logger = null)
     {
         _autoCADService = autoCADService;
@@ -150,6 +152,7 @@ public partial class PurchaseRequisitionViewModel : ObservableObject
         _guiProxy = guiProxy;
         _logService = logService;
         _settingsService = settingsService;
+        _drawingDataService = drawingDataService;
         _logger = logger;
 
         RefreshConnectionStatus();
@@ -218,19 +221,18 @@ public partial class PurchaseRequisitionViewModel : ObservableObject
 
         try
         {
-            // Step 1: Extract header_ids via GUIProxy
-            _logService.Log("PR: Getting header IDs from AutoCAD tables...", "PR");
-            var headerResponse = await _guiProxy.ExecuteInGuiAsync(
-                "autocad_get_header_ids", null, timeout: 15000);
+            // Step 1: Extract header_ids via IDrawingDataService (COM or File mode)
+            _logService.Log("PR: Getting header IDs from drawing...", "PR");
+            var headerIdResult = await _drawingDataService.GetHeaderIdsAsync();
 
             List<string> headerIds;
-            if (headerResponse.Success && headerResponse.Result is IList<string> ids && ids.Count > 0)
+            if (headerIdResult.Count > 0)
             {
-                headerIds = ids.ToList();
+                headerIds = headerIdResult.ToList();
             }
             else
             {
-                ConvertStatusText = "No header IDs found in AutoCAD tables";
+                ConvertStatusText = "No header IDs found in drawing tables";
                 LastConvertResult = "Failed: No header IDs found. Ensure BOQ has been pushed to Odoo first.";
                 _logService.Log("PR: No header IDs found", "PR", AppLogLevel.Warning);
                 return;
@@ -493,9 +495,11 @@ public partial class PurchaseRequisitionViewModel : ObservableObject
     [RelayCommand]
     private void RefreshConnectionStatus()
     {
-        IsAutoCADConnected = _autoCADService.IsConnected;
+        IsAutoCADConnected = _drawingDataService.IsReady;
         IsOdooConnected = _odooService.IsConnected;
     }
+
+    public bool IsFileMode => _drawingDataService.Mode == AutoCADOperationMode.File;
 
     internal void UpdateSummary()
     {

@@ -176,8 +176,16 @@ public partial class App : Application
         // AutoCAD service (singleton for maintaining connection state)
         services.AddSingleton<IAutoCADService, AutoCADService>();
 
-        // DWG file reader (ACadSharp — no COM, no running AutoCAD needed)
-        services.AddSingleton<IDwgReaderService, DwgReaderService>();
+        // DWG file services (ACadSharp — no COM, no running AutoCAD needed)
+        services.AddSingleton<IDwgReaderService, DwgFileService>();
+        services.AddSingleton<IDwgFileService>(sp => (DwgFileService)sp.GetRequiredService<IDwgReaderService>());
+        services.AddSingleton<SidecarIdStore>();
+
+        // Drawing data service (dual-mode: COM + File)
+        services.AddSingleton<ComDrawingDataService>();
+        services.AddSingleton<FileDrawingDataService>();
+        services.AddSingleton<DrawingDataServiceDispatcher>();
+        services.AddSingleton<IDrawingDataService>(sp => sp.GetRequiredService<DrawingDataServiceDispatcher>());
 
         // Odoo service with configured timeout
         services.AddSingleton<IOdooService>(sp =>
@@ -217,6 +225,7 @@ public partial class App : Application
             sp.GetRequiredService<IOdooService>(),
             sp.GetRequiredService<ISettingsService>(),
             sp.GetRequiredService<IAppLogService>(),
+            sp.GetRequiredService<IDrawingDataService>(),
             sp.GetService<ILogger<AutoCADViewModel>>()));
         services.AddTransient<BOQViewModel>();
         services.AddTransient<SettingsViewModel>();
@@ -255,6 +264,24 @@ public partial class App : Application
     private async Task AutoConnectServicesAsync()
     {
         var logService = Services.GetRequiredService<IAppLogService>();
+
+        // Apply saved AutoCAD mode preference
+        try
+        {
+            var settings = Services.GetRequiredService<ISettingsService>();
+            var savedMode = await settings.GetPreferenceAsync("autocad_mode", "COM");
+            if (savedMode == "File")
+            {
+                var dispatcher = Services.GetRequiredService<DrawingDataServiceDispatcher>();
+                await dispatcher.SwitchModeAsync(AutoCADOperationMode.File);
+                Log.Information("AutoCAD mode set to File (ACadSharp)");
+                logService.Log("AutoCAD mode: File (ACadSharp)", "Startup");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to apply saved AutoCAD mode (defaulting to COM)");
+        }
 
         // Delay to let UI render, DispatcherTimer start polling, and AutoCAD
         // COM server fully initialize. The 2s delay reduces the risk of

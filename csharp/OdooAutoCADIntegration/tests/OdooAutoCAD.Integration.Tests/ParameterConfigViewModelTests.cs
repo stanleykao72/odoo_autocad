@@ -16,6 +16,7 @@ public class ParameterConfigViewModelTests
     private readonly Mock<IGUIProxy> _mockGuiProxy;
     private readonly Mock<ISettingsService> _mockSettingsService;
     private readonly Mock<IAppLogService> _mockLogService;
+    private readonly Mock<IDrawingDataService> _mockDrawingDataService;
 
     public ParameterConfigViewModelTests()
     {
@@ -24,6 +25,7 @@ public class ParameterConfigViewModelTests
         _mockGuiProxy = new Mock<IGUIProxy>();
         _mockSettingsService = new Mock<ISettingsService>();
         _mockLogService = new Mock<IAppLogService>();
+        _mockDrawingDataService = new Mock<IDrawingDataService>();
     }
 
     private ParameterConfigViewModel CreateSUT()
@@ -33,7 +35,8 @@ public class ParameterConfigViewModelTests
             _mockOdoo.Object,
             _mockGuiProxy.Object,
             _mockSettingsService.Object,
-            _mockLogService.Object);
+            _mockLogService.Object,
+            _mockDrawingDataService.Object);
     }
 
     #region Constructor / Default State
@@ -194,7 +197,7 @@ public class ParameterConfigViewModelTests
     [Fact]
     public void CanSubmit_WhenAllFieldsFilledAndAutoCADConnected_ReturnsTrue()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
         var sut = CreateSUT();
         SetAllSelections(sut);
 
@@ -204,7 +207,7 @@ public class ParameterConfigViewModelTests
     [Fact]
     public void CanSubmit_WhenAutoCADDisconnected_ReturnsFalse()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(false);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(false);
         var sut = CreateSUT();
         SetAllSelections(sut);
 
@@ -214,7 +217,7 @@ public class ParameterConfigViewModelTests
     [Fact]
     public void CanSubmit_WhenIsSubmitting_ReturnsFalse()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
         var sut = CreateSUT();
         SetAllSelections(sut);
 
@@ -226,7 +229,7 @@ public class ParameterConfigViewModelTests
     [Fact]
     public void CanSubmit_WhenFieldsMissing_ReturnsFalse()
     {
-        _mockAutoCAD.Setup(s => s.IsConnected).Returns(true);
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
         var sut = CreateSUT();
         // Don't set any selections
 
@@ -296,6 +299,203 @@ public class ParameterConfigViewModelTests
         var b = new OdooColor("Blue", "B001", 1);
 
         a.Should().NotBe(b);
+    }
+
+    #endregion
+
+    #region Dual-Mode Tests
+
+    [Fact]
+    public void IsFileMode_WhenCOM_ReturnsFalse()
+    {
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.COM);
+        var sut = CreateSUT();
+
+        sut.IsFileMode.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsFileMode_WhenFile_ReturnsTrue()
+    {
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.File);
+        var sut = CreateSUT();
+
+        sut.IsFileMode.Should().BeTrue();
+    }
+
+    [Fact]
+    public void CanSubmit_InFileMode_WhenReady_ReturnsTrue()
+    {
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.File);
+        var sut = CreateSUT();
+        SetAllSelections(sut);
+
+        sut.CanSubmit.Should().BeTrue();
+    }
+
+    #endregion
+
+    #region Layout Picker
+
+    [Fact]
+    public void Layouts_DefaultsToEmpty()
+    {
+        var sut = CreateSUT();
+        sut.Layouts.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SelectedLayout_DefaultsToNull()
+    {
+        var sut = CreateSUT();
+        sut.SelectedLayout.Should().BeNull();
+    }
+
+    [Fact]
+    public void ApplyToAllLayouts_DefaultsToFalse()
+    {
+        var sut = CreateSUT();
+        sut.ApplyToAllLayouts.Should().BeFalse();
+    }
+
+    [Fact]
+    public void SelectedLayout_UpdatesLayoutSummary()
+    {
+        var sut = CreateSUT();
+
+        sut.SelectedLayout = "S405-201";
+
+        sut.LayoutSummary.Should().Be("Will update: S405-201");
+    }
+
+    [Fact]
+    public void ApplyToAllLayouts_True_UpdatesLayoutSummary()
+    {
+        var sut = CreateSUT();
+
+        sut.ApplyToAllLayouts = true;
+
+        sut.LayoutSummary.Should().Be("Will update: All layouts");
+    }
+
+    [Fact]
+    public void ApplyToAllLayouts_False_WithSelection_UpdatesLayoutSummary()
+    {
+        var sut = CreateSUT();
+        sut.SelectedLayout = "Layout1";
+
+        sut.ApplyToAllLayouts = true;
+        sut.ApplyToAllLayouts = false;
+
+        sut.LayoutSummary.Should().Be("Will update: Layout1");
+    }
+
+    [Fact]
+    public void Cancel_ResetsApplyToAllLayouts_ForCOMMode()
+    {
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.COM);
+        var sut = CreateSUT();
+        sut.ApplyToAllLayouts = true;
+
+        sut.CancelCommand.Execute(null);
+
+        sut.ApplyToAllLayouts.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Cancel_ResetsApplyToAllLayouts_ForFileMode()
+    {
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.File);
+        var sut = CreateSUT();
+        sut.ApplyToAllLayouts = false;
+
+        sut.CancelCommand.Execute(null);
+
+        sut.ApplyToAllLayouts.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Cancel_ResetsSelectedLayout_ToFirst()
+    {
+        var sut = CreateSUT();
+        sut.Layouts.Add("Layout1");
+        sut.Layouts.Add("Layout2");
+        sut.SelectedLayout = "Layout2";
+
+        sut.CancelCommand.Execute(null);
+
+        sut.SelectedLayout.Should().Be("Layout1");
+    }
+
+    [Fact]
+    public async Task SubmitAsync_ApplyToAll_PassesNullLayout()
+    {
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
+        _mockDrawingDataService.Setup(s => s.SetAttributeValuesAsync(
+                It.IsAny<Dictionary<string, string>>(), null))
+            .ReturnsAsync(new List<string> { "product_name" });
+        var sut = CreateSUT();
+        SetAllSelections(sut);
+        sut.ApplyToAllLayouts = true;
+
+        await sut.SubmitCommand.ExecuteAsync(null);
+
+        _mockDrawingDataService.Verify(s => s.SetAttributeValuesAsync(
+            It.IsAny<Dictionary<string, string>>(), null), Times.Once);
+        sut.LastSubmitResult.Should().Contain("All layouts");
+    }
+
+    [Fact]
+    public async Task SubmitAsync_SingleLayout_PassesSelectedLayout()
+    {
+        _mockDrawingDataService.Setup(s => s.IsReady).Returns(true);
+        _mockDrawingDataService.Setup(s => s.SetAttributeValuesAsync(
+                It.IsAny<Dictionary<string, string>>(), "S405-201"))
+            .ReturnsAsync(new List<string> { "product_name" });
+        var sut = CreateSUT();
+        SetAllSelections(sut);
+        sut.ApplyToAllLayouts = false;
+        sut.SelectedLayout = "S405-201";
+
+        await sut.SubmitCommand.ExecuteAsync(null);
+
+        _mockDrawingDataService.Verify(s => s.SetAttributeValuesAsync(
+            It.IsAny<Dictionary<string, string>>(), "S405-201"), Times.Once);
+        sut.LastSubmitResult.Should().Contain("S405-201");
+    }
+
+    [Fact]
+    public async Task LoadOptionsAsync_PopulatesLayouts()
+    {
+        // Arrange
+        _mockDrawingDataService.Setup(s => s.GetLayoutsAsync())
+            .ReturnsAsync(new List<LayoutInfo>
+            {
+                new("Layout1", 1, false, ""),
+                new("Layout2", 2, false, "")
+            });
+        _mockDrawingDataService.Setup(s => s.Mode).Returns(AutoCADOperationMode.File);
+        _mockDrawingDataService.Setup(s => s.GetPRNumberAsync())
+            .ReturnsAsync(string.Empty);
+        _mockSettingsService.Setup(s => s.LoadServerConfigsAsync())
+            .ReturnsAsync(new Dictionary<string, string?>
+            {
+                ["odoo_swagger_url"] = "https://odoo.test/api/v1/boq_import_api/swagger.json?token=abc&db=testdb",
+                ["odoo_user_token"] = "test"
+            });
+
+        var sut = CreateSUT();
+
+        // Act
+        await sut.LoadOptionsCommand.ExecuteAsync(null);
+
+        // Assert
+        sut.Layouts.Should().HaveCount(2);
+        sut.Layouts.Should().Contain("Layout1");
+        sut.Layouts.Should().Contain("Layout2");
+        sut.SelectedLayout.Should().Be("Layout1");
+        sut.ApplyToAllLayouts.Should().BeTrue(); // File mode defaults to all
     }
 
     #endregion
