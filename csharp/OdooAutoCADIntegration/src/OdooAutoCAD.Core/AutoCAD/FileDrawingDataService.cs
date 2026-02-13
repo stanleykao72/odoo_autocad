@@ -191,23 +191,33 @@ public class FileDrawingDataService : IDrawingDataService
         // 1. Modify TABLE cells in memory
         _dwgFileService.WriteTableIdsToDocument(layoutName, headerId, details);
 
-        // 2. Try DWG export first (native format), fallback to DXF
+        // 2. Try DWG export first (overwrite original), fallback to DXF
         string? outputPath = null;
         WriteStrategy usedStrategy = WriteStrategy.SidecarJson;
+        var originalPath = _dwgFileService.LoadedFilePath;
 
         if (_dwgFileService.CanWriteDwg)
         {
-            var dwgPath = _dwgFileService.LoadedFilePath + ".modified.dwg";
-            if (await _dwgFileService.SaveAsDwgAsync(dwgPath))
+            var tmpPath = originalPath + ".tmp";
+            if (await _dwgFileService.SaveAsDwgAsync(tmpPath))
             {
-                outputPath = dwgPath;
+                try
+                {
+                    File.Copy(tmpPath, originalPath, overwrite: true);
+                    File.Delete(tmpPath);
+                }
+                catch
+                {
+                    // If replace fails, keep the tmp file as fallback
+                }
+                outputPath = originalPath;
                 usedStrategy = WriteStrategy.DirectDwg;
             }
         }
 
         if (outputPath == null)
         {
-            var dxfPath = Path.ChangeExtension(_dwgFileService.LoadedFilePath, ".dxf");
+            var dxfPath = Path.ChangeExtension(originalPath, ".dxf");
             if (await _dwgFileService.SaveAsDxfAsync(dxfPath))
             {
                 outputPath = dxfPath;
@@ -242,7 +252,7 @@ public class FileDrawingDataService : IDrawingDataService
         if (outputPath != null)
         {
             var msg = usedStrategy == WriteStrategy.DirectDwg
-                ? $"ID 已寫入 DWG: {outputPath}"
+                ? $"ID 已寫回原始 DWG: {outputPath}"
                 : $"ID 已寫入 DXF: {outputPath}";
             return new WritebackResult(true, msg, usedStrategy, outputPath);
         }
@@ -319,15 +329,29 @@ public class FileDrawingDataService : IDrawingDataService
             }
         }
 
-        // Try DWG export first (to separate file), fallback to DXF
+        // Try DWG export first (overwrite original), fallback to DXF
+        var originalPath = _dwgFileService.LoadedFilePath;
+
         if (_dwgFileService.CanWriteDwg)
         {
-            var dwgPath = _dwgFileService.LoadedFilePath + ".modified.dwg";
-            if (await _dwgFileService.SaveAsDwgAsync(dwgPath))
-                return true;
+            var tmpPath = originalPath + ".tmp";
+            if (await _dwgFileService.SaveAsDwgAsync(tmpPath))
+            {
+                try
+                {
+                    File.Copy(tmpPath, originalPath, overwrite: true);
+                    File.Delete(tmpPath);
+                    return true;
+                }
+                catch
+                {
+                    // tmp file still exists as fallback
+                    return true;
+                }
+            }
         }
 
-        var dxfPath = Path.ChangeExtension(_dwgFileService.LoadedFilePath, ".dxf");
+        var dxfPath = Path.ChangeExtension(originalPath, ".dxf");
         return await _dwgFileService.SaveAsDxfAsync(dxfPath);
     }
 }

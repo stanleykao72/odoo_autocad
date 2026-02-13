@@ -409,11 +409,11 @@ public class FileDrawingDataServiceWriteTableIdsTests : IDisposable
 
         Assert.True(result.Success);
         Assert.Equal(WriteStrategy.DirectDwg, result.StrategyUsed);
-        Assert.Contains(".modified.dwg", result.OutputPath);
+        Assert.Equal(_tempDwgPath, result.OutputPath); // Writes back to original file
 
-        // DWG was attempted — DXF should NOT be called
+        // DWG was written to temp file — DXF should NOT be called
         _mockDwgFile.Verify(d => d.SaveAsDwgAsync(
-            It.Is<string>(p => p.Contains(".modified.dwg"))), Times.Once);
+            It.Is<string>(p => p.EndsWith(".tmp"))), Times.Once);
         _mockDwgFile.Verify(d => d.SaveAsDxfAsync(It.IsAny<string>()), Times.Never);
     }
 
@@ -489,7 +489,7 @@ public class FileDrawingDataServiceWriteTableIdsTests : IDisposable
 
         Assert.True(result);
         _mockDwgFile.Verify(d => d.SaveAsDwgAsync(
-            It.Is<string>(p => p.Contains(".modified.dwg"))), Times.Once);
+            It.Is<string>(p => p.EndsWith(".tmp"))), Times.Once);
         _mockDwgFile.Verify(d => d.SaveAsDxfAsync(It.IsAny<string>()), Times.Never);
     }
 
