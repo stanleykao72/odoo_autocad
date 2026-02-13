@@ -113,6 +113,7 @@ public partial class MainViewModel : ObservableObject
             "Odoo" => "Odoo Connection",
             "BOQ" => "BOQ Manager",
             "PR" => "Purchase Requisition",
+            "ParameterConfig" => "Parameter Configuration",
             "MCP" => "AI Assistant (MCP)",
             "Settings" => "Settings",
             _ => pageName

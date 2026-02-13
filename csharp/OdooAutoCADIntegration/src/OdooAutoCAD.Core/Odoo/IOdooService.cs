@@ -62,6 +62,16 @@ public record OdooProduct(
     string? Category);
 
 /// <summary>
+/// Odoo setup value from get_setup_v2 API (spec, product_catelog, operation_flow, surface_treatment).
+/// </summary>
+public record OdooSetupValue(string Value, string SetupName);
+
+/// <summary>
+/// Odoo color from get_color_v2 API.
+/// </summary>
+public record OdooColor(string Name, string ColorNo, int ProjectId);
+
+/// <summary>
 /// BOQ (Bill of Quantities) entry.
 /// </summary>
 public class BOQEntry
@@ -252,6 +262,20 @@ public interface IOdooService
     /// Gets all product categories.
     /// </summary>
     Task<IReadOnlyList<OdooProductCategory>> GetCategoriesAsync();
+
+    /// <summary>
+    /// Gets setup values via Swagger/BasicAuth get_setup_v2 API.
+    /// Used for spec, product_catelog, operation_flow, surface_treatment dropdowns.
+    /// </summary>
+    Task<IReadOnlyList<OdooSetupValue>> GetSetupViaApiAsync(
+        string setupName, string baseUrl, string endpointPath, string database, string userToken);
+
+    /// <summary>
+    /// Gets color values via Swagger/BasicAuth get_color_v2 API.
+    /// Returns colors filtered by project ID.
+    /// </summary>
+    Task<IReadOnlyList<OdooColor>> GetColorsViaApiAsync(
+        int projectId, string baseUrl, string endpointPath, string database, string userToken);
 
     #endregion
 

@@ -99,6 +99,8 @@
                             Style="{StaticResource NavButton}" Click="NavButton_Click"/>
                     <Button x:Name="BtnPR" Tag="BtnPR" Content="🛒 Purchase Requisition"
                             Style="{StaticResource NavButton}" Click="NavButton_Click"/>
+                    <Button x:Name="BtnParameterConfig" Tag="BtnParameterConfig" Content="🔧 Parameter Config"
+                            Style="{StaticResource NavButton}" Click="NavButton_Click"/>
                     <Button x:Name="BtnMCP" Tag="BtnMCP" Content="🤖 AI Assistant"
                             Style="{StaticResource NavButton}" Click="NavButton_Click"/>
                     <Button x:Name="BtnLogs" Tag="BtnLogs" Content="📝 Logs"

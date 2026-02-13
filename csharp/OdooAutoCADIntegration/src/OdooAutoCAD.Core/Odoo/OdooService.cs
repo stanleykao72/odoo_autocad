@@ -414,13 +414,18 @@ public class OdooService : IOdooService, IDisposable
             var credentials = Convert.ToBase64String(
                 Encoding.UTF8.GetBytes($"{database}:{userToken}"));
 
-            var resolvedPath = endpointPath.Replace("{method_name}", "get_product_list");
+            var resolvedPath = endpointPath.Replace("{method_name}", "get_product_v2");
             var apiEndpoint = $"{baseUrl.TrimEnd('/')}{resolvedPath}";
 
             var request = new HttpRequestMessage(HttpMethod.Patch, apiEndpoint);
             request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
             request.Content = new StringContent(
-                JsonSerializer.Serialize(new { kwargs = new { user_token = userToken }, context = new { } }),
+                JsonSerializer.Serialize(new
+                {
+                    kwargs = new { user_token = userToken },
+                    args = new object[] { new object[] { new object[] { "categ_id", "child_of", 27 }, new object[] { "active", "=", true } } },
+                    context = new { }
+                }),
                 Encoding.UTF8,
                 "application/json");
 
@@ -432,21 +437,50 @@ public class OdooService : IOdooService, IDisposable
 
             var products = new List<OdooProduct>();
 
-            // Parse response — expect array of product objects
-            if (jsonDoc.ValueKind == JsonValueKind.Array)
+            _logger?.LogDebug("get_product_v2 raw response: {Response}",
+                responseJson.Length > 500 ? responseJson[..500] + "..." : responseJson);
+
+            // Check for API error response
+            if (jsonDoc.TryGetProperty("error_code", out _))
             {
-                foreach (var item in jsonDoc.EnumerateArray())
+                var errMsg = jsonDoc.TryGetProperty("error_message", out var em) ? em.GetString() : "Unknown error";
+                _logger?.LogWarning("get_product_v2 returned error: {Error}", errMsg);
+                return products;
+            }
+
+            // Parse response — try multiple formats:
+            // 1. Direct: { product: [{id, name, ...}] }
+            // 2. Wrapped: { result: { product: [...] } }
+            // 3. Direct array: [...]
+            // 4. Flat result: { result: [...] }
+            JsonElement productArray = default;
+            if (jsonDoc.TryGetProperty("product", out var pa) && pa.ValueKind == JsonValueKind.Array)
+            {
+                productArray = pa;
+            }
+            else if (jsonDoc.TryGetProperty("result", out var result))
+            {
+                if (result.TryGetProperty("product", out var rpa) && rpa.ValueKind == JsonValueKind.Array)
+                    productArray = rpa;
+                else if (result.ValueKind == JsonValueKind.Array)
+                    productArray = result;
+            }
+            else if (jsonDoc.ValueKind == JsonValueKind.Array)
+            {
+                productArray = jsonDoc;
+            }
+
+            if (productArray.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in productArray.EnumerateArray())
                 {
                     products.Add(ParseApiProduct(item));
                 }
             }
-            else if (jsonDoc.TryGetProperty("result", out var resultArray) &&
-                     resultArray.ValueKind == JsonValueKind.Array)
+            else
             {
-                foreach (var item in resultArray.EnumerateArray())
-                {
-                    products.Add(ParseApiProduct(item));
-                }
+                _logger?.LogWarning("get_product_v2: could not find 'product' array in response. Keys: {Keys}",
+                    string.Join(", ", jsonDoc.EnumerateObject().Select(p => p.Name)));
             }
 
             _logger?.LogInformation("Fetched {Count} products via API", products.Count);
@@ -471,14 +505,199 @@ public class OdooService : IOdooService, IDisposable
                 ? desc.GetString() : null,
             ListPrice: item.TryGetProperty("list_price", out var price) && price.ValueKind == JsonValueKind.Number
                 ? price.GetDecimal() : null,
-            UnitOfMeasure: item.TryGetProperty("uom_id", out var uom)
-                ? (uom.ValueKind == JsonValueKind.Array ? uom[1].GetString()
-                    : uom.ValueKind == JsonValueKind.String ? uom.GetString() : null)
-                : null,
+            UnitOfMeasure: item.TryGetProperty("uom", out var uom)
+                ? (uom.ValueKind == JsonValueKind.String ? uom.GetString()
+                    : uom.ValueKind == JsonValueKind.Array ? uom[1].GetString() : null)
+                : (item.TryGetProperty("uom_id", out var uomId)
+                    ? (uomId.ValueKind == JsonValueKind.Array ? uomId[1].GetString()
+                        : uomId.ValueKind == JsonValueKind.String ? uomId.GetString() : null)
+                    : null),
             Category: item.TryGetProperty("categ_id", out var cat)
                 ? (cat.ValueKind == JsonValueKind.Array ? cat[1].GetString()
                     : cat.ValueKind == JsonValueKind.String ? cat.GetString() : null)
                 : null);
+    }
+
+    public async Task<IReadOnlyList<OdooSetupValue>> GetSetupViaApiAsync(
+        string setupName, string baseUrl, string endpointPath, string database, string userToken)
+    {
+        try
+        {
+            var credentials = Convert.ToBase64String(
+                Encoding.UTF8.GetBytes($"{database}:{userToken}"));
+
+            var resolvedPath = endpointPath.Replace("{method_name}", "get_setup_v2");
+            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{resolvedPath}";
+
+            var request = new HttpRequestMessage(HttpMethod.Patch, apiEndpoint);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+            request.Content = new StringContent(
+                JsonSerializer.Serialize(new
+                {
+                    kwargs = new { user_token = userToken },
+                    args = new object[] { new object[] { new object[] { "setup_name", "=", setupName } } },
+                    context = new { }
+                }),
+                Encoding.UTF8,
+                "application/json");
+
+            var response = await _httpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            var jsonDoc = JsonSerializer.Deserialize<JsonElement>(responseJson);
+
+            var values = new List<OdooSetupValue>();
+
+            _logger?.LogDebug("get_setup_v2 raw response for '{SetupName}': {Response}",
+                setupName, responseJson.Length > 500 ? responseJson[..500] + "..." : responseJson);
+
+            // Check for API error response
+            if (jsonDoc.TryGetProperty("error_code", out _))
+            {
+                var errMsg = jsonDoc.TryGetProperty("error_message", out var em) ? em.GetString() : "Unknown error";
+                _logger?.LogWarning("get_setup_v2 returned error for '{SetupName}': {Error}", setupName, errMsg);
+                return values;
+            }
+
+            // Parse response — try multiple formats:
+            // 1. Direct: { setup: [{value: "..."}] }
+            // 2. Wrapped: { result: { setup: [...] } }
+            // 3. JSON-RPC: { jsonrpc: "2.0", result: { setup: [...] } }
+            JsonElement setupArray = default;
+            if (jsonDoc.TryGetProperty("setup", out var sa) && sa.ValueKind == JsonValueKind.Array)
+            {
+                setupArray = sa;
+            }
+            else if (jsonDoc.TryGetProperty("result", out var result))
+            {
+                if (result.TryGetProperty("setup", out var rsa) && rsa.ValueKind == JsonValueKind.Array)
+                    setupArray = rsa;
+                else if (result.ValueKind == JsonValueKind.Array)
+                    setupArray = result; // Flat array under "result"
+            }
+
+            if (setupArray.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in setupArray.EnumerateArray())
+                {
+                    // Support both { value: "..." } objects and plain strings
+                    string value;
+                    if (item.ValueKind == JsonValueKind.String)
+                    {
+                        value = item.GetString() ?? "";
+                    }
+                    else
+                    {
+                        value = item.TryGetProperty("value", out var v) ? v.GetString() ?? "" : "";
+                    }
+                    if (!string.IsNullOrEmpty(value))
+                    {
+                        values.Add(new OdooSetupValue(value, setupName));
+                    }
+                }
+            }
+            else
+            {
+                _logger?.LogWarning("get_setup_v2: could not find 'setup' array in response for '{SetupName}'. Keys: {Keys}",
+                    setupName, string.Join(", ", jsonDoc.EnumerateObject().Select(p => p.Name)));
+            }
+
+            _logger?.LogInformation("Fetched {Count} setup values for '{SetupName}' via API", values.Count, setupName);
+            return values;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to fetch setup values for '{SetupName}' via API", setupName);
+            throw;
+        }
+    }
+
+    public async Task<IReadOnlyList<OdooColor>> GetColorsViaApiAsync(
+        int projectId, string baseUrl, string endpointPath, string database, string userToken)
+    {
+        try
+        {
+            var credentials = Convert.ToBase64String(
+                Encoding.UTF8.GetBytes($"{database}:{userToken}"));
+
+            var resolvedPath = endpointPath.Replace("{method_name}", "get_color_v2");
+            var apiEndpoint = $"{baseUrl.TrimEnd('/')}{resolvedPath}";
+
+            var request = new HttpRequestMessage(HttpMethod.Patch, apiEndpoint);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+            request.Content = new StringContent(
+                JsonSerializer.Serialize(new
+                {
+                    kwargs = new { user_token = userToken },
+                    args = new object[] { new object[] { new object[] { "job_project_id", "=", projectId } } },
+                    context = new { }
+                }),
+                Encoding.UTF8,
+                "application/json");
+
+            var response = await _httpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            var jsonDoc = JsonSerializer.Deserialize<JsonElement>(responseJson);
+
+            var colors = new List<OdooColor>();
+
+            _logger?.LogDebug("get_color_v2 raw response for project {ProjectId}: {Response}",
+                projectId, responseJson.Length > 500 ? responseJson[..500] + "..." : responseJson);
+
+            // Check for API error response
+            if (jsonDoc.TryGetProperty("error_code", out _))
+            {
+                var errMsg = jsonDoc.TryGetProperty("error_message", out var em) ? em.GetString() : "Unknown error";
+                _logger?.LogWarning("get_color_v2 returned error for project {ProjectId}: {Error}", projectId, errMsg);
+                return colors;
+            }
+
+            // Parse response — try multiple formats:
+            // 1. Direct: { color: [{name, color_no}] }
+            // 2. Wrapped: { result: { color: [...] } }
+            // 3. JSON-RPC: { jsonrpc: "2.0", result: { color: [...] } }
+            JsonElement colorArray = default;
+            if (jsonDoc.TryGetProperty("color", out var ca) && ca.ValueKind == JsonValueKind.Array)
+            {
+                colorArray = ca;
+            }
+            else if (jsonDoc.TryGetProperty("result", out var result))
+            {
+                if (result.TryGetProperty("color", out var rca) && rca.ValueKind == JsonValueKind.Array)
+                    colorArray = rca;
+                else if (result.ValueKind == JsonValueKind.Array)
+                    colorArray = result;
+            }
+
+            if (colorArray.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in colorArray.EnumerateArray())
+                {
+                    var name = item.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
+                    var colorNo = item.TryGetProperty("color_no", out var c) ? c.GetString() ?? "" : "";
+                    if (!string.IsNullOrEmpty(name))
+                    {
+                        colors.Add(new OdooColor(name, colorNo, projectId));
+                    }
+                }
+            }
+            else
+            {
+                _logger?.LogWarning("get_color_v2: could not find 'color' array in response for project {ProjectId}. Keys: {Keys}",
+                    projectId, string.Join(", ", jsonDoc.EnumerateObject().Select(p => p.Name)));
+            }
+
+            _logger?.LogInformation("Fetched {Count} colors for project {ProjectId} via API", colors.Count, projectId);
+            return colors;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to fetch colors for project {ProjectId} via API", projectId);
+            throw;
+        }
     }
 
     #endregion
