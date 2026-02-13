@@ -191,9 +191,12 @@ public partial class DashboardViewModel : ObservableObject
         {
             _logger?.LogInformation("Dashboard: connecting to AutoCAD");
 
-            var response = await _guiProxy.ExecuteInGuiAsync("autocad_connect", null, timeout: 15000);
+            // Call ConnectAsync directly (bypasses GUIProxy/DispatcherTimer).
+            // AutoCAD 2014's COM server crashes with Access Violation when the
+            // initial connection goes through GUIProxy's DispatcherTimer.Tick context.
+            var connected = await _autoCADService.ConnectAsync();
 
-            if (response.Success && response.Result is bool connected && connected)
+            if (connected)
             {
                 IsAutoCADConnected = true;
                 AutoCADErrorMessage = string.Empty;

@@ -57,14 +57,13 @@ public class AutoCADService : IAutoCADService, IDisposable
     /// Gets an active COM object by ProgID (replacement for Marshal.GetActiveObject in .NET Core).
     /// Uses CLSIDFromProgIDEx with fallback to CLSIDFromProgID for broader compatibility.
     ///
-    /// Critically, performs an explicit QueryInterface for IDispatch immediately after
-    /// obtaining the IUnknown pointer — matching pywin32's GetActiveObject behavior:
-    ///   dispatch = pythoncom.GetActiveObject(clsid)
-    ///   dispatch = dispatch.QueryInterface(pythoncom.IID_IDispatch)
-    ///
-    /// Without this explicit QI, .NET's dynamic/DLR defers the IDispatch QI until the
-    /// first property access. This deferred QI inside a DispatcherTimer callback can
-    /// crash AutoCAD 2014 with "Unhandled Access Violation Reading 0x003f".
+    /// IMPORTANT: Does NOT perform an explicit IDispatch QueryInterface here.
+    /// Earlier versions forced a QI warmup immediately after GetActiveObject, but this
+    /// triggered "Access Violation Reading 0x003f/0x0050" inside AutoCAD 2014's COM
+    /// proxy DLL (53ac1e63h) — the proxy's vtable isn't ready for cross-apartment QI
+    /// immediately after ROT lookup. Instead, ConnectInternalAsync uses stabilization
+    /// delays before the first dynamic property access, letting .NET's DLR handle
+    /// the IDispatch QI naturally when the proxy is ready.
     /// </summary>
     private static object GetActiveObject(string progId)
     {
@@ -81,12 +80,6 @@ public class AutoCADService : IAutoCADService, IDisposable
         }
 
         GetActiveObject(ref clsid, IntPtr.Zero, out object obj);
-
-        // Explicit QI for IDispatch — matches pywin32's immediate QueryInterface.
-        // This "warms up" the COM proxy so that subsequent dynamic property access
-        // doesn't trigger a deferred cross-process QI inside a DispatcherTimer callback.
-        IntPtr pDispatch = Marshal.GetIDispatchForObject(obj);
-        Marshal.Release(pDispatch);
 
         return obj;
     }
@@ -566,6 +559,185 @@ public class AutoCADService : IAutoCADService, IDisposable
             return Task.FromResult<object?>(totalCleared);
         });
 
+        // Handler: Read current attribute values from the parameter block in a layout
+        _guiProxy.RegisterHandler("autocad_get_attribute_block", (parameters) =>
+        {
+            if (_acadDoc == null)
+                return Task.FromResult<object?>(new Dictionary<string, string>());
+
+            var attrs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                // Optional layout filter; if omitted, search all non-Model layouts
+                parameters.TryGetValue("layoutName", out var lnVal);
+                var targetLayout = lnVal as string;
+
+                foreach (dynamic layout in _acadDoc.Layouts)
+                {
+                    string layoutName = layout.Name;
+                    if (layoutName == "Model") continue;
+                    if (targetLayout != null && !string.Equals(layoutName, targetLayout, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    try
+                    {
+                        dynamic space = layout.Block;
+                        foreach (dynamic entity in space)
+                        {
+                            try
+                            {
+                                string entityType = entity.EntityName;
+                                if (entityType != "AcDbBlockReference") continue;
+                                if (!(bool)entity.HasAttributes) continue;
+
+                                // Check if this block has project_name or job_working_plan_name attribute
+                                bool isParamBlock = false;
+                                foreach (dynamic attr in entity.GetAttributes())
+                                {
+                                    string tag = (attr.TagString ?? "").Trim();
+                                    if (string.Equals(tag, "project_name", StringComparison.OrdinalIgnoreCase) ||
+                                        string.Equals(tag, "job_working_plan_name", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        isParamBlock = true;
+                                        break;
+                                    }
+                                }
+
+                                if (!isParamBlock) continue;
+
+                                // Read all attributes from this block
+                                foreach (dynamic attr in entity.GetAttributes())
+                                {
+                                    string tag = (attr.TagString ?? "").Trim();
+                                    string value = LM_UnFormat(attr.TextString ?? "");
+                                    if (!string.IsNullOrEmpty(tag))
+                                    {
+                                        attrs[tag] = value;
+                                    }
+                                }
+
+                                _logger?.LogInformation("Read {Count} attributes from block in layout {Layout}",
+                                    attrs.Count, layoutName);
+                                return Task.FromResult<object?>(attrs);
+                            }
+                            catch { /* skip unreadable entities */ }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Error reading layout {Layout} for attribute block", layoutName);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to get attribute block");
+            }
+
+            return Task.FromResult<object?>(attrs);
+        });
+
+        // Handler: Write attribute values to parameter block in a specific layout (or all non-Model layouts)
+        _guiProxy.RegisterHandler("autocad_set_attribute_values", (parameters) =>
+        {
+            if (_acadDoc == null)
+                return Task.FromResult<object?>(new List<string> { "Error: No document open" });
+
+            var results = new List<string>();
+
+            try
+            {
+                parameters.TryGetValue("attributes", out var attrsVal);
+                var newValues = attrsVal as Dictionary<string, string>;
+                if (newValues == null || newValues.Count == 0)
+                    return Task.FromResult<object?>(new List<string> { "Error: No attributes provided" });
+
+                // If layout_name is specified, only update that layout; otherwise update all
+                parameters.TryGetValue("layout_name", out var layoutNameVal);
+                var targetLayout = layoutNameVal as string;
+
+                foreach (dynamic layout in _acadDoc.Layouts)
+                {
+                    string layoutName = layout.Name;
+                    if (layoutName == "Model") continue;
+                    if (!string.IsNullOrEmpty(targetLayout) &&
+                        !string.Equals(layoutName, targetLayout, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    try
+                    {
+                        dynamic space = layout.Block;
+                        foreach (dynamic entity in space)
+                        {
+                            try
+                            {
+                                string entityType = entity.EntityName;
+                                if (entityType != "AcDbBlockReference") continue;
+                                if (!(bool)entity.HasAttributes) continue;
+
+                                // Check if this is the parameter block
+                                bool isParamBlock = false;
+                                foreach (dynamic attr in entity.GetAttributes())
+                                {
+                                    string tag = (attr.TagString ?? "").Trim();
+                                    if (string.Equals(tag, "project_name", StringComparison.OrdinalIgnoreCase) ||
+                                        string.Equals(tag, "job_working_plan_name", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        isParamBlock = true;
+                                        break;
+                                    }
+                                }
+
+                                if (!isParamBlock) continue;
+
+                                // Write matching attributes
+                                int written = 0;
+                                foreach (dynamic attr in entity.GetAttributes())
+                                {
+                                    string tag = (attr.TagString ?? "").Trim();
+                                    foreach (var kv in newValues)
+                                    {
+                                        if (string.Equals(tag, kv.Key, StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            try
+                                            {
+                                                attr.TextString = kv.Value;
+                                                written++;
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                results.Add($"[{layoutName}] Failed to write '{kv.Key}': {ex.Message}");
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                results.Add($"[{layoutName}] Wrote {written}/{newValues.Count} attributes");
+                                break; // first param block per layout
+                            }
+                            catch { /* skip unreadable entities */ }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        results.Add($"[{layoutName}] Error: {ex.Message}");
+                        _logger?.LogWarning(ex, "Error writing attributes in layout {Layout}", layoutName);
+                    }
+                }
+
+                _logger?.LogInformation("Set attribute values across layouts: {Results}", string.Join("; ", results));
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to set attribute values");
+                results.Add($"Error: {ex.Message}");
+            }
+
+            return Task.FromResult<object?>(results);
+        });
+
         _logger?.LogDebug("AutoCAD GUI proxy handlers registered");
     }
 
@@ -577,8 +749,14 @@ public class AutoCADService : IAutoCADService, IDisposable
 
     public async Task<bool> ConnectAsync()
     {
-        var response = await _guiProxy.ExecuteInGuiAsync("autocad_connect", null, timeout: 15000);
-        return response.Success && response.Result is bool connected && connected;
+        // IMPORTANT: Connects directly on the caller's STA thread, NOT through GUIProxy.
+        // Python's pywin32 calls GetActiveObject on a regular thread with CoInitialize(),
+        // and it works fine. Our earlier approach routed through GUIProxy's DispatcherTimer,
+        // which caused "Access Violation Reading 0x003f/0x0050" in AutoCAD 2014's COM server.
+        // The DispatcherTimer.Tick callback context interferes with cross-process COM
+        // message pumping — AutoCAD's COM server can't properly negotiate OLE messages
+        // when the caller is inside a WPF timer callback. Direct async call avoids this.
+        return await ConnectInternalAsync();
     }
 
     /// <summary>
@@ -588,45 +766,87 @@ public class AutoCADService : IAutoCADService, IDisposable
     ///   1. GetActiveObject to get running AutoCAD instance
     ///   2. Retry up to 5 times for ActiveDocument
     /// </summary>
+    /// <summary>
+    /// Connects to a running AutoCAD instance via COM with full retry logic.
+    ///
+    /// MUST be called directly on the STA thread (from ViewModel async commands),
+    /// NOT through GUIProxy/DispatcherTimer. AutoCAD 2014's COM server crashes
+    /// with "Access Violation Reading 0x003f/0x0050" (at 53ac1e63h) when the initial
+    /// IDispatch QI happens inside a WPF DispatcherTimer.Tick callback — the timer
+    /// context interferes with cross-process OLE message pumping. Direct async calls
+    /// on the STA thread pump messages correctly, matching Python's pywin32 behavior.
+    ///
+    /// Retries up to 3 times with increasing delays, releasing COM objects between
+    /// attempts to avoid stale proxy state.
+    /// </summary>
     private async Task<bool> ConnectInternalAsync()
     {
-        try
-        {
-            _acadApp = GetActiveObject(DefaultProgId);
-            _logger?.LogInformation("GetActiveObject succeeded — connected to AutoCAD");
+        const int maxConnectRetries = 3;
 
-            // Retry for ActiveDocument (matches Python's retry pattern)
-            for (int attempt = 1; attempt <= MaxRetryAttempts; attempt++)
+        for (int connectAttempt = 1; connectAttempt <= maxConnectRetries; connectAttempt++)
+        {
+            try
             {
-                try
+                _acadApp = GetActiveObject(DefaultProgId);
+                _logger?.LogInformation("GetActiveObject succeeded (attempt {Attempt}/{Max})",
+                    connectAttempt, maxConnectRetries);
+
+                // Brief stabilization — let the COM proxy initialize.
+                // First attempt uses a short delay; retries use longer delays
+                // in case AutoCAD is recovering from a previous failed connection.
+                var stabilizationMs = connectAttempt == 1 ? 200 : 500 * connectAttempt;
+                await Task.Delay(stabilizationMs);
+
+                // Retry for ActiveDocument (matches Python's retry pattern)
+                for (int attempt = 1; attempt <= MaxRetryAttempts; attempt++)
                 {
-                    _acadDoc = _acadApp.ActiveDocument;
-                    if (_acadDoc != null)
+                    try
                     {
-                        string docName = _acadDoc.Name;
-                        _logger?.LogInformation("ActiveDocument: {Name}", docName);
-                        break;
+                        _acadDoc = _acadApp.ActiveDocument;
+                        if (_acadDoc != null)
+                        {
+                            // Brief pause before first property access on document —
+                            // the document proxy also needs time after first IDispatch QI.
+                            await Task.Delay(100);
+
+                            string docName = _acadDoc.Name;
+                            _logger?.LogInformation("ActiveDocument: {Name}", docName);
+                            break;
+                        }
+                    }
+                    catch (Exception ex) when (attempt < MaxRetryAttempts)
+                    {
+                        _logger?.LogWarning("Retry {Attempt}/{Max}: ActiveDocument not ready — {Error}",
+                            attempt, MaxRetryAttempts, ex.Message);
+                        await Task.Delay(RetryDelayMs);
                     }
                 }
-                catch (Exception ex) when (attempt < MaxRetryAttempts)
+
+                _isConnected = true;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "COM connect attempt {Attempt}/{Max} failed",
+                    connectAttempt, maxConnectRetries);
+
+                // Release COM objects before retry — stale proxies can cause AVs
+                ReleaseCOMObjects();
+
+                if (connectAttempt < maxConnectRetries)
                 {
-                    _logger?.LogWarning("Retry {Attempt}/{Max}: ActiveDocument not ready — {Error}",
-                        attempt, MaxRetryAttempts, ex.Message);
-                    await Task.Delay(RetryDelayMs);
+                    // Increasing delay: 1s, 2s — gives AutoCAD time to recover
+                    // after showing its "連線中斷" error dialog
+                    var retryDelay = 1000 * connectAttempt;
+                    _logger?.LogInformation("Waiting {Delay}ms before retry...", retryDelay);
+                    await Task.Delay(retryDelay);
                 }
             }
+        }
 
-            _isConnected = true;
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Failed to connect to AutoCAD");
-            _acadDoc = null;
-            _acadApp = null;
-            _isConnected = false;
-            return false;
-        }
+        _logger?.LogError("Failed to connect to AutoCAD after {MaxRetries} attempts", maxConnectRetries);
+        _isConnected = false;
+        return false;
     }
 
     public async Task DisconnectAsync()

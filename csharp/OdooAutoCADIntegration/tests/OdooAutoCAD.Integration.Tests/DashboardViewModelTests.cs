@@ -85,10 +85,8 @@ public class DashboardViewModelTests
     [StaFact]
     public async Task ConnectAutoCADAsync_WhenSuccessful_SetsConnectedState()
     {
-        // Arrange
-        _mockGuiProxy
-            .Setup(p => p.ExecuteInGuiAsync("autocad_connect", null, 15000))
-            .ReturnsAsync(GUIProxyResponse.CreateSuccess("req1", true));
+        // Arrange — ConnectAsync is now called directly (bypasses GUIProxy)
+        _mockAutoCAD.Setup(s => s.ConnectAsync()).ReturnsAsync(true);
 
         var status = new AutoCADStatus(true, "AutoCAD", "2025", "Drawing1.dwg", null, null);
         _mockGuiProxy
@@ -110,10 +108,8 @@ public class DashboardViewModelTests
     [StaFact]
     public async Task ConnectAutoCADAsync_WhenFails_SetsErrorMessage()
     {
-        // Arrange
-        _mockGuiProxy
-            .Setup(p => p.ExecuteInGuiAsync("autocad_connect", null, 15000))
-            .ReturnsAsync(GUIProxyResponse.CreateError("req1", "COM error"));
+        // Arrange — ConnectAsync is now called directly (bypasses GUIProxy)
+        _mockAutoCAD.Setup(s => s.ConnectAsync()).ReturnsAsync(false);
 
         var sut = CreateSUT();
 

@@ -217,7 +217,8 @@ public partial class AutoCADViewModel : ObservableObject
 
     /// <summary>
     /// Connects to AutoCAD with retry logic.
-    /// All COM operations executed through IGUIProxy for thread safety.
+    /// Calls ConnectAsync directly (bypasses GUIProxy/DispatcherTimer) to avoid
+    /// Access Violation in AutoCAD 2014's COM server.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanConnect))]
     private async Task ConnectAsync()
@@ -230,10 +231,12 @@ public partial class AutoCADViewModel : ObservableObject
         {
             _logger?.LogInformation("Attempting to connect to AutoCAD");
 
-            // Execute connection through GUI proxy for STA thread safety
-            var response = await _guiProxy.ExecuteInGuiAsync("autocad_connect", null, timeout: 15000);
+            // Call ConnectAsync directly (bypasses GUIProxy/DispatcherTimer).
+            // AutoCAD 2014's COM server crashes with Access Violation when the
+            // initial connection goes through GUIProxy's DispatcherTimer.Tick context.
+            var connected = await _autoCADService.ConnectAsync();
 
-            if (response.Success && response.Result is bool connected && connected)
+            if (connected)
             {
                 IsConnected = true;
                 StatusMessage = "Successfully connected to AutoCAD";
@@ -247,11 +250,11 @@ public partial class AutoCADViewModel : ObservableObject
             else
             {
                 IsConnected = false;
-                StatusMessage = response.ErrorMessage ?? "Failed to connect to AutoCAD. Ensure AutoCAD is running.";
+                StatusMessage = "Failed to connect to AutoCAD. Ensure AutoCAD is running.";
                 ConnectButtonText = "Connect to AutoCAD";
 
-                _logService.Log($"AutoCAD connection failed: {response.ErrorMessage}", "AutoCAD", AppLogLevel.Warning);
-                _logger?.LogWarning("AutoCAD connection failed: {Error}", response.ErrorMessage);
+                _logService.Log("AutoCAD connection failed", "AutoCAD", AppLogLevel.Warning);
+                _logger?.LogWarning("AutoCAD connection failed");
             }
         }
         catch (Exception ex)

@@ -37,6 +37,12 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // Request CLR to make corrupted state exceptions (AccessViolationException)
+        // catchable. In .NET 8 this env var is checked at exception dispatch time,
+        // so setting it before any COM code runs should allow our Dispatcher handler
+        // to catch Access Violations from AutoCAD's COM proxy DLL.
+        Environment.SetEnvironmentVariable("COMPlus_legacyCorruptedStateExceptionsPolicy", "1");
+
         // Global exception handlers
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
@@ -107,6 +113,16 @@ public partial class App : Application
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         Log.Error(e.Exception, "Unhandled dispatcher exception");
+
+        // AccessViolationException from AutoCAD COM proxy — log but don't
+        // show a scary dialog, the connection retry logic will handle it.
+        if (e.Exception is System.AccessViolationException)
+        {
+            Log.Warning("Access Violation from COM proxy — suppressed (retry will handle)");
+            e.Handled = true;
+            return;
+        }
+
         MessageBox.Show(
             $"An error occurred:\n\n{e.Exception.Message}",
             "Error",
@@ -206,6 +222,7 @@ public partial class App : Application
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<OdooConnectionViewModel>();
         services.AddTransient<PurchaseRequisitionViewModel>();
+        services.AddTransient<ParameterConfigViewModel>();
 
         // Application services
         services.AddSingleton<INavigationService, NavigationService>();
@@ -239,8 +256,11 @@ public partial class App : Application
     {
         var logService = Services.GetRequiredService<IAppLogService>();
 
-        // Small delay to let UI render and DispatcherTimer start polling
-        await Task.Delay(1000);
+        // Delay to let UI render, DispatcherTimer start polling, and AutoCAD
+        // COM server fully initialize. The 2s delay reduces the risk of
+        // "Access Violation Reading 0x003f" caused by connecting too early
+        // while AutoCAD's in-process COM proxy DLL is still initializing.
+        await Task.Delay(2000);
 
         // Auto-connect AutoCAD
         try
