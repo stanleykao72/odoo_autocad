@@ -5,6 +5,9 @@
       "trust": false,
       "timeout": 30000,
       "description": "AutoCAD-Odoo Integration"
+    },
+    "odoo": {
+      "httpUrl": "https://e-smith.odoo.com/mcp/v1/message"
     }
   }
 }
