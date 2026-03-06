@@ -1,6 +1,6 @@
 # AutoLISP + Python Bridge 架構設計
 
-> 版本: 2.0 (實作完成版)
+> 版本: 2.1 (YAML 設定 + Swagger API 修正)
 > 日期: 2026-03-06
 > 架構: 方案 C — Python Bridge .exe + 檔案交換
 > 實作計畫: 見 [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)
@@ -69,14 +69,14 @@ autolisp/
 ├── bridge/                       # Python Bridge 原始碼
 │   ├── odoo_bridge.py            # 主程式（CLI 入口，action dispatch）
 │   ├── odoo_client.py            # Odoo Swagger/REST API 客戶端
-│   ├── auth.py                   # 認證管理（BasicAuth）
-│   ├── config.py                 # INI 設定檔讀取（configparser）
-│   ├── requirements.txt          # Python 依賴（requests, configparser）
+│   ├── auth.py                   # 認證管理（BasicAuth: db_name + token）
+│   ├── config.py                 # 設定檔讀取（YAML 優先，INI fallback）
+│   ├── requirements.txt          # Python 依賴（requests, pyyaml）
 │   └── build.bat                 # PyInstaller 打包腳本
 │
 ├── config/                       # 設定檔
-│   ├── bridge.ini                # Bridge 設定（.gitignore 中）
-│   └── bridge.ini.example        # 設定檔範例
+│   ├── server_prod.yaml.example  # Odoo 伺服器設定範例
+│   └── token.yaml.example        # 使用者 token 設定範例
 │
 ├── legacy/                       # 舊版檔案（參考用，不再直接使用）
 │   ├── call_python.lsp           # 舊版 Python COM 呼叫
@@ -88,8 +88,10 @@ autolisp/
 │   ├── read_csv.lsp              # CSV 工具（已棄用，改由 Bridge API 取資料）
 │   └── StripMtext v5-0b.lsp      # MText 工具（已移入 lisp/ 並加 LT fallback）
 │
-└── dist/                         # 建置輸出（.gitignore）
-    └── odoo_bridge.exe           # 打包後的 Bridge 執行檔
+├── dist/                         # 建置輸出（.gitignore）
+│   └── odoo_bridge.exe           # 打包後的 Bridge 執行檔（8.6 MB）
+│
+└── OdooBridge.prv                # VLX 專案定義（VLIDE Expert mode 產出）
 ```
 
 ---
@@ -109,7 +111,9 @@ autolisp/
 | `*ob:config-dir*` | string | config/ 目錄路徑 |
 | `*ob:dist-dir*` | string | dist/ 目錄路徑 |
 | `*ob:bridge-exe*` | string/nil | Bridge 執行檔完整路徑（nil 表示 dev mode） |
-| `*ob:ini-file*` | string | bridge.ini 路徑 |
+| `*ob:ini-file*` | string | bridge.ini 路徑（legacy fallback） |
+| `*ob:server-yaml*` | string/nil | server_prod.yaml 路徑（優先使用） |
+| `*ob:token-yaml*` | string/nil | token.yaml 路徑（優先使用） |
 | `*ob:temp-dir*` | string | JSON 暫存目錄（%TEMP%/odoo_bridge/） |
 | `*ob:odoo-connected*` | T/nil | Odoo 連線狀態 |
 | `*ob:bridge-timeout*` | int | Bridge 輪詢超時（ms，預設 30000） |
@@ -118,12 +122,14 @@ autolisp/
 | `*ob:odoo-user*` | string | 使用者名稱 |
 | `*ob:odoo-pass*` | string | 密碼/API Key |
 
+**設定檔優先順序:** YAML（server_prod.yaml + token.yaml）→ INI（bridge.ini）→ 自動偵測
+
 **函數:**
 
 | 函數 | 說明 |
 |------|------|
-| `(config:init)` | 初始化所有路徑，偵測 bridge.exe 位置 |
-| `(config:load-ini)` | 讀取 bridge.ini 到全域變數 |
+| `(config:init)` | 初始化所有路徑，偵測 bridge.exe 位置，搜尋 YAML/INI 設定 |
+| `(config:load-ini)` | 讀取 bridge.ini 到全域變數（legacy fallback） |
 | `(config:save-ini)` | 將目前設定寫回 bridge.ini |
 | `(ini:read-file path)` | 解析 INI 檔，回傳 `(("section.key" . "value") ...)` |
 | `(ini:get data section key)` | 從 INI 資料取值 |
@@ -341,33 +347,54 @@ autolisp/
 ### 4.1 bridge/odoo_bridge.py — CLI 入口
 
 ```
-用法: odoo_bridge.exe <action> <request.json> <response.json> [--config bridge.ini]
+用法: odoo_bridge.exe <action> <request.json> <response.json> [options]
+
+設定選項（優先順序）:
+  --server-config <path>   server_prod.yaml 路徑 (搭配 --token-config)
+  --token-config <path>    token.yaml 路徑 (搭配 --server-config)
+  --config <path>          bridge.ini 路徑 (legacy fallback)
 
 動作:
   test_connection     測試 Odoo 連線
   get_project         取得專案 (需 pr_no 參數)
   get_products        取得產品清單
-  get_setup           取得設定值
-  get_colors          取得顏色清單
+  get_setup           取得設定值 (spec/product_catelog/operation_flow/surface_treatment)
+  get_colors          取得顏色清單 (需 project_id 參數)
   import_to_boq       匯入 BOQ
   boq_to_pr           BOQ 轉採購申請
 ```
 
-**流程:** 讀 request.json → 解析 params → 建立 OdooClient → dispatch handler → 寫 response.json
+**流程:** 讀 request.json → 解析 params → 載入 YAML/INI 設定 → 建立 OdooClient → dispatch handler → 寫 response.json
 
 ### 4.2 bridge/odoo_client.py — Odoo API 客戶端
 
-使用 `requests` + `HTTPBasicAuth`，呼叫 Odoo Swagger v2 端點。
+使用 `requests` + `BasicAuth(db_name, token)`，呼叫 Odoo Swagger boq_import_api 端點。
 
-| 方法 | HTTP | 端點 |
-|------|------|------|
-| `test_connection()` | GET | `/api/odoo-autocad/v2/test_connection` |
-| `get_project(pr_no)` | PATCH | `/api/odoo-autocad/v2/get_project` |
-| `get_products()` | PATCH | `/api/odoo-autocad/v2/get_product_v2` |
-| `get_setup()` | PATCH | `/api/odoo-autocad/v2/get_setup_v2` |
-| `get_colors(project_id)` | PATCH | `/api/odoo-autocad/v2/get_color_v2` |
-| `import_to_boq(data)` | PATCH | `/api/odoo-autocad/v2/import2boq_v2` |
-| `boq_to_pr(header_ids)` | PATCH | `/api/odoo-autocad/v2/boq2pr_v2` |
+**API Base Path:** `/api/v1/boq_import_api`
+**Model:** `job.working.plan.boq`
+**認證:** BasicAuth — username=db_name, password=user_token
+
+所有業務方法使用統一的 PATCH 端點:
+```
+PATCH /api/v1/boq_import_api/job.working.plan.boq/call/{method_name}
+Body: {"args": [...], "kwargs": {"user_token": "..."}, "context": {}}
+```
+
+| 方法 | method_name | 說明 |
+|------|-------------|------|
+| `test_connection()` | (GET model list) | 連線測試（GET 輕量查詢） |
+| `get_project(pr_no)` | `get_project_v2` | 取得專案 |
+| `get_products()` | `get_product_v2` | 取得產品清單（484 筆） |
+| `get_setup(name)` | `get_setup_v2` | 取得設定值（spec/product_catelog/operation_flow/surface_treatment） |
+| `get_colors(project_id)` | `get_color_v2` | 取得顏色清單 |
+| `import_to_boq(data)` | `import2boq_v2` | 匯入 BOQ |
+| `boq_to_pr(header_ids)` | `boq2pr_v2` | BOQ 轉 PR |
+
+**已驗證端點（2026-03-06 測試通過）:**
+- `test_connection` → 成功連線 e-smith.odoo.com
+- `get_product_v2` → 484 products
+- `get_setup_v2` → spec(25), product_catelog(15), operation_flow(17), surface_treatment(20)
+- `get_color_v2` → 需提供 project_id（無參數時 500）
 
 ### 4.3 JSON 檔案交換格式
 
@@ -412,11 +439,12 @@ autolisp/
 
 ## 5. 安全考量
 
-- **認證資訊** 存放在 `config/bridge.ini`，不透過 JSON 檔案傳遞
+- **認證資訊** 存放在 YAML 設定檔（server_prod.yaml + token.yaml），不透過 JSON 檔案傳遞
+- **設定檔搜尋路徑**: config/ → C:/odoo/config/ → autolisp root/
 - **暫存檔** 使用唯一檔名（含時間戳 + 流水號），用完即刪
 - **Bridge.exe** 使用 HTTPS 與 Odoo 通訊
-- **config/bridge.ini** 加入 `.gitignore`，提供 `.example` 範例
-- **bridge.ini 密碼** 明碼存放（與現有 Python 應用一致，未來可加密）
+- **YAML 設定檔** 含 token，加入 `.gitignore`，提供 `.example` 範例
+- **Token 明碼存放**（與現有 Python 主應用一致，共用同一組 YAML 設定）
 
 ---
 
@@ -431,12 +459,12 @@ autolisp/
 - [x] dcl/config.dcl — 連線設定對話框
 
 ### Phase 2: Bridge 通訊 — DONE
-- [x] lisp/odoo_bridge.lsp — 檔案交換 + 輪詢機制
-- [x] bridge/odoo_bridge.py — CLI 入口 + action dispatch
-- [x] bridge/odoo_client.py — Odoo Swagger API 客戶端
-- [x] bridge/auth.py — BasicAuth 認證管理
-- [x] bridge/config.py — INI 設定讀取
-- [x] bridge/requirements.txt — Python 依賴
+- [x] lisp/odoo_bridge.lsp — 檔案交換 + 輪詢機制 + YAML CLI 參數
+- [x] bridge/odoo_bridge.py — CLI 入口 + action dispatch + --server-config/--token-config
+- [x] bridge/odoo_client.py — Odoo Swagger API 客戶端（正確的 /api/v1/boq_import_api/ 端點）
+- [x] bridge/auth.py — BasicAuth(db_name, token) 認證管理
+- [x] bridge/config.py — YAML 優先 + INI fallback 設定讀取
+- [x] bridge/requirements.txt — Python 依賴（requests, pyyaml）
 
 ### Phase 3: AutoCAD 資料操作 — DONE
 - [x] lisp/table_util.lsp — TABLE 遍歷 + 資料收集 + ID 回寫 + 清除
@@ -523,8 +551,10 @@ Application Options:
 ```
 dist/
 ├── OdooBridge.vlx           # 主程式（內嵌 .lsp + .dcl，編譯保護）
-├── odoo_bridge.exe           # Python Bridge
-└── config/bridge.ini         # 設定檔（使用者需修改連線資訊）
+├── odoo_bridge.exe           # Python Bridge（8.6 MB）
+└── config/
+    ├── server_prod.yaml     # Odoo 伺服器設定（使用者需修改）
+    └── token.yaml           # 使用者 token（使用者需修改）
 ```
 
 #### 安裝方式
@@ -535,7 +565,9 @@ dist/
    C:/OdooBridge/
      ├── OdooBridge.vlx
      ├── odoo_bridge.exe
-     └── config/bridge.ini
+     └── config/
+         ├── server_prod.yaml
+         └── token.yaml
 
 2. 載入 VLX:
    → 命令列輸入: APPLOAD
@@ -589,7 +621,12 @@ dist/
 
 問題: bridge.exe 找不到
 原因: config.lsp 中的路徑設定不正確
-解法: 編輯 config/bridge.ini，確認 [paths] bridge_exe 指向正確位置
+解法: 確認 odoo_bridge.exe 與 OdooBridge.vlx 在同一目錄，
+     或在 dist/ 子目錄中
+
+問題: Odoo 連線失敗 "AUTH_FAILED"
+原因: YAML 設定中的 db_name 或 token 不正確
+解法: 檢查 config/server_prod.yaml 的 db_name 和 token.yaml 的 token
 ```
 
 ### 待辦（Future）

@@ -1,8 +1,8 @@
 # AutoLISP DCL Main UI + Python Bridge — 實作計畫
 
-> 版本: 1.0
+> 版本: 1.1 (YAML 設定 + Swagger API 修正 + 實測通過)
 > 日期: 2026-03-06
-> 狀態: Phase 1-5 全部實作完成
+> 狀態: Phase 1-5 全部實作完成，已通過 Odoo 實測
 
 ---
 
@@ -129,10 +129,10 @@
 |---|------|------|------|
 | 7 | `lisp/odoo_bridge.lsp` | `bridge:call`（寫 JSON → startapp → 輪詢 → 讀回應）+ 7 個 wrapper | DONE |
 | 8 | `bridge/odoo_bridge.py` | CLI 入口：`odoo_bridge.py <action> <req.json> <resp.json>` | DONE |
-| 9 | `bridge/odoo_client.py` | Odoo Swagger API client（requests + BasicAuth） | DONE |
-| 10 | `bridge/auth.py` | 認證管理（BasicAuth） | DONE |
-| 11 | `bridge/config.py` | INI 讀取（configparser） | DONE |
-| 12 | `bridge/requirements.txt` | `requests`, `configparser` | DONE |
+| 9 | `bridge/odoo_client.py` | Odoo Swagger API（PATCH /api/v1/boq_import_api/...） | DONE |
+| 10 | `bridge/auth.py` | 認證管理（BasicAuth: db_name + token） | DONE |
+| 11 | `bridge/config.py` | YAML 優先 + INI fallback 設定讀取 | DONE |
+| 12 | `bridge/requirements.txt` | `requests`, `pyyaml` | DONE |
 
 ### Phase 3: AutoCAD 資料操作 — DONE
 
@@ -205,15 +205,36 @@
 ### Bridge CLI 驗證（已通過）
 
 ```bash
+# 使用 YAML 設定連接真實 Odoo（推薦）
 $ cd autolisp/bridge
-$ python odoo_bridge.py --help
-usage: odoo_bridge.py [-h] [--config CONFIG] action request_file response_file
-
-$ echo '{"action":"test_connection","params":{}}' > req.json
-$ python odoo_bridge.py test_connection req.json resp.json
+$ python odoo_bridge.py test_connection req.json resp.json \
+    --server-config C:/odoo/config/server_prod.yaml \
+    --token-config C:/odoo/config/token.yaml
 $ cat resp.json
-{"success": false, "error_code": "CONNECTION_FAILED", "message": "Cannot connect to https://odoo.example.com"}
+{"success": true, "data": {"server": "https://e-smith.odoo.com", "database": "odoo13-esmith-master-1011507", "status": "connected"}}
+
+# 取得產品清單（已驗證 484 筆）
+$ python odoo_bridge.py get_products req.json resp.json \
+    --server-config C:/odoo/config/server_prod.yaml \
+    --token-config C:/odoo/config/token.yaml
+
+# 使用打包後的 exe
+$ dist/odoo_bridge.exe test_connection req.json resp.json \
+    --server-config C:/odoo/config/server_prod.yaml \
+    --token-config C:/odoo/config/token.yaml
 ```
+
+### Odoo 實測結果（2026-03-06）
+
+| 端點 | 結果 | 備註 |
+|------|------|------|
+| test_connection | OK | e-smith.odoo.com 連線成功 |
+| get_product_v2 | OK | 484 筆產品 |
+| get_setup_v2 (spec) | OK | 25 項 |
+| get_setup_v2 (product_catelog) | OK | 15 項 |
+| get_setup_v2 (operation_flow) | OK | 17 項 |
+| get_setup_v2 (surface_treatment) | OK | 20 項 |
+| get_color_v2 | 需 project_id | 無參數時回傳 500 |
 
 ---
 
