@@ -1,0 +1,16 @@
+# Build output
+dist/
+
+# User config (contains credentials)
+config/bridge.ini
+
+# Python
+bridge/__pycache__/
+bridge/*.pyc
+bridge/build/
+bridge/dist/
+bridge/*.spec
+
+# Temp files
+*.log
+*.tmp

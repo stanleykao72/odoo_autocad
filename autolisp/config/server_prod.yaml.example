@@ -1,0 +1,5 @@
+server:
+  host: 'your-company.odoo.com'
+  db_name: 'your-database-name'
+  url: 'https://your-company.odoo.com/api/v1/boq_import_api/swagger.json?token=YOUR_SWAGGER_TOKEN&db=your-database-name'
+  token_file: 'c:\odoo\config\token.yaml'

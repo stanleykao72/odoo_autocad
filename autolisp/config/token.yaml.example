@@ -1,0 +1,3 @@
+user:
+  token: 'YOUR_USER_TOKEN_HERE'
+  server_file: 'c:/odoo/config/server_prod.yaml'
