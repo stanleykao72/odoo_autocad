@@ -22,9 +22,11 @@ from bravado.requests_client import RequestsClient
 from bravado.client import SwaggerClient
 from swagger_spec_validator.common import SwaggerValidationError
 
+APP_VERSION = "6.0"
+
 class ModernFormMain(ctk.CTk):
     """現代化的主表單，使用CustomTkinter"""
-    
+
     def __init__(self, odoo_connection, autocad_mode="com"):
         super().__init__()
 
@@ -503,7 +505,16 @@ class ModernFormMain(ctk.CTk):
             text_color="white"
         )
         self.btn_sse_control.pack(fill="x", padx=20, pady=5)
-    
+
+        # 版本號（底部）
+        version_label = ctk.CTkLabel(
+            self.sidebar,
+            text=f"v{APP_VERSION}",
+            font=("Microsoft JhengHei UI", 11),
+            text_color=theme.get_color('text_secondary')
+        )
+        version_label.pack(side="bottom", pady=(0, 10))
+
     def create_main_content(self):
         """創建主要內容區域"""
         self.main_content = ctk.CTkFrame(
