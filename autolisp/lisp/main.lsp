@@ -14,7 +14,8 @@
   (setq fp (findfile "main.lsp"))
   (if fp
     (vl-filename-directory fp)
-    ""
+    ;; Fallback: hardcoded project path
+    "C:/odoo/autocad_source/autolisp/lisp"
   )
 )
 
@@ -59,7 +60,7 @@
 
 (defun c:OB:MCP-DISPATCH ()
   "Executes IPC/MCP dispatch — reads command JSON, executes, writes result JSON."
-  (mcp:dispatch)
+  (c:mcp-dispatch)
   (princ)
 )
 

@@ -8,16 +8,36 @@
 ;;; Load autocad-mcp base dispatcher
 ;;; ============================================================
 
-(defun ob:find-mcp-dispatch ( / base-path candidate)
+(defun ob:find-mcp-dispatch ( / base-path candidate lisp-dir)
   "Find mcp_dispatch.lsp in the autocad-mcp submodule"
   ;; Try relative to autolisp root: ../libs/autocad-mcp/lisp-code/
-  (setq base-path (strcat *ob:root* "/../libs/autocad-mcp/lisp-code/mcp_dispatch.lsp"))
-  (setq candidate (findfile base-path))
-  (if candidate
-    candidate
-    ;; Fallback: search on ACAD support path
-    (findfile "mcp_dispatch.lsp")
+  (if *ob:root*
+    (progn
+      (setq base-path (strcat *ob:root* "/../libs/autocad-mcp/lisp-code/mcp_dispatch.lsp"))
+      (setq candidate (findfile base-path))
+    )
   )
+  ;; Fallback: derive from our own lisp directory
+  (if (not candidate)
+    (progn
+      (setq lisp-dir (vl-filename-directory (findfile "ob_mcp_dispatch.lsp")))
+      (if lisp-dir
+        (progn
+          (setq base-path (strcat lisp-dir "/../../libs/autocad-mcp/lisp-code/mcp_dispatch.lsp"))
+          (setq candidate (findfile base-path))
+        )
+      )
+    )
+  )
+  ;; Fallback: hardcoded project path
+  (if (not candidate)
+    (setq candidate (findfile "C:/odoo/autocad_source/libs/autocad-mcp/lisp-code/mcp_dispatch.lsp"))
+  )
+  ;; Last fallback: search on ACAD support path
+  (if (not candidate)
+    (setq candidate (findfile "mcp_dispatch.lsp"))
+  )
+  candidate
 )
 
 ;; Check if mcp-dispatch-command is already loaded (e.g. from McpDispatch.vlx)
@@ -108,10 +128,11 @@
       (setq layout-name (cdr (assoc "layout_name" attr-data)))
       (if (and layout-name (/= layout-name "null") (/= layout-name ""))
         ;; Write to specific layout
-        (let ((block (block:find-attribute-block-in-layout layout-name)))
-          (if block
+        (progn
+          (setq ob:tmp-block (block:find-attribute-block-in-layout layout-name))
+          (if ob:tmp-block
             (progn
-              (block:set-attributes block attr-data)
+              (block:set-attributes ob:tmp-block attr-data)
               (cons T (strcat "{\"message\": \"Attributes set in layout: " layout-name "\"}"))
             )
             (cons nil (strcat "No attribute block found in layout: " layout-name))
