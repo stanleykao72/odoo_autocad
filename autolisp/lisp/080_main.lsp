@@ -45,7 +45,7 @@
 (if (and (eval '(and dmc:json:json_to_list T))
          (eval '(and ob:mcp-dispatch-command T)))
   ;; VLX mode — modules already loaded by VLX packaging
-  (princ "\n[OB] VLX mode — modules already loaded")
+  (princ "\n[OB] VLX mode - modules already loaded")
 
   ;; Loose .lsp mode — load modules from disk
   (progn

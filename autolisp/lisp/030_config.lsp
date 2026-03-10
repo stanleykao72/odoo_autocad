@@ -33,6 +33,11 @@
      )
     )
 
+    ;; VLX mode / hardcoded project path
+    ((findfile "C:/odoo/autocad_source/autolisp/lisp/")
+     (setq *ob:root* "C:/odoo/autocad_source/autolisp")
+    )
+
     ;; Last resort
     (T
       (setq *ob:root* (getvar "DWGPREFIX"))
