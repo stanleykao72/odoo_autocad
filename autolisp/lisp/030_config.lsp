@@ -34,7 +34,7 @@
     )
 
     ;; VLX mode / hardcoded project path
-    ((findfile "C:/odoo/autocad_source/autolisp/lisp/")
+    ((findfile "C:/odoo/autocad_source/autolisp/build_vlx.lsp")
      (setq *ob:root* "C:/odoo/autocad_source/autolisp")
     )
 
