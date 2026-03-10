@@ -168,7 +168,7 @@ class ModernFormMain(ctk.CTk):
         # 應用程式標題
         title_label = ctk.CTkLabel(
             self.top_bar,
-            text="🏢 AutoCAD Odoo 整合系統",
+            text=f"🏢 AutoCAD Odoo 整合系統  v{APP_VERSION}",
             font=get_app_font('title'),
             text_color="white"
         )
@@ -505,15 +505,6 @@ class ModernFormMain(ctk.CTk):
             text_color="white"
         )
         self.btn_sse_control.pack(fill="x", padx=20, pady=5)
-
-        # 版本號（底部）
-        version_label = ctk.CTkLabel(
-            self.sidebar,
-            text=f"v{APP_VERSION}",
-            font=("Microsoft JhengHei UI", 11),
-            text_color=theme.get_color('text_secondary')
-        )
-        version_label.pack(side="bottom", pady=(0, 10))
 
     def create_main_content(self):
         """創建主要內容區域"""
