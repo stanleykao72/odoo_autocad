@@ -37,19 +37,28 @@
   )
 )
 
-;; Load modules in dependency order
 (princ "\n[OB] ========================================")
 (princ "\n[OB] Odoo-AutoCAD Integration (AutoLISP)")
-(princ "\n[OB] Loading modules...")
 (princ "\n[OB] ========================================")
 
-(ob:load-module "010_json_util.lsp")
-(ob:load-module "020_file_util.lsp")
-(ob:load-module "030_config.lsp")
-(ob:load-module "040_strip_mtext.lsp")
-(ob:load-module "050_block_util.lsp")
-(ob:load-module "060_table_util.lsp")
-(ob:load-module "070_ob_mcp_dispatch.lsp")
+;; Check if modules already loaded (VLX mode: all .fas run before main)
+(if (and (eval '(and dmc:json:json_to_list T))
+         (eval '(and ob:mcp-dispatch-command T)))
+  ;; VLX mode — modules already loaded by VLX packaging
+  (princ "\n[OB] VLX mode — modules already loaded")
+
+  ;; Loose .lsp mode — load modules from disk
+  (progn
+    (princ "\n[OB] Loading modules...")
+    (ob:load-module "010_json_util.lsp")
+    (ob:load-module "020_file_util.lsp")
+    (ob:load-module "030_config.lsp")
+    (ob:load-module "040_strip_mtext.lsp")
+    (ob:load-module "050_block_util.lsp")
+    (ob:load-module "060_table_util.lsp")
+    (ob:load-module "070_ob_mcp_dispatch.lsp")
+  )
+)
 
 ;; Initialize configuration
 (config:init)
