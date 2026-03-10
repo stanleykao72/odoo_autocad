@@ -1,44 +1,108 @@
-# AutoLISP + Python Bridge 架構設計
+# AutoLISP + IPC/MCP 架構設計
 
-> 版本: 2.1 (YAML 設定 + Swagger API 修正)
-> 日期: 2026-03-06
-> 架構: 方案 C — Python Bridge .exe + 檔案交換
+> 版本: 4.0 (雙模式架構 — DCL 獨立模式已移除)
+> 日期: 2026-03-10
+> 架構: 雙模式 — COM / IPC+MCP (autocad-mcp)
 > 實作計畫: 見 [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)
 
 ---
 
 ## 1. 架構概覽
 
-```
-+----------------------------------+      +------------------+      +-----------+
-|  AutoCAD (LT or Full)            |      |  odoo_bridge.exe |      |  Odoo ERP |
-|                                  |      |  (Python)        |      |           |
-|  +----------------------------+  |      |                  |      |           |
-|  | AutoLISP                   |  |      |  - HTTP Client   |      |           |
-|  |                            |  |      |  - Auth Manager  |      |           |
-|  |  1. 收集 TABLE/Block 資料  |  |      |  - JSON 解析     |      |           |
-|  |  2. 寫 request.json        |--|----->|  - 錯誤處理      |----->|  Swagger  |
-|  |  3. startapp bridge.exe    |  |      |  - 寫 response   |      |  API v2   |
-|  |  4. 輪詢 response.json     |  |      |                  |<-----|           |
-|  |  5. 讀取並處理結果         |<-|------|  - 寫 resp.json  |      |           |
-|  |  6. 回寫 ID 到 TABLE       |  |      |                  |      |           |
-|  +----------------------------+  |      +------------------+      +-----------+
-|                                  |
-|  +----------------------------+  |
-|  | DCL 對話框 (While 迴圈)    |  |
-|  |  - 主選單 (main_menu.dcl)  |  |
-|  |  - 參數選擇 (param_form)   |  |
-|  |  - 設定 (config.dcl)       |  |
-|  |  - 結果顯示 (result.dcl)   |  |
-|  +----------------------------+  |
-+----------------------------------+
+本專案支援兩條操作路徑，以 `puran-water/autocad-mcp` 作為 git submodule 提供通用 AutoCAD 工具基礎：
 
-通訊介面: JSON 檔案 (temp 目錄, 唯一檔名, 用完即刪)
+1. **COM Mode** — Python GUI + COM 直連 Full AutoCAD（現有，不改）
+2. **IPC Mode** — Python GUI + File IPC 驅動 AutoCAD LT 2024+（基於 autocad-mcp submodule）
+3. **MCP Mode** — AI 助手透過 MCP Server + File IPC 驅動 AutoCAD（基於 autocad-mcp submodule）
+
 ```
+┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────────┐
+│  Python GUI          │  │  Python GUI          │  │  AI Assistant            │
+│  (COM Mode)          │  │  (IPC Mode)          │  │  (MCP Mode)              │
+│  Settings: ●COM ○IPC │  │  Settings: ○COM ●IPC │  │  Claude / Gemini CLI     │
+│                      │  │                      │  │                          │
+│  util_autocad.py     │  │  util_autocad_ipc.py │  │  MCP Client (stdio/SSE)  │
+│  (COM 直連)          │  │  (wraps autocad-mcp) │  │                          │
+└──────────┬───────────┘  └──────────┬───────────┘  └──────────┬───────────────┘
+           │                         │                          │
+      COM Automation            File IPC                  MCP Protocol
+           │               (autocad-mcp lib)                    │
+           ▼                         │               ┌──────────▼──────────────┐
+┌──────────────────┐                 │               │  MCP Server              │
+│  Full AutoCAD    │                 │               │  (wraps autocad-mcp      │
+│  (COM objects)   │                 │               │   + Odoo tools)          │
+└──────────────────┘                 │               │                          │
+                                     │               │  8 通用 tools (autocad)  │
+                                     │               │  5 Odoo tools (我們的)    │
+                                     │               └──────────┬──────────────┘
+                                     │                          │
+                                     ▼                          ▼
+                              ┌──────────────────────────────────────┐
+                              │  AutoCAD LT 2024+ (or Full)          │
+                              │                                      │
+                              │  autocad-mcp/lisp-code/              │
+                              │    mcp_dispatch.lsp  (通用 dispatcher)│
+                              │                                      │
+                              │  autolisp/lisp/                      │
+                              │    ob_mcp_dispatch.lsp (Odoo 擴展)    │
+                              │    table_util.lsp (TABLE 操作)        │
+                              │    block_util.lsp (Block 操作)        │
+                              └──────────────────────────────────────┘
+```
+
+### Python GUI 內部架構（COM/IPC 切換）
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  odoo.py  (進入點)                                          │
+│  --autocad-mode com|ipc    (預設 com)                        │
+│  --mcp-autocad             (啟動 autocad MCP Server)         │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  forms/form_main_modern.py  (GUI 主視窗)                     │
+│                                                              │
+│  init_utilities():                                           │
+│  ┌─────────────────────────────────────────────────┐         │
+│  │  UtilAutoCADDispatcher (mode=com|ipc)            │         │
+│  │  ┌──────────────┐  ┌───────────────────────┐    │         │
+│  │  │ UtilAutoCAD  │  │ UtilAutoCADIPC        │    │         │
+│  │  │ (COM 後端)   │  │ (IPC 後端)            │    │         │
+│  │  │ pywin32 COM  │  │ wraps autocad-mcp lib │    │         │
+│  │  └──────┬───────┘  └───────────┬───────────┘    │         │
+│  │         │ (COM Mode)           │ (IPC Mode)     │         │
+│  └─────────┼──────────────────────┼────────────────┘         │
+│            │                      │                           │
+│  ┌─────────▼──────────┐          │                           │
+│  │ GUIProxy           │          │ (IPC 不需 GUI proxy,      │
+│  │ (COM 線程安全)     │          │  無 COM 線程問題)          │
+│  │ 100ms timer 輪詢   │          │                           │
+│  └────────────────────┘          │                           │
+│                                   │                           │
+│  UtilPushToBoq ──→ dispatcher     │                           │
+│  UtilTransferBoqToPr ──→ dispatcher                           │
+│  MCPManager ──→ dispatcher + mcp_server_autocad.py            │
+└──────────────────────┬───────────┬───────────────────────────┘
+                       │           │
+                  COM Automation   File IPC
+                       │           │
+                       ▼           ▼
+              Full AutoCAD    AutoCAD LT 2024+
+```
+
+**GUI → MCP 層替換:**
+
+| 舊 (v5.0 SSE 模式) | 新 (Phase 6) |
+|---|---|
+| `MCPSSEManager` (`util_mcp_sse_manager.py`) | `MCPManager` (`util_mcp_manager.py`) — 全新重寫 |
+| `mcp_server_fastmcp.py` (7 tools) | `mcp_server_autocad.py` (13 tools) |
+| `util_mcp_sse_server.py` (SSE transport) | `mcp_server_autocad.py` 內建 stdio/streamable-http |
+| `set_shared_autocad_util()` | 接收 `dispatcher` + `odoo_util` |
 
 ---
 
-## 2. 目錄結構（已實作）
+## 2. 目錄結構（已實作 + Phase 6 新增）
 
 ```
 autolisp/
@@ -49,49 +113,50 @@ autolisp/
 │   └── AUTOCAD_LT_RESEARCH.md   # LT 支援研究報告
 │
 ├── lisp/                         # AutoLISP 原始碼（LT 相容）
-│   ├── main.lsp                  # 進入點，載入所有模組，定義 8 個使用者指令
-│   ├── main_menu.lsp             # 主選單 while 迴圈 + action dispatch
-│   ├── config.lsp                # 路徑常數、INI 讀寫
+│   ├── main.lsp                  # 進入點，載入所有模組，定義使用者指令
+│   ├── config.lsp                # 路徑常數、YAML 設定讀取
 │   ├── json_util.lsp             # JSON 解析/序列化（diegomcas 版本）
 │   ├── file_util.lsp             # 檔案讀寫 + 唯一檔名 + 刪除
-│   ├── odoo_bridge.lsp           # Bridge 通訊層（寫 req / startapp / 輪詢 / 讀 resp）
 │   ├── table_util.lsp            # TABLE 實體讀寫（遍歷 Layout, 讀取/回寫 ID）
 │   ├── block_util.lsp            # Block 屬性讀寫（get/set attribute）
-│   ├── param_form.lsp            # 參數選擇表單邏輯（載入選項、使用者選擇、寫入屬性）
-│   └── strip_mtext.lsp           # MText 格式清除（RegExp + LT 純字串 fallback）
-│
-├── dcl/                          # DCL 對話框定義
-│   ├── main_menu.dcl             # 主選單（7 按鈕 + 狀態列）
-│   ├── param_form.dcl            # 參數表單（Product 關鍵字搜尋 + 6 下拉選單）
-│   ├── config.dcl                # 連線設定（URL, DB, username, password）
-│   └── result.dcl                # 結果顯示（title + 5-line message + OK）
-│
-├── bridge/                       # Python Bridge 原始碼
-│   ├── odoo_bridge.py            # 主程式（CLI 入口，action dispatch）
-│   ├── odoo_client.py            # Odoo Swagger/REST API 客戶端
-│   ├── auth.py                   # 認證管理（BasicAuth: db_name + token）
-│   ├── config.py                 # 設定檔讀取（YAML 優先，INI fallback）
-│   ├── requirements.txt          # Python 依賴（requests, pyyaml）
-│   └── build.bat                 # PyInstaller 打包腳本
+│   ├── strip_mtext.lsp           # MText 格式清除（RegExp + LT 純字串 fallback）
+│   └── ob_mcp_dispatch.lsp       # Odoo IPC 擴展 dispatcher
 │
 ├── config/                       # 設定檔
 │   ├── server_prod.yaml.example  # Odoo 伺服器設定範例
 │   └── token.yaml.example        # 使用者 token 設定範例
 │
-├── legacy/                       # 舊版檔案（參考用，不再直接使用）
-│   ├── call_python.lsp           # 舊版 Python COM 呼叫
-│   ├── transfer_to_odoo.lsp      # 舊版 Odoo 整合（COM 方式）
-│   ├── contract_product.lsp      # 舊版參數選擇
-│   ├── contract_product.dcl      # 舊版 DCL
-│   ├── param_form.dcl            # 舊版 DCL
-│   ├── json_util.lsp             # JSON 工具（已移入 lisp/）
-│   ├── read_csv.lsp              # CSV 工具（已棄用，改由 Bridge API 取資料）
-│   └── StripMtext v5-0b.lsp      # MText 工具（已移入 lisp/ 並加 LT fallback）
-│
-├── dist/                         # 建置輸出（.gitignore）
-│   └── odoo_bridge.exe           # 打包後的 Bridge 執行檔（8.6 MB）
-│
-└── OdooBridge.prv                # VLX 專案定義（VLIDE Expert mode 產出）
+└── legacy/                       # 舊版檔案（參考用，不再直接使用）
+    ├── call_python.lsp           # 舊版 Python COM 呼叫
+    ├── transfer_to_odoo.lsp      # 舊版 Odoo 整合（COM 方式）
+    ├── contract_product.lsp      # 舊版參數選擇
+    ├── contract_product.dcl      # 舊版 DCL
+    ├── param_form.dcl            # 舊版 DCL
+    ├── json_util.lsp             # JSON 工具（已移入 lisp/）
+    ├── read_csv.lsp              # CSV 工具（已棄用，改由 API 取資料）
+    └── StripMtext v5-0b.lsp      # MText 工具（已移入 lisp/ 並加 LT fallback）
+
+libs/                             # Git submodules
+└── autocad-mcp/                  # puran-water/autocad-mcp
+     ├── src/autocad_mcp/         → Python: PostMessageW, File IPC, ezdxf backend
+     ├── lisp-code/               → mcp_dispatch.lsp (通用 AutoCAD dispatcher)
+     └── ...
+
+# Phase 6 Python 端新增檔案（在專案根目錄）:
+utility/util_autocad_ipc.py        # 包裝 autocad-mcp File IPC client
+utility/util_autocad_dispatcher.py # COM/IPC 模式切換（統一介面）
+mcp_server_autocad.py              # MCP Server（包裝 autocad-mcp + Odoo tools）
+utility/util_mcp_manager.py        # 全新 MCP 管理器（取代 util_mcp_sse_manager.py）
+
+# Phase 6 需修改的現有檔案:
+forms/form_main_modern.py          # 改用 UtilAutoCADDispatcher，條件化 GUI proxy，改用 MCPManager
+utility/util_gui_proxy.py          # COM 模式才啟用，IPC 模式 bypass
+odoo.py                            # 新增 --autocad-mode / --mcp-autocad 參數
+
+# Phase 6 刪除（SSE 舊模式）:
+utility/util_mcp_sse_manager.py    # 刪除，由 util_mcp_manager.py 取代
+utility/util_mcp_sse_server.py     # 刪除，由 mcp_server_autocad.py 內建 transport 取代
+mcp_server_fastmcp.py              # 刪除，由 mcp_server_autocad.py 取代
 ```
 
 ---
@@ -106,34 +171,23 @@ autolisp/
 |------|------|------|
 | `*ob:root*` | string | autolisp 根目錄路徑 |
 | `*ob:lisp-dir*` | string | lisp/ 目錄路徑 |
-| `*ob:dcl-dir*` | string | dcl/ 目錄路徑 |
-| `*ob:bridge-dir*` | string | bridge/ 目錄路徑 |
 | `*ob:config-dir*` | string | config/ 目錄路徑 |
-| `*ob:dist-dir*` | string | dist/ 目錄路徑 |
-| `*ob:bridge-exe*` | string/nil | Bridge 執行檔完整路徑（nil 表示 dev mode） |
-| `*ob:ini-file*` | string | bridge.ini 路徑（legacy fallback） |
 | `*ob:server-yaml*` | string/nil | server_prod.yaml 路徑（優先使用） |
 | `*ob:token-yaml*` | string/nil | token.yaml 路徑（優先使用） |
 | `*ob:temp-dir*` | string | JSON 暫存目錄（%TEMP%/odoo_bridge/） |
 | `*ob:odoo-connected*` | T/nil | Odoo 連線狀態 |
-| `*ob:bridge-timeout*` | int | Bridge 輪詢超時（ms，預設 30000） |
 | `*ob:odoo-url*` | string | Odoo 伺服器 URL |
 | `*ob:odoo-db*` | string | Odoo 資料庫名稱 |
 | `*ob:odoo-user*` | string | 使用者名稱 |
 | `*ob:odoo-pass*` | string | 密碼/API Key |
 
-**設定檔優先順序:** YAML（server_prod.yaml + token.yaml）→ INI（bridge.ini）→ 自動偵測
+**設定檔優先順序:** YAML（server_prod.yaml + token.yaml）→ 自動偵測
 
 **函數:**
 
 | 函數 | 說明 |
 |------|------|
-| `(config:init)` | 初始化所有路徑，偵測 bridge.exe 位置，搜尋 YAML/INI 設定 |
-| `(config:load-ini)` | 讀取 bridge.ini 到全域變數（legacy fallback） |
-| `(config:save-ini)` | 將目前設定寫回 bridge.ini |
-| `(ini:read-file path)` | 解析 INI 檔，回傳 `(("section.key" . "value") ...)` |
-| `(ini:get data section key)` | 從 INI 資料取值 |
-| `(ini:write-file path data)` | 寫回 INI 檔 |
+| `(config:init)` | 初始化所有路徑，搜尋 YAML 設定 |
 
 ---
 
@@ -163,44 +217,10 @@ autolisp/
 | `(file:exists-p filepath)` | 檢查檔案是否存在 |
 | `(json:escape str)` | JSON 序列化前跳脫特殊字元（`\` `"` LF CR TAB） |
 | `(json:unescape str)` | JSON 解析後還原跳脫字元 |
-| `(dcl:load filename)` | 載入 DCL（VLX 內嵌優先，fallback 外部檔案） |
 
 ---
 
-### 3.4 lisp/odoo_bridge.lsp — Bridge 通訊層
-
-**核心函數:**
-
-| 函數 | 說明 |
-|------|------|
-| `(bridge:call action payload)` | 寫 req.json → startapp → 輪詢 → 讀 resp.json → 清理 |
-| `(bridge:launch action req resp)` | 啟動 bridge exe 或 python（dev mode） |
-| `(bridge:wait-for-response resp timeout)` | 每 500ms 輪詢 findfile，超時回傳錯誤 |
-
-**回應解析:**
-
-| 函數 | 說明 |
-|------|------|
-| `(bridge:success-p response)` | 檢查 success 欄位 |
-| `(bridge:get-data response)` | 取得 data 欄位 |
-| `(bridge:get-message response)` | 取得 message 欄位 |
-| `(bridge:get-error response)` | 取得 error_code 欄位 |
-
-**API Wrappers（7 個）:**
-
-| 函數 | Bridge Action | 說明 |
-|------|--------------|------|
-| `(bridge:test-connection)` | `test_connection` | 測試連線 |
-| `(bridge:get-project pr-no)` | `get_project` | 取得專案資訊 |
-| `(bridge:get-products)` | `get_products` | 取得產品清單 |
-| `(bridge:get-setup)` | `get_setup` | 取得設定值選項 |
-| `(bridge:get-colors project-id)` | `get_colors` | 取得顏色清單 |
-| `(bridge:import-to-boq data)` | `import_to_boq` | 推送 BOQ |
-| `(bridge:boq-to-pr header-ids)` | `boq_to_pr` | BOQ 轉 PR |
-
----
-
-### 3.5 lisp/table_util.lsp — TABLE 實體操作
+### 3.4 lisp/table_util.lsp — TABLE 實體操作
 
 **TABLE 結構（9 欄）:**
 
@@ -237,7 +257,7 @@ autolisp/
 |------|------|
 | `(table:write-header-id ename id)` | 寫 header_id 到 (0,8) |
 | `(table:write-detail-id ename product-no id)` | 寫 detail_id 到匹配的列 |
-| `(table:update-ids-from-response response)` | 從 bridge 回應批量回寫 ID |
+| `(table:update-ids-from-response response)` | 從回應批量回寫 ID |
 
 **清除:**
 
@@ -249,7 +269,7 @@ autolisp/
 
 ---
 
-### 3.6 lisp/block_util.lsp — Block 屬性操作
+### 3.5 lisp/block_util.lsp — Block 屬性操作
 
 **7 個屬性 Tag:**
 `product_name`, `spec`, `product_catelog`, `operation_flow`, `surface_treatment`, `color_name`, `color_no`
@@ -270,7 +290,7 @@ autolisp/
 
 ---
 
-### 3.7 lisp/strip_mtext.lsp — MText 格式清除
+### 3.6 lisp/strip_mtext.lsp — MText 格式清除
 
 | 函數 | 說明 |
 |------|------|
@@ -283,38 +303,7 @@ autolisp/
 
 ---
 
-### 3.8 lisp/param_form.lsp — 參數選擇表單
-
-| 函數 | 說明 |
-|------|------|
-| `(param:parse-products data)` | 解析產品 → (ids names uoms) |
-| `(param:parse-setup data)` | 解析設定 → (catalogs specs ops surfs) |
-| `(param:parse-colors data)` | 解析顏色 → (names nos)，加 "No Color" |
-| `(param:load-lov-data)` | 從 Odoo 載入所有 LOV 資料（3 次 bridge call） |
-| `(param:filter-products keyword)` | 以關鍵字過濾產品清單並更新 list_box |
-| `(param:get-selected-product-index str)` | 將 list_box 選項對應回原始產品索引 |
-| `(param:show-form lov-list)` | 顯示 DCL 表單，回傳選擇結果 |
-| `(param:apply-to-block block selections)` | 將選擇結果寫入 Block 屬性 |
-
----
-
-### 3.9 lisp/main_menu.lsp — 主選單邏輯
-
-| 函數 | 說明 |
-|------|------|
-| `(menu:show)` | 主選單 while 迴圈（7 個 action code） |
-| `(menu:show-result title msg)` | 結果對話框（fallback 到 alert） |
-| `(menu:do-connect)` | 測試 Odoo 連線 |
-| `(menu:do-config)` | 設定對話框 → 存 bridge.ini |
-| `(menu:do-set-params)` | 載入 LOV → 找 Block → 顯示表單 → 寫入 |
-| `(menu:do-push-boq)` | 收集 TABLE → bridge → 回寫 ID |
-| `(menu:do-create-pr)` | 收集 header_ids → bridge → PR |
-| `(menu:do-clear-current)` | 清除目前 Layout TABLE ID |
-| `(menu:do-clear-all)` | 清除所有 Layout TABLE ID |
-
----
-
-### 3.10 lisp/main.lsp — 進入點
+### 3.7 lisp/main.lsp — 進入點
 
 **載入順序:**
 1. json_util.lsp
@@ -323,314 +312,415 @@ autolisp/
 4. strip_mtext.lsp
 5. block_util.lsp
 6. table_util.lsp
-7. odoo_bridge.lsp
-8. param_form.lsp
-9. main_menu.lsp
+7. ob_mcp_dispatch.lsp
 
-**使用者指令（8 個）:**
+**使用者指令（1 個）:**
 
 | 指令 | 函數 | 說明 |
 |------|------|------|
-| `OB:MENU` | `menu:show` | 開啟主選單 |
-| `OB:CONNECT` | `menu:do-connect` | 測試 Odoo 連線 |
-| `OB:CONFIG` | `menu:do-config` | 連線設定 |
-| `OB:SET-PARAMS` | `menu:do-set-params` | 參數選擇表單 |
-| `OB:PUSH-BOQ` | `menu:do-push-boq` | 推送 BOQ |
-| `OB:CREATE-PR` | `menu:do-create-pr` | BOQ 轉 PR |
-| `OB:CLEAR-IDS` | `menu:do-clear-current` | 清除目前 Layout ID |
-| `OB:CLEAR-ALL-IDS` | `menu:do-clear-all` | 清除所有 Layout ID |
+| `OB:MCP-DISPATCH` | `mcp:dispatch` | IPC/MCP dispatcher（命令列背景執行） |
 
 ---
 
-## 4. Python Bridge 規格
+### 3.8 lisp/ob_mcp_dispatch.lsp — Odoo IPC 擴展
 
-### 4.1 bridge/odoo_bridge.py — CLI 入口
+此模組載入 autocad-mcp 的 `mcp_dispatch.lsp` 作為基礎 dispatcher，並擴展 dispatch table 加入 Odoo 專用 actions。
 
+**設計原則:**
+- autocad-mcp 的 `mcp_dispatch.lsp` 提供通用 dispatch 框架（讀取 JSON command → 執行 → 寫回 JSON result）
+- `ob_mcp_dispatch.lsp` 在載入後追加 Odoo 擴展 actions 到 dispatch table
+- Odoo actions 呼叫現有 `table_util.lsp` / `block_util.lsp` 執行 AutoCAD 操作
+
+**擴展的 Odoo actions:**
+
+| Action | 說明 | 呼叫的現有函數 |
+|--------|------|---------------|
+| `odoo_extract_tables` | 收集所有 Layout TABLE + Block 資料 | `table:get-all-layouts-data` |
+| `odoo_get_header_ids` | 收集所有 Layout 的 header_id | `table:get-all-header-ids` |
+| `odoo_write_ids` | 回寫 header_id + detail_id 到 TABLE | `table:update-ids-from-response` |
+| `odoo_get_block_attrs` | 讀取屬性 Block 的所有屬性 | `block:find-attribute-block` + `block:get-all-attributes` |
+| `odoo_set_block_attrs` | 寫入屬性到所有 Layout 的 Block | `block:set-attributes-all-layouts` |
+| `odoo_clear_ids` | 清除 TABLE ID | `table:clear-all-layouts-ids` |
+
+**載入流程:**
+```lisp
+;; 1. 載入 autocad-mcp 的通用 dispatcher
+(load (strcat *ob:root* "/../libs/autocad-mcp/lisp-code/mcp_dispatch.lsp"))
+
+;; 2. 擴展 dispatch table，加入 Odoo actions
+(mcp:register-action "odoo_extract_tables" 'ob:action-extract-tables)
+(mcp:register-action "odoo_get_header_ids" 'ob:action-get-header-ids)
+;; ... 其他 Odoo actions
 ```
-用法: odoo_bridge.exe <action> <request.json> <response.json> [options]
-
-設定選項（優先順序）:
-  --server-config <path>   server_prod.yaml 路徑 (搭配 --token-config)
-  --token-config <path>    token.yaml 路徑 (搭配 --server-config)
-  --config <path>          bridge.ini 路徑 (legacy fallback)
-
-動作:
-  test_connection     測試 Odoo 連線
-  get_project         取得專案 (需 pr_no 參數)
-  get_products        取得產品清單
-  get_setup           取得設定值 (spec/product_catelog/operation_flow/surface_treatment)
-  get_colors          取得顏色清單 (需 project_id 參數)
-  import_to_boq       匯入 BOQ
-  boq_to_pr           BOQ 轉採購申請
-```
-
-**流程:** 讀 request.json → 解析 params → 載入 YAML/INI 設定 → 建立 OdooClient → dispatch handler → 寫 response.json
-
-### 4.2 bridge/odoo_client.py — Odoo API 客戶端
-
-使用 `requests` + `BasicAuth(db_name, token)`，呼叫 Odoo Swagger boq_import_api 端點。
-
-**API Base Path:** `/api/v1/boq_import_api`
-**Model:** `job.working.plan.boq`
-**認證:** BasicAuth — username=db_name, password=user_token
-
-所有業務方法使用統一的 PATCH 端點:
-```
-PATCH /api/v1/boq_import_api/job.working.plan.boq/call/{method_name}
-Body: {"args": [...], "kwargs": {"user_token": "..."}, "context": {}}
-```
-
-| 方法 | method_name | 說明 |
-|------|-------------|------|
-| `test_connection()` | (GET model list) | 連線測試（GET 輕量查詢） |
-| `get_project(pr_no)` | `get_project_v2` | 取得專案 |
-| `get_products()` | `get_product_v2` | 取得產品清單（484 筆） |
-| `get_setup(name)` | `get_setup_v2` | 取得設定值（spec/product_catelog/operation_flow/surface_treatment） |
-| `get_colors(project_id)` | `get_color_v2` | 取得顏色清單 |
-| `import_to_boq(data)` | `import2boq_v2` | 匯入 BOQ |
-| `boq_to_pr(header_ids)` | `boq2pr_v2` | BOQ 轉 PR |
-
-**已驗證端點（2026-03-06 測試通過）:**
-- `test_connection` → 成功連線 e-smith.odoo.com
-- `get_product_v2` → 484 products
-- `get_setup_v2` → spec(25), product_catelog(15), operation_flow(17), surface_treatment(20)
-- `get_color_v2` → 需提供 project_id（無參數時 500）
-
-### 4.3 JSON 檔案交換格式
-
-**Request:**
-```json
-{
-  "action": "import_to_boq",
-  "params": { "project_id": 123, "layouts": [...] }
-}
-```
-
-**Response（成功）:**
-```json
-{
-  "success": true,
-  "data": { ... },
-  "message": "Successfully imported to BOQ"
-}
-```
-
-**Response（失敗）:**
-```json
-{
-  "success": false,
-  "error_code": "AUTH_FAILED",
-  "message": "Authentication failed: invalid credentials"
-}
-```
-
-**Error Codes:**
-- `CONNECTION_ERROR` — 無法連線
-- `TIMEOUT` — 逾時
-- `AUTH_FAILED` — 認證失敗（HTTP 401）
-- `HTTP_{status}` — 其他 HTTP 錯誤
-- `MISSING_PARAM` — 缺少必要參數
-- `UNKNOWN_ACTION` — 未知動作
-- `FILE_NOT_FOUND` — 檔案不存在
-- `INVALID_JSON` — JSON 解析錯誤
-- `INTERNAL_ERROR` — 其他內部錯誤
 
 ---
 
-## 5. 安全考量
+## 4. 安全考量
 
 - **認證資訊** 存放在 YAML 設定檔（server_prod.yaml + token.yaml），不透過 JSON 檔案傳遞
 - **設定檔搜尋路徑**: config/ → C:/odoo/config/ → autolisp root/
-- **暫存檔** 使用唯一檔名（含時間戳 + 流水號），用完即刪
-- **Bridge.exe** 使用 HTTPS 與 Odoo 通訊
 - **YAML 設定檔** 含 token，加入 `.gitignore`，提供 `.example` 範例
 - **Token 明碼存放**（與現有 Python 主應用一致，共用同一組 YAML 設定）
 
 ---
 
-## 6. 開發階段進度
+## 5. 開發階段進度
 
-### Phase 1: 基礎架構 — DONE
-- [x] lisp/config.lsp — 路徑常數 + INI 讀寫
-- [x] lisp/json_util.lsp — JSON 解析器
-- [x] lisp/file_util.lsp — 檔案 I/O 工具
-- [x] dcl/main_menu.dcl — 主選單對話框
-- [x] dcl/result.dcl — 結果顯示對話框
-- [x] dcl/config.dcl — 連線設定對話框
+### Phase 1-5: DCL 獨立模式 — DONE (已移除)
 
-### Phase 2: Bridge 通訊 — DONE
-- [x] lisp/odoo_bridge.lsp — 檔案交換 + 輪詢機制 + YAML CLI 參數
-- [x] bridge/odoo_bridge.py — CLI 入口 + action dispatch + --server-config/--token-config
-- [x] bridge/odoo_client.py — Odoo Swagger API 客戶端（正確的 /api/v1/boq_import_api/ 端點）
-- [x] bridge/auth.py — BasicAuth(db_name, token) 認證管理
-- [x] bridge/config.py — YAML 優先 + INI fallback 設定讀取
-- [x] bridge/requirements.txt — Python 依賴（requests, pyyaml）
+Phase 1-5 實作了 DCL 對話框 + Python Bridge.exe 的獨立模式架構。
+此模式已被 Phase 6 的 IPC/MCP 模式取代，相關程式碼已刪除。
+舊版檔案保留在 `legacy/` 目錄供參考。
 
-### Phase 3: AutoCAD 資料操作 — DONE
-- [x] lisp/table_util.lsp — TABLE 遍歷 + 資料收集 + ID 回寫 + 清除
-- [x] lisp/block_util.lsp — Block 屬性讀寫 + 搜尋
-- [x] lisp/strip_mtext.lsp — MText 格式清除（RegExp + LT fallback）
-
-### Phase 4: UI 邏輯 + 整合 — DONE
-- [x] dcl/param_form.dcl — 參數表單（Product 關鍵字搜尋 + 6 下拉選單）
-- [x] lisp/param_form.lsp — 載入 Odoo 資料 → 顯示表單 → 寫入屬性
-- [x] lisp/main_menu.lsp — While 迴圈 + 7 個 action handler
-- [x] lisp/main.lsp — 模組載入 + 8 個使用者指令
-
-### Phase 5: 打包部署 — DONE
-- [x] bridge/build.bat — PyInstaller 打包腳本
-- [x] VLX 支援 — dcl:load 統一載入函數（VLX 內嵌 / 外部檔案自動判斷）
-- [x] main.lsp — ob:vlx-mode-p 偵測，VLX 模式自動跳過 load
-
-### 交付方式
-
-| 格式 | AutoCAD Full | AutoCAD LT 2024+ | 程式碼保護 |
-|------|:------------:|:-----------------:|:----------:|
-| .lsp | 可 | 可 | 無（明文） |
-| .fas | 可 | 可 | 編譯保護 |
-| .vlx | 可 | 可 | 基本保護 |
-
-#### 建置 VLX（需在 Full AutoCAD 中操作）
-
-VLX 透過 AutoCAD 內建的 VLISP IDE 建置，步驟如下：
-
-**步驟 1: 開啟 VLISP IDE**
-```
-在 AutoCAD 命令列輸入: VLIDE
-→ 開啟 Visual LISP IDE 視窗
-```
-
-**步驟 2: 啟動 Make Application Wizard**
-```
-VLISP IDE 選單: File → Make Application → New Application Wizard...
-```
-
-**步驟 3: 設定應用程式屬性**
-```
-Application Name: OdooBridge
-Application Location: 選擇輸出目錄（例如 autolisp/dist/）
-Application Options:
-  [x] Separate Namespace  ← 建議勾選，避免全域變數污染
-```
-
-**步驟 4: 加入 LISP 檔案（按順序）**
-```
-按 "Add..." 加入以下 10 個 .lsp 檔（順序重要，依相依性排列）：
-
-  1. lisp/json_util.lsp
-  2. lisp/file_util.lsp
-  3. lisp/config.lsp
-  4. lisp/strip_mtext.lsp
-  5. lisp/block_util.lsp
-  6. lisp/table_util.lsp
-  7. lisp/odoo_bridge.lsp
-  8. lisp/param_form.lsp
-  9. lisp/main_menu.lsp
- 10. lisp/main.lsp          ← 必須最後載入（進入點）
-```
-
-**步驟 5: 建置**
-```
-按 "Next" → "Finish"
-→ VLISP 編譯所有 .lsp → 打包為 OdooBridge.vlx
-→ 建置成功後會在 Console 顯示訊息
-```
-
-> **替代方式:** 也可在 AutoCAD 命令列直接輸入 `MAKELISPAPP`，
-> 會開啟同樣的 Wizard 介面。
-
-> **注意:** VLIDE / MAKELISPAPP 僅在 **Full AutoCAD** 中可用，
-> AutoCAD LT 無此功能。但建置產出的 .vlx 可在 LT 2024+ 中執行。
-
-> **DCL 嵌入:** Expert mode 的 "Resource Files" 頁面可將 .dcl 嵌入 VLX。
-> 嵌入後交付時不需額外帶 dcl/ 目錄，`dcl:load` 會優先從 VLX 內部載入。
-> 若未嵌入 DCL，`dcl:load` 會自動 fallback 到外部檔案路徑。
-
-#### 交付包結構
-
-```
-dist/
-├── OdooBridge.vlx           # 主程式（內嵌 .lsp + .dcl，編譯保護）
-├── odoo_bridge.exe           # Python Bridge（8.6 MB）
-└── config/
-    ├── server_prod.yaml     # Odoo 伺服器設定（使用者需修改）
-    └── token.yaml           # 使用者 token（使用者需修改）
-```
-
-#### 安裝方式
-
-**方式 A: APPLOAD 命令（推薦，永久載入）**
-```
-1. 將交付檔案複製到固定位置，例如:
-   C:/OdooBridge/
-     ├── OdooBridge.vlx
-     ├── odoo_bridge.exe
-     └── config/
-         ├── server_prod.yaml
-         └── token.yaml
-
-2. 載入 VLX:
-   → 命令列輸入: APPLOAD
-   → 瀏覽選擇 C:/OdooBridge/OdooBridge.vlx
-   → 按 "Load"
-
-3. 設定每次啟動自動載入:
-   → 在 APPLOAD 對話框中，找到 "Startup Suite" 區域
-   → 按 "Contents..."
-   → 按 "Add..." → 選擇 OdooBridge.vlx
-   → 按 "Close"
-   → 之後每次開啟 AutoCAD 都會自動載入
-```
-
-**方式 B: 命令列手動載入（臨時測試用）**
-```
-在 AutoCAD 命令列輸入:
-  (load "C:/OdooBridge/OdooBridge.vlx")
-```
-
-**方式 C: acaddoc.lsp 自動載入**
-```
-在 AutoCAD 支援檔案搜尋路徑中建立或編輯 acaddoc.lsp，加入:
-  (load "C:/OdooBridge/OdooBridge.vlx")
-此檔案在每次開啟圖檔時自動執行。
-```
-
-**載入成功確認:**
-```
-命令列應顯示:
-  [OB] ========================================
-  [OB] Odoo-AutoCAD Integration (AutoLISP)
-  [OB] Loading modules...
-  [OB] VLX mode: json_util.lsp (embedded)
-  [OB] VLX mode: file_util.lsp (embedded)
-  ...
-  [OB] All modules loaded successfully!
-  [OB] Commands:
-  [OB]   OB:MENU        - Main menu
-  ...
-
-輸入 OB:MENU 開啟主選單。
-```
-
-**常見問題排除:**
-```
-問題: OB:MENU 顯示 "Error: main_menu.dcl not found"
-原因: VLX 建置時未嵌入 DCL（Simple mode 建置）
-解法: 用 Expert mode 重新建置，在 Resource Files 頁加入 4 個 .dcl
-     或將 dcl/ 目錄加入 OPTIONS → Files → Support File Search Path
-
-問題: bridge.exe 找不到
-原因: config.lsp 中的路徑設定不正確
-解法: 確認 odoo_bridge.exe 與 OdooBridge.vlx 在同一目錄，
-     或在 dist/ 子目錄中
-
-問題: Odoo 連線失敗 "AUTH_FAILED"
-原因: YAML 設定中的 db_name 或 token 不正確
-解法: 檢查 config/server_prod.yaml 的 db_name 和 token.yaml 的 token
-```
+### Phase 6: autocad-mcp Submodule + IPC/MCP Mode — TODO
+- [ ] `libs/autocad-mcp/` — git submodule (puran-water/autocad-mcp)
+- [ ] `lisp/ob_mcp_dispatch.lsp` — Odoo 擴展 dispatcher
+- [ ] `utility/util_autocad_ipc.py` — Python File IPC client
+- [ ] `utility/util_autocad_dispatcher.py` — COM/IPC 模式切換
+- [ ] `mcp_server_autocad.py` — MCP Server（autocad-mcp + Odoo tools）
+- [ ] `lisp/main.lsp` — 新增 OB:MCP-DISPATCH 指令
 
 ### 待辦（Future）
-- [ ] bridge/tests/ — Bridge 單元測試
 - [ ] AutoCAD 內端對端測試
 - [ ] 安裝腳本（自動設定搜尋路徑）
 - [ ] 使用者操作手冊
+
+---
+
+## 6. autocad-mcp Submodule 整合
+
+### 6.1 Submodule 路徑與版本管理
+
+```bash
+# 新增 submodule
+git submodule add https://github.com/puran-water/autocad-mcp.git libs/autocad-mcp
+
+# 初始化（clone 後）
+git submodule update --init --recursive
+
+# 更新到最新版本
+cd libs/autocad-mcp && git pull origin main && cd ../..
+git add libs/autocad-mcp && git commit -m "chore: Update autocad-mcp submodule"
+```
+
+Git submodule：
+- `libs/autocad-mcp/` — Python AutoCAD IPC + MCP tools（autolisp/Python 專案使用）
+
+### 6.2 autocad-mcp 提供的 8 個通用 Tools
+
+| Tool | 功能 | 說明 |
+|------|------|------|
+| `drawing` | 開檔/存檔/undo/redo | 基本圖檔操作 |
+| `entity` | CRUD 幾何圖形 | line/circle/polyline/arc 等 |
+| `layer` | 圖層管理 | 建立/凍結/鎖定/設定顏色 |
+| `block` | Block 操作 | 插入 Block、讀寫屬性 |
+| `annotation` | 標註操作 | 文字/標註/引線 |
+| `pid` | P&ID 符號 | CTO library 符號庫 |
+| `view` | 視圖操作 | 縮放/截圖 |
+| `system` | 系統查詢 | 狀態查詢 + `execute_lisp` 擴展 |
+
+### 6.3 mcp_dispatch.lsp — 通用 Dispatcher
+
+autocad-mcp 提供的 `lisp-code/mcp_dispatch.lsp` 是 File IPC 的 AutoCAD 端核心：
+- 讀取 `mcp_command_*.json` → dispatch 到對應 handler → 寫回 `mcp_result_*.json`
+- 透過 `(c:mcp-dispatch)` 指令觸發（可由 PostMessageW 注入）
+- 支援透過 `mcp:register-action` 擴展自訂 actions
+
+### 6.4 ezdxf Backend（無頭模式）
+
+autocad-mcp 支援三種 backend：
+- **auto** — 自動偵測（優先 File IPC，fallback ezdxf）
+- **file_ipc** — 透過 PostMessageW + JSON 與執行中的 AutoCAD 通訊
+- **ezdxf** — 無需 AutoCAD 實例，直接讀寫 DXF/DWG 檔案
+
+ezdxf backend 適用於 CI/CD 測試和批次處理場景。
+
+---
+
+## 7. File IPC 通訊協定
+
+### 7.1 IPC 目錄
+
+autocad-mcp 使用可配置的 IPC 目錄：
+- 預設: `%TEMP%/autocad_mcp/`
+- 環境變數: `AUTOCAD_MCP_IPC_DIR`
+
+### 7.2 JSON Command/Result 格式
+
+**Command（Python → AutoCAD）:**
+```json
+{
+  "action": "odoo_extract_tables",
+  "params": {
+    "layout_name": null
+  },
+  "id": "cmd_1710000000_001"
+}
+```
+
+**Result（AutoCAD → Python）:**
+```json
+{
+  "success": true,
+  "data": { ... },
+  "id": "cmd_1710000000_001"
+}
+```
+
+### 7.3 IPC 流程
+
+```
+呼叫端 (Python GUI 或 MCP Server)        AutoCAD (mcp_dispatch.lsp)
+         │                                          │
+    1. 寫 mcp_command_*.json 到 IPC 目錄             │
+    2. 送 2×ESC (取消殘留命令)                        │
+    3. PostMessageW(WM_CHAR) ──────────────────────→ │
+       注入 "(c:mcp-dispatch)\n"                     │
+       (Focus-Free，不搶焦點)                         │
+         │                                    4. 讀 mcp_command JSON
+         │                                    5. dispatch → 執行操作
+         │                                    6. 寫 mcp_result_*.json
+    7. 輪詢 mcp_result JSON ←────────────────────────│
+    8. 讀取結果，刪除暫存檔                            │
+```
+
+### 7.4 通用 Actions（autocad-mcp 內建）
+
+由 `mcp_dispatch.lsp` 直接處理，包括：`get_status`, `open_drawing`, `save_drawing`, `execute_lisp` 等。
+
+### 7.5 Odoo 擴展 Actions（ob_mcp_dispatch.lsp 新增）
+
+| Action | 說明 |
+|--------|------|
+| `odoo_extract_tables` | 收集所有 Layout TABLE + Block 資料 |
+| `odoo_get_header_ids` | 收集所有 Layout 的 header_id |
+| `odoo_write_ids` | 回寫 header_id + detail_id 到 TABLE |
+| `odoo_get_block_attrs` | 讀取屬性 Block 的所有屬性 |
+| `odoo_set_block_attrs` | 寫入屬性到所有 Layout 的 Block |
+| `odoo_clear_ids` | 清除 TABLE ID |
+
+### 7.6 超時與並發控制
+
+| 機制 | 說明 |
+|------|------|
+| 可配置 timeout | `AUTOCAD_MCP_IPC_TIMEOUT`（1-300 秒，預設 10） |
+| asyncio.Lock | Python 端防止並行 dispatch 競態 |
+| PostMessageW(WM_CHAR) | Win32 API 送字元到 MDIClient 窗口，不搶焦點 |
+| ESC 前置 | 2×ESC 取消殘留命令 |
+| UTF-8 / cp1252 fallback | 自動處理編碼差異 |
+
+---
+
+## 8. MCP Server — AI 助手整合
+
+### 8.1 概述
+
+`mcp_server_autocad.py` 包裝 autocad-mcp 的 MCP server 並新增 Odoo 專用 tools，
+提供 AI 助手（Claude / Gemini CLI）統一的自然語言操作介面。
+
+### 8.2 Tool 分類
+
+**8 個通用 AutoCAD Tools（來自 autocad-mcp）:**
+
+| Tool | 功能 |
+|------|------|
+| `drawing` | 開檔/存檔/undo/redo |
+| `entity` | CRUD 幾何圖形 |
+| `layer` | 圖層管理 |
+| `block` | Block 插入、屬性操作 |
+| `annotation` | 文字/標註/引線 |
+| `pid` | P&ID 符號 |
+| `view` | 縮放/截圖 |
+| `system` | 狀態查詢 + `execute_lisp` |
+
+**5 個 Odoo 專用 Tools（我們擴展）:**
+
+| Tool | 功能 |
+|------|------|
+| `odoo_extract` | 讀取所有 Layout TABLE + Block 資料 |
+| `odoo_push_boq` | 收集 TABLE → 推送 Odoo → 回寫 ID |
+| `odoo_create_pr` | 收集 header_ids → BOQ 轉 PR |
+| `odoo_set_params` | 讀取 Odoo 選項 → 寫入 Block 屬性 |
+| `odoo_status` | 檢查 Odoo 連線狀態 |
+
+### 8.3 AI 使用範例
+
+```
+User: "幫我把目前圖檔的 BOQ 推送到 Odoo"
+
+AI Assistant:
+  1. 呼叫 system tool → get_status → 確認 AutoCAD 已連線
+  2. 呼叫 odoo_status tool → 確認 Odoo 已連線
+  3. 呼叫 odoo_extract tool → 收集所有 Layout TABLE 資料
+  4. 呼叫 odoo_push_boq tool → 推送到 Odoo + 回寫 ID
+  5. 回報結果: "已成功推送 3 個 Layout、15 筆明細到 Odoo BOQ"
+```
+
+### 8.4 execute_lisp 擴展能力
+
+透過 autocad-mcp 的 `system` tool 的 `execute_lisp` action，AI 助手可以執行任意 AutoLISP 程式碼，實現無限擴展：
+
+```
+AI: system.execute_lisp("(table:get-all-layouts-data)")
+→ 直接呼叫我們的 AutoLISP 函數，無需新增 MCP tool
+```
+
+---
+
+## 9. Python GUI 層 — COM/IPC 模式切換
+
+### 9.1 進入點 `odoo.py`
+
+Phase 6 新增兩個命令列參數：
+
+```bash
+# 預設 COM 模式（現有行為不變）
+python odoo.py
+
+# 明確指定 COM 模式
+python odoo.py --autocad-mode com
+
+# IPC 模式（AutoCAD LT 2024+ 支援）
+python odoo.py --autocad-mode ipc
+
+# 啟動 MCP Server（搭配任一 AutoCAD 模式）
+python odoo.py --autocad-mode ipc --mcp-autocad
+```
+
+`odoo.py` 解析參數後傳給 `FormMain`：
+
+```python
+# odoo.py (Phase 6 修改)
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--autocad-mode', choices=['com', 'ipc'], default='com')
+parser.add_argument('--mcp-autocad', action='store_true')
+# 保留舊參數相容性
+parser.add_argument('--enable-mcp', action='store_true', help='(deprecated, use --mcp-autocad)')
+args = parser.parse_args()
+
+app = FormMain(odoo_connection, autocad_mode=args.autocad_mode,
+               enable_mcp=args.mcp_autocad or args.enable_mcp)
+```
+
+### 9.2 FormMain 初始化流程
+
+`forms/form_main_modern.py` 根據 `autocad_mode` 參數決定初始化路徑：
+
+```python
+class FormMain:
+    def __init__(self, odoo_connection, autocad_mode='com', enable_mcp=False):
+        self.autocad_mode = autocad_mode
+
+    def init_utilities(self):
+        # 統一介面：UtilAutoCADDispatcher
+        self.dispatcher = UtilAutoCADDispatcher(mode=self.autocad_mode)
+
+        # COM 模式需要 GUI Proxy（STA 線程安全）
+        if self.autocad_mode == 'com':
+            setup_gui_proxy_handlers(self.dispatcher)
+            self.start_gui_proxy_timer()  # 100ms 輪詢
+
+        # IPC 模式不需 GUI Proxy（File IPC 無 COM 線程問題）
+
+        # 業務邏輯透過 dispatcher 透明切換
+        self.push_boq = UtilPushToBoq(self.dispatcher, self.odoo_util)
+        self.transfer_pr = UtilTransferBoqToPr(self.dispatcher, self.odoo_util)
+
+        # MCP 管理器（全新，取代舊 MCPSSEManager）
+        if self.enable_mcp:
+            self.mcp_manager = MCPManager(self.dispatcher, self.odoo_util)
+            self.mcp_manager.start()
+```
+
+### 9.3 UtilAutoCADDispatcher 設計
+
+統一介面，持有兩個後端，依 mode 轉發呼叫：
+
+```python
+class UtilAutoCADDispatcher:
+    def __init__(self, mode='com'):
+        self.mode = mode
+        self._com_backend = None   # UtilAutoCAD (lazy init)
+        self._ipc_backend = None   # UtilAutoCADIPC (lazy init)
+
+    @property
+    def active_backend(self):
+        if self.mode == 'com':
+            if not self._com_backend:
+                self._com_backend = UtilAutoCAD(...)
+            return self._com_backend
+        else:
+            if not self._ipc_backend:
+                self._ipc_backend = UtilAutoCADIPC(...)
+            return self._ipc_backend
+
+    def switch_mode(self, new_mode):
+        """切換模式（可由 UI 設定區觸發）"""
+        self.mode = new_mode
+
+    # 統一介面方法 — 轉發到 active_backend
+    def get_all_layouts_data(self): ...
+    def get_all_header_ids(self): ...
+    def write_ids(self, response): ...
+    def get_block_attributes(self): ...
+    def set_block_attributes(self, attrs, layout=None): ...
+```
+
+### 9.4 GUI Proxy 條件化
+
+`utility/util_gui_proxy.py` 的 `setup_gui_proxy_handlers()` 加入模式判斷：
+
+- **COM 模式**: 啟用 GUI Proxy（所有 COM 操作必須在 GUI 主線程 STA 執行）
+- **IPC 模式**: bypass GUI Proxy（File IPC 是 process 間通訊，無 COM 線程問題）
+
+### 9.5 MCP 層替換
+
+**舊架構（刪除）:**
+```
+form_main_modern.py
+  └→ MCPSSEManager(autocad_util, odoo_util)     [utility/util_mcp_sse_manager.py]  ← 刪除
+       └→ import mcp_server_fastmcp              [mcp_server_fastmcp.py]            ← 刪除
+       └→ StandardMCPSSEServer                    [utility/util_mcp_sse_server.py]   ← 刪除
+```
+
+**新架構（取代）:**
+```
+form_main_modern.py
+  └→ MCPManager(dispatcher, odoo_util)            [utility/util_mcp_manager.py]     ← 全新
+       └→ import mcp_server_autocad               [mcp_server_autocad.py]            ← 全新
+            └→ 8 通用 tools (from autocad-mcp submodule)
+            └→ 5 Odoo tools (我們擴展)
+       └→ stdio / streamable-http transport        [取代舊 SSE 模式]
+```
+
+**刪除清單:**
+- `utility/util_mcp_sse_manager.py` — 舊 SSE 管理器
+- `utility/util_mcp_sse_server.py` — 舊 SSE transport
+- `mcp_server_fastmcp.py` — 舊 7 tools MCP server
+
+### 9.6 業務邏輯不需修改
+
+`UtilPushToBoq` / `UtilTransferBoqToPr` 透過 dispatcher 統一介面操作 AutoCAD，
+不需要知道底層是 COM 還是 IPC，模式切換對它們完全透明。
+
+### 9.7 模式切換 UI
+
+GUI 設定區域提供 RadioButton / OptionMenu，讓使用者在運行時切換 COM ↔ IPC：
+
+```
+┌─ AutoCAD Mode ────────────────────────┐
+│  ● COM (Full AutoCAD, pywin32)        │
+│  ○ IPC (AutoCAD LT 2024+, File IPC)  │
+└───────────────────────────────────────┘
+```
+
+切換時呼叫 `dispatcher.switch_mode(new_mode)`，並更新狀態列顯示。
+
+### 9.8 衝突避免
+
+COM 模式和 IPC 模式不應同時操作 AutoCAD：
+- 同一時間應只有一個 caller（Python COM 端 或 Python IPC 端）
+- autocad-mcp 使用 `asyncio.Lock` 防止 Python 端並行 dispatch
+- GUI 的模式切換是排他的（COM 或 IPC，不同時啟用）

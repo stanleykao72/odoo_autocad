@@ -274,12 +274,24 @@ def start_mcp_server_only(args):
         return 1
 
 
-def start_gui_application(enable_mcp=False, mcp_args=None):
+def start_mcp_autocad_server(args):
+    """啟動 MCP AutoCAD 伺服器 (mcp_server_autocad.py, stdio)"""
+    try:
+        import mcp_server_autocad
+        _logger.info("Starting MCP AutoCAD server (stdio)...")
+        mcp_server_autocad.main()
+        return 0
+    except Exception as e:
+        _logger.error(f"MCP AutoCAD server failed: {e}")
+        return 1
+
+
+def start_gui_application(enable_mcp=False, mcp_args=None, autocad_mode="com"):
     """啟動GUI應用程式 (可選擇性啟用MCP)"""
     odoo_connection = sqlite_create_table()
-    
+
     if odoo_connection:
-        form_main = FormMain(odoo_connection=odoo_connection)
+        form_main = FormMain(odoo_connection=odoo_connection, autocad_mode=autocad_mode)
         
         # 如果啟用MCP，自動啟動MCP伺服器
         if enable_mcp and hasattr(form_main, 'initialize_mcp_server_manager'):
@@ -318,15 +330,26 @@ def main():
                        help='MCP Named Pipe名稱')
     parser.add_argument('--enable-mcp', action='store_true',
                        help='在GUI模式下啟用MCP伺服器')
-    
+    parser.add_argument('--autocad-mode', choices=['com', 'ipc'], default='com',
+                       help='AutoCAD connection mode: com (Full AutoCAD) or ipc (LT 2024+)')
+    parser.add_argument('--mcp-autocad', action='store_true',
+                       help='啟動MCP模式操作AutoCAD（使用 mcp_server_autocad.py）')
+
     args = parser.parse_args()
     
-    if args.mcp_server:
+    if args.mcp_autocad:
+        # MCP AutoCAD 模式 (stdio, uses mcp_server_autocad.py)
+        return start_mcp_autocad_server(args)
+    elif args.mcp_server:
         # 純MCP伺服器模式
         return start_mcp_server_only(args)
     else:
         # GUI模式
-        start_gui_application(enable_mcp=args.enable_mcp, mcp_args=args)
+        start_gui_application(
+            enable_mcp=args.enable_mcp,
+            mcp_args=args,
+            autocad_mode=args.autocad_mode
+        )
         return 0
 
 

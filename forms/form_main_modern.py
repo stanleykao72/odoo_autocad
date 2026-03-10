@@ -8,11 +8,11 @@ from typing import Optional
 
 from utility.util_odoo import UtilOdoo
 from utility.util_autocad import UtilAutoCAD
+from utility.util_autocad_dispatcher import UtilAutoCADDispatcher
 from utility.util_push_to_boq import UtilPushToBoq
 from utility.util_transfer_boq_to_pr import UtilTransferBoqToPr
 from utility.util_log import UtilLog
-from utility.util_mcp_sse_manager import MCPSSEManager
-from ai_assistant.mcp_server_manager import MCPServerManager
+from utility.util_mcp_manager import MCPManager
 from utility.util_gui_proxy import setup_gui_proxy_handlers, get_gui_proxy
 from forms.form_autocad_param import FormAutoCADParam
 from forms.form_autocad_param_enhanced import EnhancedFormAutoCADParam
@@ -25,13 +25,14 @@ from swagger_spec_validator.common import SwaggerValidationError
 class ModernFormMain(ctk.CTk):
     """現代化的主表單，使用CustomTkinter"""
     
-    def __init__(self, odoo_connection):
+    def __init__(self, odoo_connection, autocad_mode="com"):
         super().__init__()
-        
+
         # 設置主題
         UITheme.setup_theme("system", "blue")
-        
+
         self.odoo_connection = odoo_connection
+        self.autocad_mode = autocad_mode
         self.title("AutoCAD Odoo 整合系統")
         
         # 設置視窗圖示
@@ -93,31 +94,42 @@ class ModernFormMain(ctk.CTk):
     def init_utilities(self):
         """初始化工具類別"""
         # 注意：log_util 已經在 create_ui() -> setup_log_util() 中創建
-        
-        # 初始化工具類別，現在可以使用 log_util
+
+        # 初始化工具類別
         self.odoo_util = UtilOdoo(self.odoo_connection, self.log_util)
-        self.autocad_util = UtilAutoCAD(self.odoo_util, self.log_util)
-        self.push_to_boq_util = UtilPushToBoq(self.odoo_util, self.autocad_util, self.log_util)
-        self.transfer_boq_to_pr_util = UtilTransferBoqToPr(self.odoo_util, self.autocad_util, self.log_util)
-        
-        # 初始化AI助手相關組件
-        self.mcp_server_manager = None  # 將在需要時初始化
-        self.mcp_sse_manager = MCPSSEManager(
-            port=8084, 
-            autocad_util=self.autocad_util, 
-            odoo_util=self.odoo_util
-        )  # 標準 MCP SSE 伺服器管理器，傳遞已連接的工具實例
-        self.mcp_sse_manager.set_status_callback(self.on_mcp_sse_status_update)
-        
-        # 初始化GUI代理系統 (解決COM線程問題)
-        self.gui_proxy = setup_gui_proxy_handlers(self.autocad_util, self.log_util)
-        self.log_util.safe_log_insert("[GUI] GUI代理系統已初始化\n")
-        
-        # 啟動GUI代理處理定時器
-        self.start_gui_proxy_processing()
-        
-        # 自動啟動 SSE 伺服器以供 Gemini CLI 連接
-        self.auto_start_sse_server()
+
+        # 使用 Dispatcher 統一 COM/IPC 介面
+        self.autocad_dispatcher = UtilAutoCADDispatcher(
+            self.odoo_util, self.log_util, mode=self.autocad_mode
+        )
+        # 保持向後相容：autocad_util 指向 dispatcher
+        self.autocad_util = self.autocad_dispatcher
+
+        self.push_to_boq_util = UtilPushToBoq(self.odoo_util, self.autocad_dispatcher, self.log_util)
+        self.transfer_boq_to_pr_util = UtilTransferBoqToPr(self.odoo_util, self.autocad_dispatcher, self.log_util)
+
+        # MCP Manager (取代 MCPSSEManager)
+        self.mcp_manager = MCPManager(
+            autocad_dispatcher=self.autocad_dispatcher,
+            odoo_util=self.odoo_util,
+            transport="sse",
+            port=8084
+        )
+        self.mcp_manager.set_status_callback(self.on_mcp_status_update)
+
+        # GUI代理系統：僅 COM 模式需要（解決COM線程問題）
+        if self.autocad_mode == "com":
+            self.gui_proxy = setup_gui_proxy_handlers(
+                self.autocad_dispatcher.active_backend, self.log_util
+            )
+            self.log_util.safe_log_insert("[GUI] GUI代理系統已初始化 (COM模式)\n")
+            self.start_gui_proxy_processing()
+        else:
+            self.gui_proxy = None
+            self.log_util.safe_log_insert("[GUI] IPC模式 — GUI代理系統已跳過\n")
+
+        # 自動啟動 MCP 伺服器
+        self.auto_start_mcp_server()
     
     def create_ui(self):
         """創建使用者介面"""
@@ -314,7 +326,74 @@ class ModernFormMain(ctk.CTk):
             text_color="white"
         )
         self.btn_connect_autocad.pack(fill="x", padx=20, pady=5)
-    
+
+        # AutoCAD 模式切換
+        mode_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        mode_frame.pack(fill="x", padx=20, pady=(2, 5))
+
+        mode_label = ctk.CTkLabel(
+            mode_frame,
+            text="模式:",
+            font=("Microsoft JhengHei UI", 11),
+            text_color="#B0B0B0"
+        )
+        mode_label.pack(side="left", padx=(0, 5))
+
+        self.mode_var = ctk.StringVar(value=self.autocad_mode.upper())
+        self.mode_switch = ctk.CTkSegmentedButton(
+            mode_frame,
+            values=["COM", "IPC"],
+            variable=self.mode_var,
+            command=self._on_mode_switch,
+            font=("Microsoft JhengHei UI", 11),
+            height=28,
+            corner_radius=6
+        )
+        self.mode_switch.pack(side="left", fill="x", expand=True)
+
+    def _on_mode_switch(self, selected):
+        """處理 COM/IPC 模式切換"""
+        new_mode = selected.lower()
+        if new_mode == self.autocad_mode:
+            return
+
+        old_mode = self.autocad_mode
+        self.autocad_mode = new_mode
+
+        # 切換 dispatcher 模式
+        self.autocad_dispatcher.switch_mode(new_mode)
+
+        # COM 模式需要 GUI Proxy，IPC 不需要
+        if new_mode == "com" and self.gui_proxy is None:
+            from utility.util_gui_proxy import setup_gui_proxy_handlers
+            self.gui_proxy = setup_gui_proxy_handlers(
+                self.autocad_dispatcher.active_backend, self.log_util
+            )
+            self.start_gui_proxy_processing()
+            self.log_util.safe_log_insert("[GUI] COM 模式 — GUI代理系統已啟動\n")
+        elif new_mode == "ipc" and self.gui_proxy is not None:
+            self.gui_proxy = None
+            self.log_util.safe_log_insert("[GUI] IPC 模式 — GUI代理系統已停用\n")
+
+        # 更新 MCP Manager
+        if hasattr(self, 'mcp_manager'):
+            self.mcp_manager.update_autocad_dispatcher(self.autocad_dispatcher)
+
+        self.log_util.safe_log_insert(
+            f"[Mode] {old_mode.upper()} -> {new_mode.upper()}\n"
+        )
+
+        # 更新連接按鈕文字
+        self._update_autocad_button_label()
+        self.update_connection_status()
+
+    def _update_autocad_button_label(self):
+        """根據模式更新 AutoCAD 按鈕文字"""
+        if self.autocad_mode == "ipc":
+            self.btn_connect_autocad.configure(text="📐 連接到 AutoCAD LT")
+        else:
+            self.btn_connect_autocad.configure(text="📐 連接到 AutoCAD")
+
     def create_main_functions_section(self):
         """創建主要功能區"""
         # 主要功能標題
@@ -536,16 +615,21 @@ class ModernFormMain(ctk.CTk):
             )
         
         # 更新AutoCAD狀態
+        mode_tag = f" ({self.autocad_mode.upper()})"
         if hasattr(self, 'autocad_util') and self.autocad_util.connected_autocad():
-            self.autocad_status_label.configure(text="📐 AutoCAD: ✅ 已連接")
+            self.autocad_status_label.configure(
+                text=f"📐 AutoCAD{mode_tag}: ✅ 已連接"
+            )
             self.btn_connect_autocad.configure(
-                fg_color="#2E7D32",  # 深綠色表示已連接
+                fg_color="#2E7D32",
                 hover_color="#1B5E20"
             )
         else:
-            self.autocad_status_label.configure(text="📐 AutoCAD: ❌ 未連接")
+            self.autocad_status_label.configure(
+                text=f"📐 AutoCAD{mode_tag}: ❌ 未連接"
+            )
             self.btn_connect_autocad.configure(
-                fg_color="#7B1FA2",  # 原紫色表示未連接
+                fg_color="#7B1FA2",
                 hover_color="#4A148C"
             )
     
@@ -581,15 +665,13 @@ class ModernFormMain(ctk.CTk):
             if self.log_util:
                 self.log_util.safe_log_insert("✅ 與 AutoCAD 連線成功\n")
             
-            # 更新MCP伺服器的AutoCAD狀態快取
-            if hasattr(self, 'mcp_server_manager') and self.mcp_server_manager:
+            # 更新MCP伺服器的AutoCAD dispatcher
+            if hasattr(self, 'mcp_manager') and self.mcp_manager:
                 try:
-                    self.mcp_server_manager.update_autocad_status_cache()
-                    if self.log_util:
-                        self.log_util.safe_log_insert("🔄 MCP狀態快取已更新\n")
+                    self.mcp_manager.update_autocad_dispatcher(self.autocad_dispatcher)
                 except Exception as e:
                     if self.log_util:
-                        self.log_util.safe_log_insert(f"⚠️ MCP狀態快取更新失敗: {e}\n")
+                        self.log_util.safe_log_insert(f"MCP dispatcher 更新失敗: {e}\n")
     
     def get_parameters_from_odoo(self):
         """從Odoo獲取參數 - 使用改進的界面"""
@@ -641,17 +723,12 @@ class ModernFormMain(ctk.CTk):
         messagebox.showinfo(title, message, parent=self)
     
     def initialize_mcp_server_manager(self):
-        """初始化MCP SSE服務管理器（使用已存在的mcp_sse_manager）"""
+        """初始化MCP服務管理器（向後相容）"""
         try:
-            # 使用已經初始化的 mcp_sse_manager，將其賦值給 mcp_server_manager
-            # 這樣可以保持與 odoo.py 中自動啟動邏輯的相容性
-            self.mcp_server_manager = self.mcp_sse_manager
-            
-            self.log_util.safe_log_insert("MCP SSE服務管理器已準備就緒（使用共享實例）\n")
-            self.log_util.safe_log_insert(f"MCP伺服器端口: {self.mcp_server_manager.port}\n")
-            
+            self.log_util.safe_log_insert("MCP服務管理器已準備就緒\n")
+            self.log_util.safe_log_insert(f"MCP伺服器端口: {self.mcp_manager.port}\n")
         except Exception as e:
-            self.log_util.safe_log_insert(f"MCP SSE服務管理器初始化失敗: {e}\n")
+            self.log_util.safe_log_insert(f"MCP服務管理器初始化失敗: {e}\n")
             messagebox.showerror("錯誤", f"無法初始化AI助手服務管理器：{e}")
     
     # toggle_mcp_server 方法已移除 - MCP 按鈕已從 UI 中移除
@@ -659,173 +736,66 @@ class ModernFormMain(ctk.CTk):
     # update_mcp_status_display 方法已移除 - MCP 按鈕已從 UI 中移除
     
     def toggle_sse_server(self):
-        """切換 SSE 伺服器狀態"""
-        self.log_util.safe_log_insert(f"[SSE GUI] toggle_sse_server 被呼叫\n")
+        """切換 MCP 伺服器狀態"""
         try:
-            current_status = self.mcp_sse_manager.is_running
-            self.log_util.safe_log_insert(f"[SSE GUI] 當前 SSE 伺服器狀態: {current_status}\n")
-            
-            if current_status:
-                # 停止 SSE 伺服器
-                self.log_util.safe_log_insert("[SSE GUI] 準備停止 SSE 伺服器\n")
-                stop_result = self.mcp_sse_manager.stop_server()
-                self.log_util.safe_log_insert(f"[SSE GUI] 停止 SSE 伺服器結果: {stop_result}\n")
-                if stop_result:
-                    self.log_util.safe_log_insert("[SSE GUI] ✅ SSE 伺服器已成功停止\n")
-                else:
-                    self.log_util.safe_log_insert("[SSE GUI] ❌ SSE 伺服器停止失敗\n")
+            if self.mcp_manager.is_running:
+                self.mcp_manager.stop_server()
             else:
-                # 啟動 SSE 伺服器
-                self.log_util.safe_log_insert("[SSE GUI] 準備啟動 SSE 伺服器（端口: 8083）\n")
-                import threading
-                thread = threading.Thread(target=self._start_sse_server_async, daemon=True)
-                self.log_util.safe_log_insert(f"[SSE GUI] 創建啟動執行緒: {thread.name}\n")
-                thread.start()
-                self.log_util.safe_log_insert("[SSE GUI] 啟動執行緒已開始\n")
-                
+                self.mcp_manager.start_server()
         except Exception as e:
-            import traceback
-            error_trace = traceback.format_exc()
-            self.log_util.safe_log_insert(f"[SSE GUI] ❌ 切換 SSE 伺服器狀態發生異常: {e}\n")
-            self.log_util.safe_log_insert(f"[SSE GUI] 錯誤追蹤:\n{error_trace}\n")
-            messagebox.showerror("錯誤", f"無法切換 SSE 伺服器狀態：{e}")
-    
-    def auto_start_sse_server(self):
-        """自動啟動 SSE 伺服器以供 Gemini CLI 連接"""
+            self.log_util.safe_log_insert(f"[MCP] Toggle server error: {e}\n")
+            messagebox.showerror("錯誤", f"無法切換 MCP 伺服器狀態：{e}")
+
+    def auto_start_mcp_server(self):
+        """自動啟動 MCP 伺服器"""
         try:
-            # 在應用程式啟動時自動啟動 SSE 伺服器
-            # 這解決了 Gemini CLI 在 SSE 伺服器啟動之前就嘗試連接的時機問題
-            if hasattr(self, 'log_util') and self.log_util:
-                self.log_util.safe_log_insert("[SSE GUI] 開始自動啟動 SSE 伺服器流程\n")
-                self.log_util.safe_log_insert(f"[SSE GUI] 目標端口: {getattr(self.mcp_sse_manager, 'port', '未知')}\n")
-            
-            import threading
-            thread = threading.Thread(target=self._start_sse_server_async, daemon=True)
-            if hasattr(self, 'log_util') and self.log_util:
-                self.log_util.safe_log_insert(f"[SSE GUI] 創建自動啟動執行緒: {thread.name}\n")
-            thread.start()
-            
-            if hasattr(self, 'log_util') and self.log_util:
-                self.log_util.safe_log_insert("[SSE GUI] 自動啟動執行緒已開始執行\n")
-            
+            self.log_util.safe_log_insert(f"[MCP] Auto-starting MCP server on port {self.mcp_manager.port}\n")
+            self.mcp_manager.start_server()
         except Exception as e:
-            # 如果自動啟動失敗，記錄錯誤但不阻止應用程式啟動
-            import traceback
-            error_trace = traceback.format_exc()
-            if hasattr(self, 'log_util') and self.log_util:
-                self.log_util.safe_log_insert(f"[SSE GUI] ❌ 自動啟動 SSE 伺服器失敗: {e}\n")
-                self.log_util.safe_log_insert(f"[SSE GUI] 錯誤追蹤:\n{error_trace}\n")
-            else:
-                print(f"[SSE GUI] 自動啟動 SSE 伺服器失敗: {e}")
-                print(f"[SSE GUI] 錯誤追蹤:\n{error_trace}")
-    
-    def _start_sse_server_async(self):
-        """異步啟動 SSE 伺服器"""
-        import threading
-        thread_name = threading.current_thread().name
-        
-        # 使用 after 確保日誌在主執行緒中記錄
-        self.after(0, lambda: self.log_util.safe_log_insert(f"[SSE GUI] _start_sse_server_async 開始執行 (執行緒: {thread_name})\n"))
-        
-        try:
-            self.after(0, lambda: self.log_util.safe_log_insert("[SSE GUI] 呼叫 mcp_sse_manager.start_server()\n"))
-            success = self.mcp_sse_manager.start_server()
-            
-            self.after(0, lambda: self.log_util.safe_log_insert(f"[SSE GUI] start_server() 回傳結果: {success}\n"))
-            
-            if success:
-                self.after(0, lambda: self.log_util.safe_log_insert("[SSE GUI] ✅ SSE 伺服器啟動成功\n"))
-                # 驗證伺服器狀態
-                final_status = self.mcp_sse_manager.is_running
-                self.after(0, lambda: self.log_util.safe_log_insert(f"[SSE GUI] 最終伺服器狀態: {final_status}\n"))
-            else:
-                self.after(0, lambda: self.log_util.safe_log_insert("[SSE GUI] ❌ SSE 伺服器啟動失敗\n"))
-                
-        except Exception as e:
-            import traceback
-            error_trace = traceback.format_exc()
-            self.after(0, lambda: self.log_util.safe_log_insert(f"[SSE GUI] ❌ _start_sse_server_async 發生異常: {e}\n"))
-            self.after(0, lambda: self.log_util.safe_log_insert(f"[SSE GUI] 錯誤追蹤:\n{error_trace}\n"))
-    
-    def on_mcp_sse_status_update(self, message: str, is_running: bool):
-        """SSE 狀態更新回調"""
+            self.log_util.safe_log_insert(f"[MCP] Auto-start failed: {e}\n")
+
+    # Keep old name for backward compatibility
+    auto_start_sse_server = auto_start_mcp_server
+
+    def on_mcp_status_update(self, is_running: bool, message: str):
+        """MCP 狀態更新回調"""
         def update_ui():
-            self.log_util.safe_log_insert(f"[SSE GUI] 收到狀態更新回調: message='{message}', is_running={is_running}\n")
-            
-            # 更新 SSE 狀態顯示
             if is_running:
-                self.log_util.safe_log_insert("[SSE GUI] 更新 UI 為運行狀態\n")
-                self.sse_status_label.configure(text="🟢")  # 綠色表示運行中
-                self.sse_toggle_button.configure(text="⏹️")  # 停止圖示
-                self.sse_info_label.configure(text=f"SSE: :{self.mcp_sse_manager.port}")
+                if hasattr(self, 'sse_status_label'):
+                    self.sse_status_label.configure(text="🟢")
+                if hasattr(self, 'sse_toggle_button'):
+                    self.sse_toggle_button.configure(text="⏹️")
+                if hasattr(self, 'sse_info_label'):
+                    self.sse_info_label.configure(text=f"MCP: :{self.mcp_manager.port}")
             else:
-                self.log_util.safe_log_insert("[SSE GUI] 更新 UI 為停止狀態\n")
-                self.sse_status_label.configure(text="🔴")  # 紅色表示停止
-                self.sse_toggle_button.configure(text="🌊")  # 啟動圖示
-                self.sse_info_label.configure(text="")
-            
-            # 記錄狀態消息
-            self.log_util.safe_log_insert(f"[SSE 狀態] {message}\n")
-            
-            # 更新面板狀態（如果面板已打開）
-            try:
-                self.update_sse_panel_status()
-                self.log_util.safe_log_insert("[SSE GUI] 面板狀態已更新\n")
-            except Exception as e:
-                self.log_util.safe_log_insert(f"[SSE GUI] 更新面板狀態失敗: {e}\n")
-        
+                if hasattr(self, 'sse_status_label'):
+                    self.sse_status_label.configure(text="🔴")
+                if hasattr(self, 'sse_toggle_button'):
+                    self.sse_toggle_button.configure(text="🌊")
+                if hasattr(self, 'sse_info_label'):
+                    self.sse_info_label.configure(text="")
+            self.log_util.safe_log_insert(f"[MCP] {message}\n")
         self.after(0, update_ui)
+
+    # Keep old callback name for backward compat
+    def on_mcp_sse_status_update(self, message: str, is_running: bool):
+        """SSE 狀態更新回調 (backward compat)"""
+        self.on_mcp_status_update(is_running, message)
     
     def show_sse_status(self):
-        """顯示 SSE 伺服器詳細狀態"""
-        status = self.mcp_sse_manager.get_server_status()
-        
+        """顯示 MCP 伺服器詳細狀態"""
         status_text = f"""
-SSE 伺服器狀態:
-運行狀態: {'🟢 運行中' if status['is_running'] else '🔴 已停止'}
-端口: {status['port']}
-模式: 直接整合 MCPSSEServer
-健康檢查: {'✅ 正常' if status['health_check'] else '❌ 異常'}
+MCP 伺服器狀態:
+運行狀態: {'🟢 運行中' if self.mcp_manager.is_running else '🔴 已停止'}
+端口: {self.mcp_manager.port}
+AutoCAD 模式: {self.autocad_mode.upper()}
         """
-        
-        # 添加伺服器資訊（如果可用）
-        if 'server_name' in status:
-            status_text += f"\n伺服器名稱: {status['server_name']}"
-            status_text += f"\n版本: {status['server_version']}"
-            status_text += f"\n活動連接: {status['active_connections']}"
-        
-        messagebox.showinfo("SSE 伺服器狀態", status_text)
-    
+        messagebox.showinfo("MCP 伺服器狀態", status_text)
+
     def test_sse_connection(self):
-        """測試 SSE 連接"""
-        self.log_util.safe_log_insert("[SSE GUI] 開始測試 SSE 連接\n")
-        
-        try:
-            # 記錄測試前的狀態
-            server_status = self.mcp_sse_manager.get_server_status()
-            self.log_util.safe_log_insert(f"[SSE GUI] 測試前伺服器狀態: {server_status}\n")
-            
-            # 執行連接測試
-            self.log_util.safe_log_insert("[SSE GUI] 呼叫 test_mcp_connection()\n")
-            result = self.mcp_sse_manager.test_mcp_connection()
-            self.log_util.safe_log_insert(f"[SSE GUI] 測試結果: {result}\n")
-            
-            if result["success"]:
-                test_result = result.get('test_result', '未知')
-                message = f"✅ SSE 連接成功\n工具數量: {result['tools_count']}\n可用工具: {', '.join(result['tools'])}\n\n工具測試結果:\n{test_result}"
-                self.log_util.safe_log_insert("[SSE GUI] ✅ SSE 連接測試成功\n")
-                messagebox.showinfo("SSE 連接測試", message)
-            else:
-                error_msg = result.get('error', '未知錯誤')
-                self.log_util.safe_log_insert(f"[SSE GUI] ❌ SSE 連接測試失敗: {error_msg}\n")
-                messagebox.showerror("SSE 連接測試", f"❌ SSE 連接失敗\n錯誤: {error_msg}")
-                
-        except Exception as e:
-            import traceback
-            error_trace = traceback.format_exc()
-            self.log_util.safe_log_insert(f"[SSE GUI] ❌ 測試 SSE 連接時發生異常: {e}\n")
-            self.log_util.safe_log_insert(f"[SSE GUI] 錯誤追蹤:\n{error_trace}\n")
-            messagebox.showerror("SSE 連接測試", f"❌ 測試過程發生錯誤：{e}")
+        """測試 MCP 連接"""
+        status = "Running" if self.mcp_manager.is_running else "Stopped"
+        messagebox.showinfo("MCP 連接測試", f"MCP Server: {status}\nPort: {self.mcp_manager.port}")
     
     def create_sse_control_panel(self):
         """創建 SSE 控制面板"""
@@ -921,14 +891,14 @@ SSE 伺服器狀態:
         config_details.pack(fill="x", padx=10, pady=5)
         
         # 插入配置信息
-        config_text = f"""端口: {self.mcp_sse_manager.port}
-整合模式: 直接整合 MCPSSEServer 類別
-Gemini CLI 配置:
+        config_text = f"""端口: {self.mcp_manager.port}
+AutoCAD 模式: {self.autocad_mode.upper()}
+MCP 配置:
 {{
-  "autocad-odoo-sse": {{
-    "url": "http://localhost:{self.mcp_sse_manager.port}/sse",
-    "timeout": 30000,
-    "description": "AutoCAD-Odoo Integration with SSE transport"
+  "autocad-odoo": {{
+    "command": "python",
+    "args": ["mcp_server_autocad.py"],
+    "description": "AutoCAD-Odoo Integration MCP Server"
   }}
 }}"""
         config_details.insert("0.0", config_text)
@@ -959,10 +929,10 @@ Gemini CLI 配置:
         self.update_sse_panel_status()
     
     def update_sse_panel_status(self):
-        """更新 SSE 面板狀態"""
+        """更新 MCP 面板狀態"""
         if hasattr(self, 'sse_panel_status_label'):
-            status = self.mcp_sse_manager.get_server_status()
-            if status['is_running']:
+            is_running = self.mcp_manager.is_running
+            if is_running:
                 self.sse_panel_status_label.configure(text="狀態: 🟢 運行中")
                 if hasattr(self, 'sse_panel_toggle_button'):
                     self.sse_panel_toggle_button.configure(
@@ -984,38 +954,28 @@ Gemini CLI 配置:
         self.process_gui_proxy_requests()
     
     def process_gui_proxy_requests(self):
-        """處理GUI代理請求 (在主線程中運行)"""
+        """處理GUI代理請求 (在主線程中運行, COM模式only)"""
+        if self.gui_proxy is None:
+            return
         try:
-            # 處理所有待處理的請求
             processed = self.gui_proxy.process_requests()
-            
             if processed > 0:
                 self.log_util.safe_log_insert(f"[GUI Proxy] 處理了 {processed} 個請求\n")
-                
         except Exception as e:
             self.log_util.safe_log_insert(f"[GUI Proxy] 處理請求時發生錯誤: {e}\n")
-        
         # 每100毫秒檢查一次
         self.after(100, self.process_gui_proxy_requests)
     
     def on_closing(self):
         """視窗關閉事件"""
-        # 在關閉應用程式前停止MCP服務
+        # 停止 MCP 伺服器
         try:
-            if self.mcp_server_manager and self.mcp_server_manager.is_running():
-                self.mcp_server_manager.stop_all_servers()
-                self.log_util.safe_log_insert("AI助手服務已停止\n")
+            if hasattr(self, 'mcp_manager') and self.mcp_manager and self.mcp_manager.is_running:
+                self.mcp_manager.stop_server()
+                self.log_util.safe_log_insert("MCP 伺服器已停止\n")
         except Exception as e:
-            self.log_util.safe_log_insert(f"停止AI助手服務失敗: {e}\n")
-        
-        # 停止 SSE 伺服器
-        try:
-            if self.mcp_sse_manager and self.mcp_sse_manager.is_running:
-                self.mcp_sse_manager.cleanup()
-                self.log_util.safe_log_insert("SSE 伺服器已停止\n")
-        except Exception as e:
-            self.log_util.safe_log_insert(f"停止 SSE 伺服器失敗: {e}\n")
-        
+            self.log_util.safe_log_insert(f"停止 MCP 伺服器失敗: {e}\n")
+
         if self.log_util:
             self.log_util.safe_log_insert("正在關閉應用程式...\n")
         self.destroy()
