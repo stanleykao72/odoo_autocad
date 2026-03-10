@@ -153,7 +153,7 @@ Response: { ... }
 | `odoo_get_colors` | — | Fetch color options |
 | `odoo_status` | — | Check AutoCAD + Odoo connection |
 
-## 4. AutoLISP IPC Actions (ob_mcp_dispatch.lsp)
+## 4. AutoLISP IPC Actions (070_ob_mcp_dispatch.lsp)
 
 Dispatched via `mcp-dispatch-command`:
 

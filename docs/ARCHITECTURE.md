@@ -107,14 +107,14 @@ Python                              AutoCAD LT
 
 | File | Description |
 |------|-------------|
-| `main.lsp` | Entry point. Loads modules, registers `OB:MCP-DISPATCH` |
-| `ob_mcp_dispatch.lsp` | 6 Odoo IPC actions (extract_tables, write_ids, etc.) |
-| `config.lsp` | Path resolution, YAML config locations |
-| `table_util.lsp` | 9-column TABLE entity read/write |
-| `block_util.lsp` | Attribute block read/write |
-| `json_util.lsp` | Pure AutoLISP JSON parser |
-| `file_util.lsp` | File I/O utilities |
-| `strip_mtext.lsp` | MText formatting cleanup |
+| `080_main.lsp` | Entry point. Loads modules, registers `OB:MCP-DISPATCH` |
+| `070_ob_mcp_dispatch.lsp` | 6 Odoo IPC actions (extract_tables, write_ids, etc.) |
+| `030_config.lsp` | Path resolution, YAML config locations |
+| `060_table_util.lsp` | 9-column TABLE entity read/write |
+| `050_block_util.lsp` | Attribute block read/write |
+| `010_json_util.lsp` | Pure AutoLISP JSON parser |
+| `020_file_util.lsp` | File I/O utilities |
+| `040_strip_mtext.lsp` | MText formatting cleanup |
 
 ### External Dependencies
 

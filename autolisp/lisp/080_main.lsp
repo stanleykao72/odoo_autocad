@@ -1,5 +1,5 @@
-;;; main.lsp — Entry point: loads all modules and registers user commands
-;;; Usage: (load "main.lsp") then OB:MCP-DISPATCH to execute IPC/MCP commands
+;;; 080_main.lsp — Entry point: loads all modules and registers user commands
+;;; Usage: (load "080_main.lsp") then OB:MCP-DISPATCH to execute IPC/MCP commands
 ;;;
 ;;; AutoCAD LT 2024+ compatible (no vlax-create-object / vlax-get-or-create-object)
 
@@ -11,7 +11,7 @@
 
 ;; Determine our base directory from this file
 (defun ob:get-lisp-dir ( / fp)
-  (setq fp (findfile "main.lsp"))
+  (setq fp (findfile "080_main.lsp"))
   (if fp
     (vl-filename-directory fp)
     ;; Fallback: hardcoded project path
@@ -43,13 +43,13 @@
 (princ "\n[OB] Loading modules...")
 (princ "\n[OB] ========================================")
 
-(ob:load-module "json_util.lsp")
-(ob:load-module "file_util.lsp")
-(ob:load-module "config.lsp")
-(ob:load-module "strip_mtext.lsp")
-(ob:load-module "block_util.lsp")
-(ob:load-module "table_util.lsp")
-(ob:load-module "ob_mcp_dispatch.lsp")
+(ob:load-module "010_json_util.lsp")
+(ob:load-module "020_file_util.lsp")
+(ob:load-module "030_config.lsp")
+(ob:load-module "040_strip_mtext.lsp")
+(ob:load-module "050_block_util.lsp")
+(ob:load-module "060_table_util.lsp")
+(ob:load-module "070_ob_mcp_dispatch.lsp")
 
 ;; Initialize configuration
 (config:init)

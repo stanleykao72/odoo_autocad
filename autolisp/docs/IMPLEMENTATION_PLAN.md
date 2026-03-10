@@ -13,7 +13,7 @@
 
 ### 核心需求
 
-- **LT 相容**: 所有 `.lsp` 檔不含 `vlax-create-object` / `vlax-get-or-create-object`（例外：`strip_mtext.lsp` 使用 `vl-catch-all-apply` 包裹 + LT fallback）
+- **LT 相容**: 所有 `.lsp` 檔不含 `vlax-create-object` / `vlax-get-or-create-object`（例外：`040_strip_mtext.lsp` 使用 `vl-catch-all-apply` 包裹 + LT fallback）
 - **IPC Mode**: Python GUI 透過 File IPC（autocad-mcp）驅動 AutoCAD LT 2024+
 - **MCP Mode**: AI 助手透過 MCP Server + File IPC 驅動 AutoCAD
 - **COM Mode 不變**: 現有 Python GUI + COM 直連 Full AutoCAD 完全不受影響
@@ -32,12 +32,12 @@ Phase 1-5 曾實作 DCL 對話框 + Python Bridge.exe 的獨立模式架構（�
 
 | # | 檔案 | 說明 | 狀態 |
 |---|------|------|------|
-| 1 | `lisp/config.lsp` | 路徑常數、YAML 設定讀取 | DONE |
-| 2 | `lisp/json_util.lsp` | JSON 解析/序列化 | DONE |
-| 3 | `lisp/file_util.lsp` | 檔案讀寫 + 唯一檔名 | DONE |
-| 4 | `lisp/table_util.lsp` | TABLE 遍歷 + 資料收集 + ID 回寫 + 清除 | DONE |
-| 5 | `lisp/block_util.lsp` | Block 屬性讀寫 + 搜尋 | DONE |
-| 6 | `lisp/strip_mtext.lsp` | MText 格式清除（RegExp + LT fallback） | DONE |
+| 1 | `lisp/030_config.lsp` | 路徑常數、YAML 設定讀取 | DONE |
+| 2 | `lisp/010_json_util.lsp` | JSON 解析/序列化 | DONE |
+| 3 | `lisp/020_file_util.lsp` | 檔案讀寫 + 唯一檔名 | DONE |
+| 4 | `lisp/060_table_util.lsp` | TABLE 遍歷 + 資料收集 + ID 回寫 + 清除 | DONE |
+| 5 | `lisp/050_block_util.lsp` | Block 屬性讀寫 + 搜尋 | DONE |
+| 6 | `lisp/040_strip_mtext.lsp` | MText 格式清除（RegExp + LT fallback） | DONE |
 
 ---
 
@@ -53,11 +53,11 @@ Phase 1-5 曾實作 DCL 對話框 + Python Bridge.exe 的獨立模式架構（�
 | # | 檔案 | 動作 | 內容 | 狀態 |
 |---|------|------|------|------|
 | 1 | `libs/autocad-mcp/` | 新增 | git submodule (puran-water/autocad-mcp) | DONE |
-| 2 | `lisp/ob_mcp_dispatch.lsp` | 新增 | Odoo 擴展 dispatcher（載入 autocad-mcp `mcp_dispatch.lsp` + 註冊 Odoo actions） | DONE |
+| 2 | `lisp/070_ob_mcp_dispatch.lsp` | 新增 | Odoo 擴展 dispatcher（載入 autocad-mcp `mcp_dispatch.lsp` + 註冊 Odoo actions） | DONE |
 | 3 | `utility/util_autocad_ipc.py` | 新增 | Python File IPC client（包裝 autocad-mcp lib，提供與 `util_autocad.py` 相似的介面） | DONE |
 | 4 | `utility/util_autocad_dispatcher.py` | 新增 | COM/IPC 模式切換（統一介面） | DONE |
 | 5 | `mcp_server_autocad.py` | 新增 | MCP Server（包裝 autocad-mcp 的 8 通用 tools + 新增 5 個 Odoo tools = 13 tools） | DONE |
-| 6 | `lisp/main.lsp` | 修改 | 新增 `OB:MCP-DISPATCH` 指令，載入 `ob_mcp_dispatch.lsp`（DCL 相關已移除） | DONE |
+| 6 | `lisp/080_main.lsp` | 修改 | 新增 `OB:MCP-DISPATCH` 指令，載入 `070_ob_mcp_dispatch.lsp`（DCL 相關已移除） | DONE |
 
 ### 實作檔案 — 修改現有 (4 項)
 

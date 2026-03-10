@@ -44,9 +44,9 @@
                               │    mcp_dispatch.lsp  (通用 dispatcher)│
                               │                                      │
                               │  autolisp/lisp/                      │
-                              │    ob_mcp_dispatch.lsp (Odoo 擴展)    │
-                              │    table_util.lsp (TABLE 操作)        │
-                              │    block_util.lsp (Block 操作)        │
+                              │    070_ob_mcp_dispatch.lsp (Odoo 擴展)│
+                              │    060_table_util.lsp (TABLE 操作)    │
+                              │    050_block_util.lsp (Block 操作)    │
                               └──────────────────────────────────────┘
 ```
 
@@ -113,14 +113,14 @@ autolisp/
 │   └── AUTOCAD_LT_RESEARCH.md   # LT 支援研究報告
 │
 ├── lisp/                         # AutoLISP 原始碼（LT 相容）
-│   ├── main.lsp                  # 進入點，載入所有模組，定義使用者指令
-│   ├── config.lsp                # 路徑常數、YAML 設定讀取
-│   ├── json_util.lsp             # JSON 解析/序列化（diegomcas 版本）
-│   ├── file_util.lsp             # 檔案讀寫 + 唯一檔名 + 刪除
-│   ├── table_util.lsp            # TABLE 實體讀寫（遍歷 Layout, 讀取/回寫 ID）
-│   ├── block_util.lsp            # Block 屬性讀寫（get/set attribute）
-│   ├── strip_mtext.lsp           # MText 格式清除（RegExp + LT 純字串 fallback）
-│   └── ob_mcp_dispatch.lsp       # Odoo IPC 擴展 dispatcher
+│   ├── 080_main.lsp              # 進入點，載入所有模組，定義使用者指令
+│   ├── 030_config.lsp            # 路徑常數、YAML 設定讀取
+│   ├── 010_json_util.lsp         # JSON 解析/序列化（diegomcas 版本）
+│   ├── 020_file_util.lsp         # 檔案讀寫 + 唯一檔名 + 刪除
+│   ├── 060_table_util.lsp        # TABLE 實體讀寫（遍歷 Layout, 讀取/回寫 ID）
+│   ├── 050_block_util.lsp        # Block 屬性讀寫（get/set attribute）
+│   ├── 040_strip_mtext.lsp       # MText 格式清除（RegExp + LT 純字串 fallback）
+│   └── 070_ob_mcp_dispatch.lsp   # Odoo IPC 擴展 dispatcher
 │
 ├── config/                       # 設定檔
 │   ├── server_prod.yaml.example  # Odoo 伺服器設定範例
@@ -163,7 +163,7 @@ mcp_server_fastmcp.py              # 刪除，由 mcp_server_autocad.py 取代
 
 ## 3. 模組規格
 
-### 3.1 lisp/config.lsp — 設定管理
+### 3.1 lisp/030_config.lsp — 設定管理
 
 **全域變數:**
 
@@ -191,7 +191,7 @@ mcp_server_fastmcp.py              # 刪除，由 mcp_server_autocad.py 取代
 
 ---
 
-### 3.2 lisp/json_util.lsp — JSON 解析/序列化
+### 3.2 lisp/010_json_util.lsp — JSON 解析/序列化
 
 基於 diegomcas 版本，修改 `value_to_string` 加入 `json:escape` 呼叫。
 
@@ -203,7 +203,7 @@ mcp_server_fastmcp.py              # 刪除，由 mcp_server_autocad.py 取代
 
 ---
 
-### 3.3 lisp/file_util.lsp — 檔案 I/O
+### 3.3 lisp/020_file_util.lsp — 檔案 I/O
 
 | 函數 | 說明 |
 |------|------|
@@ -220,7 +220,7 @@ mcp_server_fastmcp.py              # 刪除，由 mcp_server_autocad.py 取代
 
 ---
 
-### 3.4 lisp/table_util.lsp — TABLE 實體操作
+### 3.4 lisp/060_table_util.lsp — TABLE 實體操作
 
 **TABLE 結構（9 欄）:**
 
@@ -269,7 +269,7 @@ mcp_server_fastmcp.py              # 刪除，由 mcp_server_autocad.py 取代
 
 ---
 
-### 3.5 lisp/block_util.lsp — Block 屬性操作
+### 3.5 lisp/050_block_util.lsp — Block 屬性操作
 
 **7 個屬性 Tag:**
 `product_name`, `spec`, `product_catelog`, `operation_flow`, `surface_treatment`, `color_name`, `color_no`
@@ -290,7 +290,7 @@ mcp_server_fastmcp.py              # 刪除，由 mcp_server_autocad.py 取代
 
 ---
 
-### 3.6 lisp/strip_mtext.lsp — MText 格式清除
+### 3.6 lisp/040_strip_mtext.lsp — MText 格式清除
 
 | 函數 | 說明 |
 |------|------|
@@ -303,16 +303,16 @@ mcp_server_fastmcp.py              # 刪除，由 mcp_server_autocad.py 取代
 
 ---
 
-### 3.7 lisp/main.lsp — 進入點
+### 3.7 lisp/080_main.lsp — 進入點
 
 **載入順序:**
-1. json_util.lsp
-2. file_util.lsp
-3. config.lsp
-4. strip_mtext.lsp
-5. block_util.lsp
-6. table_util.lsp
-7. ob_mcp_dispatch.lsp
+1. 010_json_util.lsp
+2. 020_file_util.lsp
+3. 030_config.lsp
+4. 040_strip_mtext.lsp
+5. 050_block_util.lsp
+6. 060_table_util.lsp
+7. 070_ob_mcp_dispatch.lsp
 
 **使用者指令（1 個）:**
 
@@ -322,14 +322,14 @@ mcp_server_fastmcp.py              # 刪除，由 mcp_server_autocad.py 取代
 
 ---
 
-### 3.8 lisp/ob_mcp_dispatch.lsp — Odoo IPC 擴展
+### 3.8 lisp/070_ob_mcp_dispatch.lsp — Odoo IPC 擴展
 
 此模組載入 autocad-mcp 的 `mcp_dispatch.lsp` 作為基礎 dispatcher，並擴展 dispatch table 加入 Odoo 專用 actions。
 
 **設計原則:**
 - autocad-mcp 的 `mcp_dispatch.lsp` 提供通用 dispatch 框架（讀取 JSON command → 執行 → 寫回 JSON result）
-- `ob_mcp_dispatch.lsp` 在載入後追加 Odoo 擴展 actions 到 dispatch table
-- Odoo actions 呼叫現有 `table_util.lsp` / `block_util.lsp` 執行 AutoCAD 操作
+- `070_ob_mcp_dispatch.lsp` 在載入後追加 Odoo 擴展 actions 到 dispatch table
+- Odoo actions 呼叫現有 `060_table_util.lsp` / `050_block_util.lsp` 執行 AutoCAD 操作
 
 **擴展的 Odoo actions:**
 
@@ -374,11 +374,11 @@ Phase 1-5 實作了 DCL 對話框 + Python Bridge.exe 的獨立模式架構。
 
 ### Phase 6: autocad-mcp Submodule + IPC/MCP Mode — TODO
 - [ ] `libs/autocad-mcp/` — git submodule (puran-water/autocad-mcp)
-- [ ] `lisp/ob_mcp_dispatch.lsp` — Odoo 擴展 dispatcher
+- [ ] `lisp/070_ob_mcp_dispatch.lsp` — Odoo 擴展 dispatcher
 - [ ] `utility/util_autocad_ipc.py` — Python File IPC client
 - [ ] `utility/util_autocad_dispatcher.py` — COM/IPC 模式切換
 - [ ] `mcp_server_autocad.py` — MCP Server（autocad-mcp + Odoo tools）
-- [ ] `lisp/main.lsp` — 新增 OB:MCP-DISPATCH 指令
+- [ ] `lisp/080_main.lsp` — 新增 OB:MCP-DISPATCH 指令
 
 ### 待辦（Future）
 - [ ] AutoCAD 內端對端測試
@@ -488,7 +488,7 @@ autocad-mcp 使用可配置的 IPC 目錄：
 
 由 `mcp_dispatch.lsp` 直接處理，包括：`get_status`, `open_drawing`, `save_drawing`, `execute_lisp` 等。
 
-### 7.5 Odoo 擴展 Actions（ob_mcp_dispatch.lsp 新增）
+### 7.5 Odoo 擴展 Actions（070_ob_mcp_dispatch.lsp 新增）
 
 | Action | 說明 |
 |--------|------|

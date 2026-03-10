@@ -65,14 +65,14 @@ token.yaml                     API token
 ## autolisp/ — AutoCAD Side
 
 ```
-lisp/main.lsp                  Entry point, module loader, OB:MCP-DISPATCH command
-lisp/ob_mcp_dispatch.lsp       6 Odoo IPC actions, wraps mcp_dispatch.lsp
-lisp/config.lsp                Path resolution, config directories
-lisp/table_util.lsp            9-column TABLE read/write
-lisp/block_util.lsp            Attribute block read/write
-lisp/json_util.lsp             JSON parser (pure AutoLISP)
-lisp/file_util.lsp             File I/O utilities
-lisp/strip_mtext.lsp           MText formatting cleanup
+lisp/080_main.lsp              Entry point, module loader, OB:MCP-DISPATCH command
+lisp/070_ob_mcp_dispatch.lsp   6 Odoo IPC actions, wraps mcp_dispatch.lsp
+lisp/030_config.lsp            Path resolution, config directories
+lisp/060_table_util.lsp        9-column TABLE read/write
+lisp/050_block_util.lsp        Attribute block read/write
+lisp/010_json_util.lsp         JSON parser (pure AutoLISP)
+lisp/020_file_util.lsp         File I/O utilities
+lisp/040_strip_mtext.lsp       MText formatting cleanup
 build_vlx.lsp                  VLX build script (BUILD-ALL command)
 dist/                          VLX output directory
 docs/ARCHITECTURE.md           AutoLISP architecture doc

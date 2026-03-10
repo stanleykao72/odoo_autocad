@@ -70,14 +70,14 @@
 
   ;; Compile in dependency order
   (setq fas-list (list
-    (build:compile-one (strcat *build:lisp-dir* "json_util.lsp"))
-    (build:compile-one (strcat *build:lisp-dir* "file_util.lsp"))
-    (build:compile-one (strcat *build:lisp-dir* "config.lsp"))
-    (build:compile-one (strcat *build:lisp-dir* "strip_mtext.lsp"))
-    (build:compile-one (strcat *build:lisp-dir* "block_util.lsp"))
-    (build:compile-one (strcat *build:lisp-dir* "table_util.lsp"))
-    (build:compile-one (strcat *build:lisp-dir* "ob_mcp_dispatch.lsp"))
-    (build:compile-one (strcat *build:lisp-dir* "main.lsp"))
+    (build:compile-one (strcat *build:lisp-dir* "010_json_util.lsp"))
+    (build:compile-one (strcat *build:lisp-dir* "020_file_util.lsp"))
+    (build:compile-one (strcat *build:lisp-dir* "030_config.lsp"))
+    (build:compile-one (strcat *build:lisp-dir* "040_strip_mtext.lsp"))
+    (build:compile-one (strcat *build:lisp-dir* "050_block_util.lsp"))
+    (build:compile-one (strcat *build:lisp-dir* "060_table_util.lsp"))
+    (build:compile-one (strcat *build:lisp-dir* "070_ob_mcp_dispatch.lsp"))
+    (build:compile-one (strcat *build:lisp-dir* "080_main.lsp"))
   ))
 
   (setq vlx-path (strcat *build:dist-dir* "OdooAutoCAD.vlx"))

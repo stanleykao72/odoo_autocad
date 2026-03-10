@@ -1,4 +1,4 @@
-;;; config.lsp — Path constants and YAML config (pure AutoLISP)
+;;; 030_config.lsp — Path constants and YAML config (pure AutoLISP)
 ;;; No COM dependencies — LT compatible
 
 ;;; ============================================================
@@ -13,8 +13,8 @@
     ;; If *ob:root* already set, keep it
     (*ob:root* nil)
 
-    ;; Dev mode: derive from config.lsp → lisp/ → autolisp/
-    ((setq lsp-dir (findfile "config.lsp"))
+    ;; Dev mode: derive from 030_config.lsp → lisp/ → autolisp/
+    ((setq lsp-dir (findfile "030_config.lsp"))
      (setq *ob:root*
        (vl-string-right-trim
          "\\/"
@@ -23,8 +23,8 @@
      )
     )
 
-    ;; Dev mode fallback: derive from main.lsp
-    ((setq lsp-dir (findfile "main.lsp"))
+    ;; Dev mode fallback: derive from 080_main.lsp
+    ((setq lsp-dir (findfile "080_main.lsp"))
      (setq *ob:root*
        (vl-string-right-trim
          "\\/"

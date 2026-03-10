@@ -1,4 +1,4 @@
-;;; ob_mcp_dispatch.lsp — Odoo IPC extension for autocad-mcp dispatcher
+;;; 070_ob_mcp_dispatch.lsp — Odoo IPC extension for autocad-mcp dispatcher
 ;;; Loads mcp_dispatch.lsp from the autocad-mcp submodule, then extends
 ;;; the dispatch table with Odoo-specific actions.
 ;;;
@@ -20,7 +20,7 @@
   ;; Fallback: derive from our own lisp directory
   (if (not candidate)
     (progn
-      (setq lisp-dir (vl-filename-directory (findfile "ob_mcp_dispatch.lsp")))
+      (setq lisp-dir (vl-filename-directory (findfile "070_ob_mcp_dispatch.lsp")))
       (if lisp-dir
         (progn
           (setq base-path (strcat lisp-dir "/../../libs/autocad-mcp/lisp-code/mcp_dispatch.lsp"))
