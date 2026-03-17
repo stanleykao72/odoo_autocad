@@ -28,6 +28,7 @@ class UtilAutoCADIPC:
     def __init__(self, log_util=None):
         self.log = log_util
         self._backend = None
+        self._initialized = False
         self._loop = None
         self.acad = None  # Compatibility: None means not COM-connected
         self.project_id = None
@@ -59,18 +60,200 @@ class UtilAutoCADIPC:
             try:
                 from autocad_mcp.backends.file_ipc import FileIPCBackend
                 self._backend = FileIPCBackend()
-                await self._backend.initialize()
-                self._log("[IPC] File IPC backend initialized\n")
+                init_result = await self._backend.initialize()
+                if hasattr(init_result, 'ok') and init_result.ok:
+                    self._initialized = True
+                    self._log("[IPC] File IPC backend initialized (ping OK)\n")
+                else:
+                    self._initialized = False
+                    error = getattr(init_result, 'error', 'unknown')
+                    self._log(f"[IPC] File IPC backend initialized (ping failed: {error})\n")
+                # Monkey-patch _dispatch_unlocked to log JSON parse errors
+                self._patch_dispatch_logging()
             except Exception as e:
                 self._log(f"[IPC] Failed to initialize File IPC backend: {e}\n")
                 raise
         return self._backend
 
+    def _patch_dispatch_logging(self):
+        """Patch FileIPCBackend to log JSON parse errors instead of silent pass"""
+        import json as _json
+        import asyncio as _asyncio
+        import time as _time
+        import uuid as _uuid
+        backend = self._backend
+        log = self._log
+
+        def _fix_json_backslashes(text):
+            """Fix unescaped backslashes in JSON from AutoLISP serializer."""
+            VALID = set('"\\' + '/bfnrtu')
+            out = []
+            i = 0
+            while i < len(text):
+                ch = text[i]
+                if ch == '\\':
+                    if i + 1 < len(text) and text[i + 1] in VALID:
+                        out.append(ch)
+                        out.append(text[i + 1])
+                        i += 2
+                    else:
+                        out.append('\\\\')
+                        i += 1
+                else:
+                    out.append(ch)
+                    i += 1
+            return ''.join(out)
+
+        original_dispatch = backend._dispatch_unlocked
+
+        async def patched_dispatch(command, params):
+            """Wrapped _dispatch_unlocked with JSON error logging"""
+            from autocad_mcp.backends.file_ipc import TIMEOUT, POLL_INTERVAL, CommandResult
+            import pathlib
+
+            request_id = _uuid.uuid4().hex[:12]
+            ipc_dir = backend._ipc_dir
+            cmd_file = ipc_dir / f"autocad_mcp_cmd_{request_id}.json"
+            result_file = ipc_dir / f"autocad_mcp_result_{request_id}.json"
+            tmp_file = cmd_file.with_suffix(".tmp")
+
+            try:
+                clean_params = {k: v for k, v in params.items() if v is not None}
+                payload = {
+                    "request_id": request_id,
+                    "command": command,
+                    "params": clean_params,
+                    "ts": _time.time(),
+                }
+                json_str = _json.dumps(payload, ensure_ascii=False)
+                try:
+                    tmp_file.write_text(json_str, encoding="cp950")
+                except UnicodeEncodeError:
+                    tmp_file.write_text(json_str, encoding="utf-8")
+                tmp_file.rename(cmd_file)
+
+                backend._type_dispatch_trigger()
+
+                deadline = _time.time() + TIMEOUT
+                parse_error_logged = False
+                while _time.time() < deadline:
+                    if result_file.exists():
+                        try:
+                            # AutoCAD writes in system codepage (cp950 for Chinese).
+                            # Try cp950 FIRST to avoid Big5 0x5C phantom backslash,
+                            # then UTF-8, then cp1252.
+                            text = None
+                            used_enc = None
+                            for enc in ("cp950", "utf-8", "cp1252"):
+                                try:
+                                    text = result_file.read_text(encoding=enc)
+                                    used_enc = enc
+                                    break
+                                except (UnicodeDecodeError, ValueError):
+                                    continue
+                            if text is None:
+                                text = result_file.read_text(
+                                    encoding="utf-8", errors="replace")
+                                used_enc = "utf-8(replace)"
+
+                            data = _json.loads(text)
+                            if data.get("request_id") == request_id:
+                                return CommandResult(
+                                    ok=data.get("ok", False),
+                                    payload=data.get("payload"),
+                                    error=data.get("error"),
+                                )
+                        except _json.JSONDecodeError as e:
+                            # Fix unescaped backslashes from AutoLISP JSON
+                            try:
+                                fixed = _fix_json_backslashes(text)
+                                data = _json.loads(fixed)
+                                if data.get("request_id") == request_id:
+                                    if not parse_error_logged:
+                                        log(f"[IPC] Fixed JSON backslash ({used_enc}) in {command}\n")
+                                    return CommandResult(
+                                        ok=data.get("ok", False),
+                                        payload=data.get("payload"),
+                                        error=data.get("error"),
+                                    )
+                            except _json.JSONDecodeError:
+                                pass
+                            if not parse_error_logged:
+                                fsize = result_file.stat().st_size
+                                log(f"[IPC] DIAG: JSON error ({used_enc}): {e}\n")
+                                log(f"[IPC] DIAG: size={fsize}, first 300: {text[:300]}\n")
+                                log(f"[IPC] DIAG: last 200: {text[-200:]}\n")
+                                parse_error_logged = True
+                        except OSError as e:
+                            if not parse_error_logged:
+                                log(f"[IPC] DIAG: OS error: {e}\n")
+                                parse_error_logged = True
+                    await _asyncio.sleep(POLL_INTERVAL)
+
+                return CommandResult(ok=False, error=f"Timeout waiting for result (request_id={request_id})")
+            finally:
+                for f in (cmd_file, result_file, tmp_file):
+                    try:
+                        f.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+
+        backend._dispatch_unlocked = patched_dispatch
+
+    # Commands that may take longer than the default IPC timeout (10s)
+    _SLOW_COMMANDS = {"odoo_extract_tables", "odoo_extract_table_for_layout",
+                      "odoo_get_header_ids", "odoo_write_ids"}
+    _SLOW_TIMEOUT = 60.0  # seconds
+
     async def _dispatch(self, command, params=None):
         """Send a command via File IPC and return the result"""
         backend = await self._get_backend()
-        result = await backend._dispatch(command, params or {})
+        # For slow commands, temporarily increase the backend timeout
+        if command in self._SLOW_COMMANDS:
+            import autocad_mcp.backends.file_ipc as _fipc
+            saved_timeout = _fipc.TIMEOUT
+            _fipc.TIMEOUT = self._SLOW_TIMEOUT
+            try:
+                result = await backend._dispatch(command, params or {})
+            finally:
+                _fipc.TIMEOUT = saved_timeout
+        else:
+            result = await backend._dispatch(command, params or {})
+        payload_preview = str(result.payload)[:200] if result.payload else None
+        self._log(f"[IPC] dispatch({command}) -> ok={result.ok}, error={result.error}, payload={payload_preview}\n")
+
+        # Diagnostic: if timeout, check for orphaned result file (truncated JSON)
+        if not result.ok and result.error and "Timeout" in str(result.error):
+            self._diagnose_timeout(command, result)
+
         return result
+
+    def _diagnose_timeout(self, command, result):
+        """Diagnose timeout failures — check for truncated response files"""
+        import pathlib
+        ipc_dir = pathlib.Path("C:/temp")
+        try:
+            # Look for any leftover result files
+            result_files = list(ipc_dir.glob("autocad_mcp_result_*.json"))
+            tmp_files = list(ipc_dir.glob("autocad_mcp_result_*.json.tmp"))
+            self._log(f"[IPC] DIAG: {command} timeout. "
+                      f"Orphaned result files: {len(result_files)}, "
+                      f"tmp files: {len(tmp_files)}\n")
+            for rf in result_files[:3]:  # Check up to 3 files
+                try:
+                    size = rf.stat().st_size
+                    preview = rf.read_text(encoding="utf-8", errors="replace")[:300]
+                    self._log(f"[IPC] DIAG: {rf.name} ({size} bytes): {preview}...\n")
+                except Exception as e:
+                    self._log(f"[IPC] DIAG: {rf.name} read error: {e}\n")
+            for tf in tmp_files[:3]:
+                try:
+                    size = tf.stat().st_size
+                    self._log(f"[IPC] DIAG: {tf.name} ({size} bytes)\n")
+                except Exception as e:
+                    self._log(f"[IPC] DIAG: {tf.name} error: {e}\n")
+        except Exception as e:
+            self._log(f"[IPC] DIAG error: {e}\n")
 
     # === Connection & Status ===
 
@@ -87,13 +270,35 @@ class UtilAutoCADIPC:
         self._log("[IPC] Connecting to AutoCAD via File IPC...\n")
         try:
             self._run_async(self._get_backend())
-            # Test connection
-            if self.connected_autocad():
+            # initialize() already did a ping - use that result
+            if getattr(self, '_initialized', False):
                 self._log("[IPC] AutoCAD IPC connection established\n")
-            else:
-                self._log("[IPC] AutoCAD not responding to IPC ping\n")
+                self._check_odoo_extensions()
+                return
+            # initialize() ping failed - retry with delay
+            import time
+            for attempt in range(3):
+                time.sleep(1.0)
+                self._log(f"[IPC] Retry ping ({attempt + 1}/3)...\n")
+                if self.connected_autocad():
+                    self._log("[IPC] AutoCAD IPC connection established\n")
+                    return
+            self._log("[IPC] AutoCAD not responding to IPC ping\n")
+            self._log("[IPC] Ensure mcp_dispatch.lsp or McpDispatch.vlx is loaded in AutoCAD\n")
         except Exception as e:
             self._log(f"[IPC] Connection failed: {e}\n")
+
+    def _check_odoo_extensions(self):
+        """Check if Odoo extensions (070_ob_mcp_dispatch.lsp) are loaded in AutoCAD"""
+        try:
+            result = self._run_async(self._dispatch("odoo_get_block_attrs"))
+            if hasattr(result, 'error') and 'Unknown command' in str(result.error or ''):
+                self._log("[IPC] WARNING: Odoo extensions NOT loaded in AutoCAD!\n")
+                self._log("[IPC] Please run in AutoCAD: (load \"080_main.lsp\")\n")
+            else:
+                self._log("[IPC] Odoo extensions loaded (6 actions available)\n")
+        except Exception:
+            pass
 
     # === Layout Management ===
 
@@ -102,19 +307,32 @@ class UtilAutoCADIPC:
         try:
             result = self._run_async(self._dispatch("drawing-info"))
             if hasattr(result, 'ok') and result.ok and result.payload:
-                return result.payload.get('active_layout')
+                payload = result.payload
+                # payload may be dict or JSON string
+                if isinstance(payload, str):
+                    import json
+                    payload = json.loads(payload)
+                layout = payload.get('active_layout')
+                self._log(f"[IPC] active_layout: {layout}\n")
+                return layout
+            self._log(f"[IPC] get_active_layout: no payload (ok={getattr(result, 'ok', '?')})\n")
             return None
         except Exception as e:
             self._log(f"[IPC] get_active_layout failed: {e}\n")
             return None
 
     def get_doc_layouts(self):
-        """Get list of layout names (excluding Model)"""
+        """Get list of layout names (excluding Model) via Odoo extension"""
         try:
-            result = self._run_async(self._dispatch("drawing-info"))
+            result = self._run_async(self._dispatch("odoo_get_layouts"))
             if hasattr(result, 'ok') and result.ok and result.payload:
-                layouts = result.payload.get('layouts', [])
+                payload = result.payload
+                if isinstance(payload, str):
+                    import json as _json
+                    payload = _json.loads(payload)
+                layouts = payload.get('layouts', []) if isinstance(payload, dict) else payload
                 return [l for l in layouts if l != 'Model']
+            self._log(f"[IPC] get_doc_layouts: no payload (error={getattr(result, 'error', '?')})\n")
             return []
         except Exception as e:
             self._log(f"[IPC] get_doc_layouts failed: {e}\n")
@@ -123,7 +341,7 @@ class UtilAutoCADIPC:
     # === Odoo-specific Operations (via ob_mcp_dispatch.lsp) ===
 
     def get_layouts_values(self):
-        """Extract TABLE + Block data from all layouts (Odoo action)"""
+        """Extract TABLE + Block data from all layouts (Odoo action) — fallback"""
         try:
             result = self._run_async(self._dispatch("odoo_extract_tables"))
             if hasattr(result, 'ok') and result.ok:
@@ -134,12 +352,34 @@ class UtilAutoCADIPC:
             self._log(f"[IPC] get_layouts_values error: {e}\n")
             return []
 
-    def get_layouts_header_id_to_pr(self):
-        """Collect all header_ids from TABLEs (Odoo action)"""
+    def get_single_layout_values(self, layout_name):
+        """Extract TABLE + Block data from a single layout by name"""
         try:
-            result = self._run_async(self._dispatch("odoo_get_header_ids"))
+            result = self._run_async(self._dispatch(
+                "odoo_extract_table_for_layout",
+                {"layout_name": layout_name}
+            ))
             if hasattr(result, 'ok') and result.ok:
                 return result.payload if result.payload else {}
+            self._log(f"[IPC] get_single_layout_values({layout_name}) failed: {getattr(result, 'error', 'unknown')}\n")
+            return {}
+        except Exception as e:
+            self._log(f"[IPC] get_single_layout_values({layout_name}) error: {e}\n")
+            return {}
+
+    def get_layouts_header_id_to_pr(self):
+        """Collect all header_ids from TABLEs (Odoo action)
+        Returns {"all": [header_id1, header_id2, ...]} to match COM mode format."""
+        try:
+            result = self._run_async(self._dispatch("odoo_get_header_ids"))
+            if hasattr(result, 'ok') and result.ok and result.payload:
+                payload = result.payload
+                # Extract header_ids list and wrap in {"all": [...]}
+                if isinstance(payload, dict) and 'header_ids' in payload:
+                    ids = payload['header_ids']
+                    self._log(f"[IPC] header_ids: {ids}\n")
+                    return {"all": ids}
+                return payload if isinstance(payload, dict) else {}
             return {}
         except Exception as e:
             self._log(f"[IPC] get_layouts_header_id_to_pr error: {e}\n")
@@ -164,13 +404,15 @@ class UtilAutoCADIPC:
             result = self._run_async(self._dispatch("odoo_get_block_attrs"))
             if hasattr(result, 'ok') and result.ok:
                 return result.payload if result.payload else {}
+            error = getattr(result, 'error', 'unknown')
+            self._log(f"[IPC] get_block_attributes: {error}\n")
             return {}
         except Exception as e:
             self._log(f"[IPC] get_block_attributes error: {e}\n")
             return {}
 
     def set_block_attributes(self, attrs, layout_name=None):
-        """Write attributes to Block (Odoo action)"""
+        """Write attributes to Block (Odoo action). Returns True on success."""
         try:
             params = dict(attrs) if not isinstance(attrs, dict) else attrs
             if layout_name:
@@ -178,10 +420,16 @@ class UtilAutoCADIPC:
             result = self._run_async(self._dispatch("odoo_set_block_attrs", params))
             if hasattr(result, 'ok') and result.ok:
                 self._log("[IPC] Block attributes written\n")
+                return True
             else:
-                self._log(f"[IPC] set_block_attributes failed: {getattr(result, 'error', 'unknown')}\n")
+                error = getattr(result, 'error', 'unknown')
+                self._log(f"[IPC] set_block_attributes failed: {error}\n")
+                raise RuntimeError(f"寫入屬性失敗: {error}")
+        except RuntimeError:
+            raise
         except Exception as e:
             self._log(f"[IPC] set_block_attributes error: {e}\n")
+            raise
 
     def clear_table_id(self, layout=None):
         """Clear TABLE IDs"""

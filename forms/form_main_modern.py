@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import logging
 import base64
+import queue
+import threading
 import requests
 import customtkinter as ctk
 from tkinter import messagebox
@@ -22,7 +24,7 @@ from bravado.requests_client import RequestsClient
 from bravado.client import SwaggerClient
 from swagger_spec_validator.common import SwaggerValidationError
 
-APP_VERSION = "6.0"
+from version import APP_VERSION
 
 class ModernFormMain(ctk.CTk):
     """現代化的主表單，使用CustomTkinter"""
@@ -254,84 +256,102 @@ class ModernFormMain(ctk.CTk):
         self.sse_info_label.grid(row=1, column=4, columnspan=2, pady=(2, 0), sticky="e")
     
     def create_sidebar(self):
-        """創建左側邊欄"""
-        self.sidebar = ctk.CTkFrame(
+        """創建左側邊欄（可捲動）"""
+        # 外層固定容器
+        sidebar_outer = ctk.CTkFrame(
             self,
             width=theme.get_size('sidebar_width'),
             corner_radius=0,
             fg_color=theme.get_color('surface')
         )
-        self.sidebar.grid(row=1, column=0, sticky="nsw", padx=0, pady=0)
-        self.sidebar.grid_propagate(False)
-        
+        sidebar_outer.grid(row=1, column=0, sticky="nsew", padx=0, pady=0)
+        sidebar_outer.grid_propagate(False)
+
+        # 可捲動的內層
+        self.sidebar = ctk.CTkScrollableFrame(
+            sidebar_outer,
+            corner_radius=0,
+            fg_color=theme.get_color('surface'),
+            scrollbar_button_color=theme.get_color('border'),
+            scrollbar_button_hover_color="#555555"
+        )
+        self.sidebar.pack(fill="both", expand=True)
+
         # 側邊欄標題
         sidebar_title = ctk.CTkLabel(
             self.sidebar,
             text="功能選單",
-            font=("Microsoft JhengHei UI", 18, "bold"),
-            text_color="#FFFFFF"  # 純白色，確保對比度
+            font=("Microsoft JhengHei UI", 16, "bold"),
+            text_color="#FFFFFF"
         )
-        sidebar_title.pack(pady=(20, 10))
-        
+        sidebar_title.pack(pady=(12, 6))
+
         # 連接功能區
         self.create_connection_section()
-        
+
         # 分隔線
-        separator1 = ctk.CTkFrame(self.sidebar, height=2, fg_color=theme.get_color('border'))
-        separator1.pack(fill="x", padx=20, pady=10)
-        
+        self._sidebar_sep()
+
+        # 圖面資訊區
+        self.create_drawing_info_section()
+
+        # 分隔線
+        self._sidebar_sep()
+
         # 主要功能區
         self.create_main_functions_section()
-        
+
         # 分隔線
-        separator2 = ctk.CTkFrame(self.sidebar, height=2, fg_color=theme.get_color('border'))
-        separator2.pack(fill="x", padx=20, pady=10)
-        
+        self._sidebar_sep()
+
         # 工具功能區
         self.create_tools_section()
+
+    def _sidebar_sep(self):
+        """側邊欄分隔線"""
+        ctk.CTkFrame(self.sidebar, height=1, fg_color=theme.get_color('border')).pack(
+            fill="x", padx=15, pady=6
+        )
     
     def create_connection_section(self):
         """創建連接功能區"""
-        # 連接區域標題
         conn_label = ctk.CTkLabel(
             self.sidebar,
             text="📡 連接管理",
-            font=("Microsoft JhengHei UI", 14, "bold"),
-            text_color="#E0E0E0"  # 淺灰色，確保良好對比度
+            font=("Microsoft JhengHei UI", 13, "bold"),
+            text_color="#E0E0E0"
         )
-        conn_label.pack(pady=(0, 10))
-        
-        # 連接到Odoo按鈕
+        conn_label.pack(pady=(0, 4))
+
         self.btn_connect_odoo = ctk.CTkButton(
             self.sidebar,
             text="🏢 連接到 Odoo",
             command=self.connect_odoo,
-            height=40,
-            font=("Microsoft JhengHei UI", 14, "bold"),
+            height=34,
+            font=("Microsoft JhengHei UI", 13, "bold"),
             corner_radius=8,
-            fg_color="#1976D2",  # 藍色，更好的對比度
-            hover_color="#0D47A1",  # 更深的藍色
+            fg_color="#1976D2",
+            hover_color="#0D47A1",
             text_color="white"
         )
-        self.btn_connect_odoo.pack(fill="x", padx=20, pady=5)
-        
-        # 連接到AutoCAD按鈕
+        self.btn_connect_odoo.pack(fill="x", padx=15, pady=3)
+
         self.btn_connect_autocad = ctk.CTkButton(
             self.sidebar,
             text="📐 連接到 AutoCAD",
             command=self.connect_autocad,
-            height=40,
-            font=("Microsoft JhengHei UI", 14, "bold"),
+            height=34,
+            font=("Microsoft JhengHei UI", 13, "bold"),
             corner_radius=8,
-            fg_color="#7B1FA2",  # 紫色，更好的對比度
-            hover_color="#4A148C",  # 更深的紫色
+            fg_color="#7B1FA2",
+            hover_color="#4A148C",
             text_color="white"
         )
-        self.btn_connect_autocad.pack(fill="x", padx=20, pady=5)
+        self.btn_connect_autocad.pack(fill="x", padx=15, pady=3)
 
         # AutoCAD 模式切換
         mode_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        mode_frame.pack(fill="x", padx=20, pady=(2, 5))
+        mode_frame.pack(fill="x", padx=15, pady=(2, 3))
 
         mode_label = ctk.CTkLabel(
             mode_frame,
@@ -387,6 +407,9 @@ class ModernFormMain(ctk.CTk):
 
         # 更新連接按鈕文字
         self._update_autocad_button_label()
+
+        # 自動連接新模式的 AutoCAD（包含讀取 pr_no 等初始化）
+        self.connect_autocad()
         self.update_connection_status()
 
     def _update_autocad_button_label(self):
@@ -396,115 +419,158 @@ class ModernFormMain(ctk.CTk):
         else:
             self.btn_connect_autocad.configure(text="📐 連接到 AutoCAD")
 
+    def create_drawing_info_section(self):
+        """創建圖面資訊區 — 顯示目前配置/專案/PR"""
+        info_label = ctk.CTkLabel(
+            self.sidebar,
+            text="📄 圖面資訊",
+            font=("Microsoft JhengHei UI", 13, "bold"),
+            text_color="#E0E0E0"
+        )
+        info_label.pack(pady=(0, 3))
+
+        # 帶邊框底色的 card，更醒目
+        self.info_card = ctk.CTkFrame(
+            self.sidebar,
+            fg_color="#1E3A5F",
+            corner_radius=6,
+            border_width=1,
+            border_color="#4A6A8A"
+        )
+        self.info_card.pack(fill="x", padx=10, pady=2)
+
+        dim = "#90A4AE"  # 未連接的預設色（比 #78909C 亮）
+
+        # 目前配置 (Layout)
+        self.lbl_layout = ctk.CTkLabel(
+            self.info_card,
+            text="配置 (Layout): --",
+            font=("Microsoft JhengHei UI", 12),
+            text_color=dim,
+            anchor="w"
+        )
+        self.lbl_layout.pack(fill="x", padx=8, pady=(5, 1))
+
+        # 請購單號 (PR No)
+        self.lbl_pr_no = ctk.CTkLabel(
+            self.info_card,
+            text="請購單號: --",
+            font=("Microsoft JhengHei UI", 12),
+            text_color=dim,
+            anchor="w"
+        )
+        self.lbl_pr_no.pack(fill="x", padx=8, pady=1)
+
+        # 專案名稱
+        self.lbl_project = ctk.CTkLabel(
+            self.info_card,
+            text="專案: --",
+            font=("Microsoft JhengHei UI", 11),
+            text_color=dim,
+            anchor="w",
+            wraplength=170
+        )
+        self.lbl_project.pack(fill="x", padx=8, pady=(1, 5))
+
     def create_main_functions_section(self):
         """創建主要功能區"""
-        # 主要功能標題
         main_label = ctk.CTkLabel(
             self.sidebar,
             text="⚙️ 主要功能",
-            font=("Microsoft JhengHei UI", 14, "bold"),
-            text_color="#E0E0E0"  # 淺灰色，確保良好對比度
+            font=("Microsoft JhengHei UI", 13, "bold"),
+            text_color="#E0E0E0"
         )
-        main_label.pack(pady=(0, 10))
-        
-        # 獲取參數按鈕
+        main_label.pack(pady=(0, 4))
+
         self.btn_get_params = ctk.CTkButton(
             self.sidebar,
             text="📋 從 Odoo 獲取參數",
             command=self.get_parameters_from_odoo,
-            height=40,
-            font=("Microsoft JhengHei UI", 14, "bold"),
+            height=34,
+            font=("Microsoft JhengHei UI", 13, "bold"),
             corner_radius=8,
-            fg_color="#388E3C",  # 綠色，更好的對比度
-            hover_color="#1B5E20",  # 更深的綠色
+            fg_color="#388E3C",
+            hover_color="#1B5E20",
             text_color="white"
         )
-        self.btn_get_params.pack(fill="x", padx=20, pady=5)
-        
-        # 推送到BOQ按鈕
+        self.btn_get_params.pack(fill="x", padx=15, pady=3)
+
         self.btn_push_boq = ctk.CTkButton(
             self.sidebar,
             text="📊 推送到 BOQ",
             command=self.push_to_boq,
-            height=40,
-            font=("Microsoft JhengHei UI", 14, "bold"),
+            height=34,
+            font=("Microsoft JhengHei UI", 13, "bold"),
             corner_radius=8,
-            fg_color="#F57C00",  # 橘色，更好的對比度
-            hover_color="#E65100",  # 更深的橘色
+            fg_color="#F57C00",
+            hover_color="#E65100",
             text_color="white"
         )
-        self.btn_push_boq.pack(fill="x", padx=20, pady=5)
-        
-        # 轉移BOQ到PR按鈕
+        self.btn_push_boq.pack(fill="x", padx=15, pady=3)
+
         self.btn_transfer_pr = ctk.CTkButton(
             self.sidebar,
             text="🔄 轉移 BOQ 到 PR",
             command=self.transfer_boq_to_pr,
-            height=40,
-            font=("Microsoft JhengHei UI", 14, "bold"),
+            height=34,
+            font=("Microsoft JhengHei UI", 13, "bold"),
             corner_radius=8,
-            fg_color="#5D4037",  # 棕色，更好的對比度
-            hover_color="#3E2723",  # 更深的棕色
+            fg_color="#5D4037",
+            hover_color="#3E2723",
             text_color="white"
         )
-        self.btn_transfer_pr.pack(fill="x", padx=20, pady=5)
+        self.btn_transfer_pr.pack(fill="x", padx=15, pady=3)
     
     def create_tools_section(self):
         """創建工具功能區"""
-        # 工具標題
         tools_label = ctk.CTkLabel(
             self.sidebar,
             text="🔧 工具",
-            font=("Microsoft JhengHei UI", 14, "bold"),
-            text_color="#E0E0E0"  # 淺灰色，確保良好對比度
+            font=("Microsoft JhengHei UI", 13, "bold"),
+            text_color="#E0E0E0"
         )
-        tools_label.pack(pady=(0, 10))
-        
-        # 清除表格ID按鈕
+        tools_label.pack(pady=(0, 4))
+
         self.btn_clear_table = ctk.CTkButton(
             self.sidebar,
             text="🗑️ 清除此配置表格ID",
             command=self.clear_table_id,
-            height=40,
-            font=("Microsoft JhengHei UI", 13, "bold"),
+            height=34,
+            font=("Microsoft JhengHei UI", 12, "bold"),
             corner_radius=8,
-            fg_color="#FF8F00",  # 警告橘色，更好的對比度
-            hover_color="#E65100",  # 更深的橘色
+            fg_color="#FF8F00",
+            hover_color="#E65100",
             text_color="white"
         )
-        self.btn_clear_table.pack(fill="x", padx=20, pady=5)
+        self.btn_clear_table.pack(fill="x", padx=15, pady=3)
         
-        # 清除所有表格ID按鈕
         self.btn_clear_all_tables = ctk.CTkButton(
             self.sidebar,
             text="🗑️ 清除所有配置表格ID",
             command=self.clear_all_tables_id,
-            height=40,
-            font=("Microsoft JhengHei UI", 13, "bold"),
+            height=34,
+            font=("Microsoft JhengHei UI", 12, "bold"),
             corner_radius=8,
-            fg_color="#D32F2F",  # 危險紅色，更好的對比度
-            hover_color="#B71C1C",  # 更深的紅色
+            fg_color="#D32F2F",
+            hover_color="#B71C1C",
             text_color="white"
         )
-        self.btn_clear_all_tables.pack(fill="x", padx=20, pady=5)
-        
-        # 分隔線
-        separator3 = ctk.CTkFrame(self.sidebar, height=2, fg_color=theme.get_color('border'))
-        separator3.pack(fill="x", padx=20, pady=10)
-        
-        # AI助手控制按鈕
+        self.btn_clear_all_tables.pack(fill="x", padx=15, pady=3)
+
+        self._sidebar_sep()
+
         self.btn_sse_control = ctk.CTkButton(
             self.sidebar,
             text="🌊 SSE 伺服器控制",
             command=self.create_sse_control_panel,
-            height=40,
-            font=("Microsoft JhengHei UI", 13, "bold"),
+            height=34,
+            font=("Microsoft JhengHei UI", 12, "bold"),
             corner_radius=8,
-            fg_color="#FF9800",  # 橘色，與頂部 SSE 按鈕一致
+            fg_color="#FF9800",
             hover_color="#F57C00",
             text_color="white"
         )
-        self.btn_sse_control.pack(fill="x", padx=20, pady=5)
+        self.btn_sse_control.pack(fill="x", padx=15, pady=3)
 
     def create_main_content(self):
         """創建主要內容區域"""
@@ -634,7 +700,51 @@ class ModernFormMain(ctk.CTk):
                 fg_color="#7B1FA2",
                 hover_color="#4A148C"
             )
+
+        # 更新圖面資訊
+        self._update_drawing_info()
     
+    def _update_drawing_info(self):
+        """更新圖面資訊（配置/請購單號/專案）"""
+        if not hasattr(self, 'lbl_layout'):
+            return
+
+        connected = hasattr(self, 'autocad_util') and self.autocad_util.connected_autocad()
+        active = "#FFFFFF"     # 白色 — 有值時
+        accent = "#FFD54F"     # 亮黃色 — PR/專案重要資訊
+        dim = "#90A4AE"        # 灰色 — 未連接/無值
+
+        if connected:
+            # Layout name — prefer layout_name from block attrs (IPC), fall back to get_active_layout
+            layout = getattr(self.autocad_util, 'layout_name', None)
+            if not layout:
+                try:
+                    layout = self.autocad_util.get_active_layout()
+                except Exception:
+                    pass
+            if layout:
+                self.lbl_layout.configure(text=f"配置 (Layout): {layout}", text_color=active)
+            else:
+                self.lbl_layout.configure(text="配置 (Layout): --", text_color=dim)
+
+            # PR No
+            pr_no = getattr(self.autocad_util, 'pr_no', None)
+            if pr_no:
+                self.lbl_pr_no.configure(text=f"請購單號: {pr_no}", text_color=accent)
+            else:
+                self.lbl_pr_no.configure(text="請購單號: --", text_color=dim)
+
+            # Project name
+            project_name = getattr(self.autocad_util, 'project_name', None)
+            if project_name:
+                self.lbl_project.configure(text=f"專案: {project_name}", text_color=active)
+            else:
+                self.lbl_project.configure(text="專案: --", text_color=dim)
+        else:
+            self.lbl_layout.configure(text="配置 (Layout): --", text_color=dim)
+            self.lbl_pr_no.configure(text="請購單號: --", text_color=dim)
+            self.lbl_project.configure(text="專案: --", text_color=dim)
+
     # === 事件處理方法 ===
     
     def connect_odoo(self):
@@ -692,12 +802,97 @@ class ModernFormMain(ctk.CTk):
         enhanced_form.get_parameters_from_odoo()
     
     def push_to_boq(self):
-        """推送到BOQ"""
-        self.push_to_boq_util.push_to_boq()
-    
+        """推送到BOQ — 帶進度條的背景執行"""
+        self._run_with_progress(
+            title="推送到 BOQ",
+            message="準備中...",
+            worker=lambda cb: self.push_to_boq_util.push_to_boq(progress_callback=cb),
+            success_msg="推送到 BOQ 完成",
+            fail_msg="推送到 BOQ 失敗或無資料",
+        )
+
     def transfer_boq_to_pr(self):
-        """轉移BOQ到PR"""
-        self.transfer_boq_to_pr_util.transfer_boq_to_pr()
+        """轉移BOQ到PR — 帶進度條的背景執行"""
+        self._run_with_progress(
+            title="轉移 BOQ 到 PR",
+            message="準備中...",
+            worker=lambda cb: self.transfer_boq_to_pr_util.transfer_boq_to_pr(progress_callback=cb),
+            success_msg="轉移 BOQ 到 PR 完成",
+            fail_msg="轉移 BOQ 到 PR 失敗或無資料",
+        )
+
+    def _run_with_progress(self, title, message, worker, success_msg, fail_msg):
+        """通用：ProgressDialog + 背景 thread 執行帶進度回調的工作
+
+        Args:
+            title: 對話框標題
+            message: 初始訊息
+            worker: callable(progress_callback) -> bool
+            success_msg / fail_msg: 結束時的訊息
+        """
+        from ui.enhanced_widgets import ProgressDialog
+
+        self.log_util.safe_log_insert(f"[Progress] 開始: {title}\n")
+        dialog = ProgressDialog(self, title=title, message=message)
+        progress_queue = queue.Queue()
+
+        # Progress callback — 由 worker thread 呼叫，寫入 queue
+        def on_progress(value, msg):
+            progress_queue.put((value, msg))
+        # Attach cancel flag so worker can check it
+        on_progress._cancelled = False
+
+        def _worker_thread():
+            try:
+                self.log_util.safe_log_insert(f"[Progress] Worker thread 啟動\n")
+                result = worker(on_progress)
+                self.log_util.safe_log_insert(f"[Progress] Worker thread 結束, result={result}\n")
+                progress_queue.put(("done", result))
+            except Exception as e:
+                self.log_util.safe_log_insert(f"[Progress] Worker thread 例外: {e}\n")
+                import traceback
+                self.log_util.safe_log_insert(f"[Progress] {traceback.format_exc()}\n")
+                progress_queue.put(("error", str(e)))
+
+        t = threading.Thread(target=_worker_thread, daemon=True)
+        t.start()
+
+        def _poll_progress():
+            # Check if dialog was cancelled
+            if dialog.cancelled:
+                on_progress._cancelled = True
+                self.log_util.safe_log_insert(f"[Progress] 使用者取消: {title}\n")
+                return
+
+            try:
+                while True:
+                    item = progress_queue.get_nowait()
+                    if item[0] == "done":
+                        dialog.update_progress(1.0, "完成")
+                        dialog.grab_release()
+                        dialog.destroy()
+                        if item[1]:
+                            self.log_util.safe_log_insert(f"[Progress] ✔ 成功: {success_msg}\n")
+                            self.show_info_message("完成", success_msg)
+                        else:
+                            self.log_util.safe_log_insert(f"[Progress] ⚠ 結束但無資料: {fail_msg}\n")
+                            self.show_info_message("提示", fail_msg)
+                        return
+                    elif item[0] == "error":
+                        dialog.grab_release()
+                        dialog.destroy()
+                        self.log_util.safe_log_insert(f"[Progress] ✘ 錯誤: {item[1]}\n")
+                        self.show_error_message("錯誤", f"執行失敗: {item[1]}")
+                        return
+                    else:
+                        value, msg = item
+                        dialog.update_progress(value, msg)
+            except queue.Empty:
+                pass
+            # Keep polling every 100ms
+            self.after(100, _poll_progress)
+
+        self.after(100, _poll_progress)
     
     def clear_table_id(self):
         """清除表格ID"""

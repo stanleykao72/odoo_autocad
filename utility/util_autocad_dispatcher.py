@@ -86,6 +86,10 @@ class UtilAutoCADDispatcher:
         self._active.project_name = value
 
     @property
+    def layout_name(self):
+        return getattr(self._active, 'layout_name', None)
+
+    @property
     def pr_no(self):
         return getattr(self._active, 'pr_no', None)
 
@@ -115,7 +119,11 @@ class UtilAutoCADDispatcher:
         return self._active.connected_autocad()
 
     def connect_autocad(self, main_body=None):
-        return self._active.connect_autocad(main_body)
+        self._active.connect_autocad(main_body)
+        # IPC mode: read block attributes and look up project from Odoo
+        # (COM mode does this internally in UtilAutoCAD.connect_autocad)
+        if self._mode == self.MODE_IPC and self._active.connected_autocad():
+            self._process_pr_no_ipc()
 
     # === Layout Management ===
 
@@ -129,6 +137,12 @@ class UtilAutoCADDispatcher:
 
     def get_layouts_values(self):
         return self._active.get_layouts_values()
+
+    def get_single_layout_values(self, layout_name):
+        if hasattr(self._active, 'get_single_layout_values'):
+            return self._active.get_single_layout_values(layout_name)
+        # COM fallback: not supported, caller should use get_layouts_values
+        return {}
 
     def set_layouts_tables_id(self, boq_list):
         return self._active.set_layouts_tables_id(boq_list)
@@ -164,6 +178,47 @@ class UtilAutoCADDispatcher:
 
     def scan_elements(self, element_type="all", **kwargs):
         return self._active.scan_elements(element_type, **kwargs)
+
+    # === IPC project initialization ===
+
+    def _process_pr_no_ipc(self):
+        """Read pr_no + layout_name from block attributes via IPC, look up project from Odoo"""
+        try:
+            attrs = self._active.get_block_attributes()
+            self._log(f"[IPC] Block attributes: {attrs}\n")
+            if not attrs:
+                self._log("[IPC] No attribute block found — ensure 050_block_util.lsp is reloaded in AutoCAD\n")
+                return
+
+            # Extract layout_name (added by ob:action-get-block-attrs)
+            layout_name = attrs.get('layout_name', '')
+            if layout_name:
+                self._active.layout_name = layout_name
+                self._log(f"[IPC] Layout: {layout_name}\n")
+
+            pr_no = attrs.get('pr_no', '')
+            if not pr_no:
+                self._log(f"[IPC] No 'pr_no' tag in block (found tags: {list(attrs.keys())})\n")
+                return
+
+            self._active.pr_no = pr_no
+            self._log(f"[IPC] PR No: {pr_no}\n")
+
+            # Look up project from Odoo
+            if self.odoo_util:
+                project = self.odoo_util.get_project(pr_no)
+                if project:
+                    self._active.project_id = project.get('id')
+                    self._active.project_name = project.get('name')
+                    self._active.job_working_plan_id = project.get('job_working_plan_id')
+                    self._active.job_working_plan_name = project.get('job_working_plan_name')
+                    self._log(f"[IPC] Project: {self._active.project_name} (ID: {self._active.project_id})\n")
+                else:
+                    self._log(f"[IPC] No project found for PR No: {pr_no}\n")
+            else:
+                self._log("[IPC] Odoo not connected, cannot look up project\n")
+        except Exception as e:
+            self._log(f"[IPC] process_pr_no failed: {e}\n")
 
     # === COM-only methods (graceful fallback for IPC) ===
 

@@ -114,13 +114,17 @@
 
 (defun json:escape (str / bs dq)
   "Escapes special characters in a string for safe JSON serialization.
-   Handles: \\ \" newline carriage-return tab
-   Must be called BEFORE wrapping string in double quotes."
+   Handles: \" newline carriage-return tab
+   Must be called BEFORE wrapping string in double quotes.
+   NOTE: Backslash escaping DISABLED — vl-string-search is byte-level,
+   not MBCS-aware. Big5/cp950 characters like 蓋 (0xBB5C) contain 0x5C
+   as a trail byte, which gets falsely matched as backslash. The Python
+   side handles any real backslashes via _fix_json_backslashes()."
   (if (not str) (setq str ""))
   (setq bs (chr 92))   ;; backslash
   (setq dq (chr 34))   ;; double quote
-  ;; Order matters: backslash first to avoid double-escaping
-  (setq str (dmc:json:str_replace str bs (strcat bs bs)))           ;; \ → \\
+  ;; Backslash escaping removed — MBCS-unsafe (corrupts Big5 蓋功等)
+  ;; (setq str (dmc:json:str_replace str bs (strcat bs bs)))
   (setq str (dmc:json:str_replace str dq (strcat bs dq)))           ;; " → \"
   (setq str (dmc:json:str_replace str (chr 10) (strcat bs "n")))    ;; LF → \n
   (setq str (dmc:json:str_replace str (chr 13) (strcat bs "r")))    ;; CR → \r

@@ -179,9 +179,89 @@
   )
 )
 
-(defun table:get-all-layouts-data (/ doc layouts layout layout-name blocks
-                                     block-ename ss i ename tables
-                                     all-data layout-data header-data)
+(defun table:get-single-layout-data (layout-name / doc layout-obj blocks
+                                      header-data all-details header-id
+                                      ename layout-data)
+  "Collects TABLE + Block data from a SINGLE layout by name.
+   Returns layout data assoc list, or nil if no data found."
+  (vl-load-com)
+  (setq doc (vla-get-activedocument (vlax-get-acad-object)))
+  (if (not doc) (progn (princ "\n[OB] No active document") (exit)))
+  (setq layout-obj (table:find-layout-by-name doc layout-name))
+  (if (not layout-obj)
+    (progn
+      (princ (strcat "\n[OB] Layout not found: " layout-name))
+      nil
+    )
+    (progn
+      (princ (strcat "\n[OB] Processing layout: " layout-name))
+      (setq blocks (vla-get-block layout-obj))
+
+      ;; Collect block attributes for header + pr_no text block
+      (setq header-data nil)
+      (setq ob:tmp-pr-no nil)
+      (vlax-for block blocks
+        (if (= (vla-get-objectname block) "AcDbBlockReference")
+          (progn
+            ;; Attribute block (project_name, job_working_plan_name, etc.)
+            (if (not header-data)
+              (setq header-data (block:get-header-attrs block layout-name))
+            )
+            ;; Separate "pr_no" text block (Name = "pr_no")
+            (if (and (not ob:tmp-pr-no)
+                     (= (strcase (vla-get-name block)) "PR_NO"))
+              (progn
+                (setq ob:tmp-pr-no (block:get-block-text block))
+                (if (and ob:tmp-pr-no (/= ob:tmp-pr-no ""))
+                  (princ (strcat "\n[OB] Found pr_no block: " ob:tmp-pr-no))
+                )
+              )
+            )
+          )
+        )
+      )
+      ;; Merge pr_no into header-data if found and not already present
+      (if (and ob:tmp-pr-no (/= ob:tmp-pr-no "") header-data
+               (not (assoc "pr_no" header-data)))
+        (setq header-data (cons (cons "pr_no" ob:tmp-pr-no) header-data))
+      )
+
+      ;; Collect TABLE data
+      (setq all-details '())
+      (setq header-id "")
+      (vlax-for block blocks
+        (if (= (vla-get-objectname block) "AcDbTable")
+          (progn
+            (setq ename (vlax-vla-object->ename block))
+            (if (table:legal-p ename)
+              (progn
+                (setq header-id (table:get-header-id ename))
+                (setq all-details
+                  (append all-details (table:get-detail-rows ename)))
+              )
+            )
+          )
+        )
+      )
+
+      ;; Build layout entry
+      ;; Note: use (list "detail" ...) not (cons "detail" ...) so
+      ;; the <ARRAY> list is nested — list_to_json needs (car sublist) = <ARRAY>
+      (if (and header-data all-details)
+        (append
+          (list (cons "header_id" header-id))
+          header-data
+          (list (list "detail"
+            (cons (quote <ARRAY>)
+              (append all-details (list (quote </ARRAY>)))))))
+        nil
+      )
+    )
+  )
+)
+
+(defun table:get-all-layouts-data (/ doc layouts layout layout-name
+                                     all-data layout-data)
   "Collects TABLE data from ALL layouts (excluding Model).
    Returns list of layout data assocs for bridge:import-to-boq."
   (vl-load-com)
@@ -193,52 +273,9 @@
         (setq layout-name (vla-get-name layout))
         (if (/= layout-name "Model")
           (progn
-            (princ (strcat "\n[OB] Processing layout: " layout-name))
-            (setq blocks (vla-get-block layout))
-
-            ;; Collect block attributes for header
-            (setq header-data nil)
-            (vlax-for block blocks
-              (if (= (vla-get-objectname block) "AcDbBlockReference")
-                (progn
-                  (setq header-data (block:get-header-attrs block layout-name))
-                )
-              )
-            )
-
-            ;; Collect TABLE data
-            (setq tables '())
-            (setq all-details '())
-            (setq header-id "")
-            (vlax-for block blocks
-              (if (= (vla-get-objectname block) "AcDbTable")
-                (progn
-                  (setq ename (vlax-vla-object->ename block))
-                  (if (table:legal-p ename)
-                    (progn
-                      (setq header-id (table:get-header-id ename))
-                      (setq all-details
-                        (append all-details (table:get-detail-rows ename)))
-                    )
-                  )
-                )
-              )
-            )
-
-            ;; Build layout entry
-            (if (and header-data all-details)
-              (progn
-                (setq layout-data
-                  (append
-                    (list (cons "header_id" header-id))
-                    header-data
-                    (list (cons "detail"
-                      (cons (quote <ARRAY>)
-                        (append all-details (list (quote </ARRAY>))))))
-                  )
-                )
-                (setq all-data (cons layout-data all-data))
-              )
+            (setq layout-data (table:get-single-layout-data layout-name))
+            (if layout-data
+              (setq all-data (cons layout-data all-data))
             )
           )
         )
@@ -252,9 +289,19 @@
 ;;; ID writeback
 ;;; ============================================================
 
+(defun table:id-to-string (val)
+  "Converts header_id/detail_id to string. Handles INT, REAL, and STR."
+  (cond
+    ((= (type val) 'INT) (itoa val))
+    ((= (type val) 'REAL) (itoa (fix val)))  ;; JSON parser may return float
+    ((= (type val) 'STR) val)
+    (T (vl-princ-to-string val))
+  )
+)
+
 (defun table:write-header-id (ename header-id)
   "Writes header_id to TABLE cell (0, 8)."
-  (table:set-cell-text ename 0 8 (if (= (type header-id) 'INT) (itoa header-id) header-id))
+  (table:set-cell-text ename 0 8 (table:id-to-string header-id))
 )
 
 (defun table:write-detail-id (ename product-no detail-id / rows row cell-product)
@@ -265,8 +312,7 @@
   (while (< row rows)
     (setq cell-product (table:get-cell-text ename row 1))
     (if (= cell-product product-no)
-      (table:set-cell-text ename row 8
-        (if (= (type detail-id) 'INT) (itoa detail-id) detail-id))
+      (table:set-cell-text ename row 8 (table:id-to-string detail-id))
     )
     (setq row (1+ row))
   )
@@ -286,10 +332,37 @@
         ;; Try direct data structure
         (setq all-list (bridge:get-data response))
       )
+      ;; json_to_list wraps JSON array as extra list level: ((obj1 obj2 ...))
+      ;; Unwrap if all-list has 1 element that is itself a list of alists
+      (if (and all-list
+               (= (length all-list) 1)
+               (listp (car all-list))
+               (listp (caar all-list))
+               (assoc "header_id" (caar all-list)))
+        (setq all-list (car all-list))
+      )
+      (princ (strcat "\n[OB] update-ids: all-list has "
+        (if all-list (itoa (length all-list)) "0") " items"))
+      (if (eval '(and ob:log T))
+        (ob:log (strcat "[WRITE-IDS] Iterating " (if all-list (itoa (length all-list)) "0") " layouts"))
+      )
       (foreach layout-list all-list
         (setq header-id   (cdr (assoc "header_id" layout-list)))
         (setq layout-name (cdr (assoc "layout_name" layout-list)))
         (setq detail-list (cdr (assoc "detail" layout-list)))
+        ;; Unwrap detail array nesting from json_to_list
+        (if (and detail-list
+                 (= (length detail-list) 1)
+                 (listp (car detail-list))
+                 (listp (caar detail-list))
+                 (assoc "product_no" (caar detail-list)))
+          (setq detail-list (car detail-list))
+        )
+        (if (eval '(and ob:log T))
+          (ob:log (strcat "[WRITE-IDS] Layout: " (if layout-name layout-name "(nil)")
+            " header_id: " (vl-princ-to-string header-id)
+            " detail count: " (if detail-list (itoa (length detail-list)) "0")))
+        )
 
         (if layout-name
           (progn
