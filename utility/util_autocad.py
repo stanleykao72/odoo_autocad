@@ -200,12 +200,10 @@ class UtilAutoCAD:
 
             # Get layout properties
             layout_name = layout.Name
-            
-            # print(f"Active Layout Name: {layout_name}")
+
             self.log.safe_log_insert(f"Active Layout Name: {layout_name}\n")
-            # print(f"Layout Block: {layout_block}")
-            
-            return layout
+
+            return layout_name
 
         except Exception as e:
             print(f"Error getting active layout: {str(e)}")
@@ -342,6 +340,12 @@ class UtilAutoCAD:
         if not self.acad:
             raise RuntimeError("AutoCAD not connected")
         doc = self.acad.ActiveDocument
+        # Ensure layout_name is a string (may be COM object)
+        if layout_name and not isinstance(layout_name, str):
+            try:
+                layout_name = layout_name.Name if hasattr(layout_name, 'Name') else str(layout_name)
+            except Exception:
+                layout_name = None
         if layout_name:
             # Write to specific layout
             try:
