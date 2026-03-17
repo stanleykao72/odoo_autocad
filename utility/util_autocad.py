@@ -268,6 +268,47 @@ class UtilAutoCAD:
             self.log.safe_log_insert(f"設置屬性值時發生錯誤: {str(e)}\n")
             return None
 
+    def set_block_attributes(self, attrs, layout_name=None):
+        """Write multiple attributes to the attribute block in AutoCAD (COM mode).
+
+        Args:
+            attrs: dict of {tag: value} to write
+            layout_name: target layout name (None = all layouts)
+        """
+        if not self.acad:
+            raise RuntimeError("AutoCAD not connected")
+        doc = self.acad.ActiveDocument
+        if layout_name:
+            # Write to specific layout
+            try:
+                layout = doc.Layouts.Item(layout_name)
+                blocks = layout.Block
+                for block in blocks:
+                    if block.ObjectName == "AcDbBlockReference" and block.HasAttributes:
+                        block_attrs = block.GetAttributes()
+                        tags = {att.TagString.upper(): att for att in block_attrs}
+                        if any(t in tags for t in ['PR_NO', 'PROJECT_NAME', 'JOB_WORKING_PLAN_NAME']):
+                            for tag, val in attrs.items():
+                                tag_upper = tag.upper()
+                                if tag_upper in tags:
+                                    old = tags[tag_upper].TextString
+                                    tags[tag_upper].TextString = str(val)
+                                    self.log.safe_log_insert(
+                                        f"設置屬性 '{tag}' 從 '{old}' 為 '{val}'\n")
+                            return True
+            except Exception as e:
+                self.log.safe_log_insert(f"寫入屬性失敗 ({layout_name}): {e}\n")
+                raise
+        else:
+            # Write to all layouts
+            for layout in doc.Layouts:
+                if layout.Name != "Model":
+                    try:
+                        self.set_block_attributes(attrs, layout.Name)
+                    except Exception:
+                        pass
+        return True
+
     def set_table_value(self, table, row, col, val):
         """
         設置表格中的單元格值。
