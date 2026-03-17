@@ -972,7 +972,37 @@ class ModernFormMain(ctk.CTk):
                 if hasattr(self, 'sse_info_label'):
                     self.sse_info_label.configure(text="")
             self.log_util.safe_log_insert(f"[MCP] {message}\n")
+            if is_running:
+                self._log_mcp_connection_guide()
         self.after(0, update_ui)
+
+    def _log_mcp_connection_guide(self):
+        """在 log 顯示 MCP 連線設定指引"""
+        port = self.mcp_manager.port
+        url = f"http://localhost:{port}/sse"
+        log = self.log_util.safe_log_insert
+        log("─" * 60 + "\n")
+        log("📋 MCP 連線設定指引\n")
+        log(f"   MCP Server URL: {url}\n")
+        log("─" * 60 + "\n")
+        log("【Claude Code】在專案目錄建立 .mcp.json:\n")
+        log('  {\n')
+        log('    "mcpServers": {\n')
+        log('      "autocad-odoo": {\n')
+        log(f'        "url": "{url}"\n')
+        log('      }\n')
+        log('    }\n')
+        log('  }\n')
+        log("\n")
+        log("【Gemini CLI】在 ~/.gemini/settings.json 加入:\n")
+        log('  {\n')
+        log('    "mcpServers": {\n')
+        log('      "autocad-odoo": {\n')
+        log(f'        "url": "{url}"\n')
+        log('      }\n')
+        log('    }\n')
+        log('  }\n')
+        log("─" * 60 + "\n")
 
     # Keep old callback name for backward compat
     def on_mcp_sse_status_update(self, message: str, is_running: bool):
