@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-MCP Server for AutoCAD-Odoo Integration — 13 tools (8 common + 5 Odoo)
+MCP Server for AutoCAD-Odoo Integration — 13 tools (8 AutoCAD + 5 Odoo)
 
-Extends autocad-mcp's 8 tools with 5 Odoo-specific tools.
+Single server combining autocad-mcp's 8 upstream tools with 5 Odoo tools.
 Supports stdio and streamable-http transports.
 
 Tools (8 from autocad-mcp):
@@ -15,13 +15,11 @@ Tools (5 Odoo-specific):
 import os
 import sys
 import logging
-import json
+import builtins
 from datetime import datetime
 from typing import Dict, Any
 
-from mcp.server.fastmcp import FastMCP
-
-# Add autocad-mcp to path (for IPC backend usage, not tool import)
+# Add autocad-mcp to path
 _autocad_mcp_src = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "libs", "autocad-mcp", "src"
@@ -29,10 +27,18 @@ _autocad_mcp_src = os.path.join(
 if _autocad_mcp_src not in sys.path:
     sys.path.insert(0, _autocad_mcp_src)
 
+# Inject ToolResult into builtins BEFORE importing autocad_mcp.server —
+# upstream tools use `-> ToolResult` (= str | list) as return type annotation.
+# Without this, FastMCP raises ForwardRef('ToolResult') error.
+builtins.ToolResult = str | list
+
 logger = logging.getLogger(__name__)
 
-# Create our MCP server
-mcp = FastMCP("autocad-odoo-mcp")
+# Import upstream autocad-mcp server — this registers 8 tools on its mcp instance
+from autocad_mcp.server import mcp  # noqa: E402
+
+# Reuse the SAME FastMCP instance — our 5 Odoo tools are added below,
+# giving a single server with all 13 tools.
 
 # --- Global utility instances ---
 _autocad_dispatcher = None
@@ -70,17 +76,7 @@ def _get_odoo_util():
 
 
 # ==========================================================================
-# Note: autocad-mcp's 8 upstream tools (drawing, entity, layer, block,
-# annotation, pid, view, system) are NOT imported here due to FastMCP
-# type annotation incompatibility. They remain available via:
-#   1. Running autocad-mcp's own server separately
-#   2. Using execute_lisp through the IPC backend
-#   3. Using our Odoo tools which call the IPC backend internally
-# ==========================================================================
-
-
-# ==========================================================================
-# 5 Odoo-specific tools
+# 5 Odoo-specific tools (registered on the same mcp instance)
 # ==========================================================================
 
 @mcp.tool()
@@ -101,17 +97,16 @@ def odoo_push_boq(project_id: int = 0) -> Dict[str, Any]:
         if odoo is None:
             return {"success": False, "error": "Odoo not connected"}
 
-        # Step 1: Extract TABLE data from AutoCAD
         layouts_data = _autocad_dispatcher.get_layouts_values()
         if not layouts_data:
             return {"success": False, "error": "No TABLE data found in drawing"}
 
-        # Step 2: Push to Odoo
         result = odoo.import2boq(layouts_data)
+        if isinstance(result, str):
+            return {"success": False, "error": result}
         if not result:
             return {"success": False, "error": "Odoo import2boq returned empty result"}
 
-        # Step 3: Write IDs back to AutoCAD
         _autocad_dispatcher.set_layouts_tables_id(result)
 
         return {
@@ -218,14 +213,15 @@ def odoo_status() -> Dict[str, Any]:
 # ==========================================================================
 
 def main():
-    """Run the MCP server on stdio transport."""
+    """Run the MCP server."""
     import argparse
 
     parser = argparse.ArgumentParser(description="AutoCAD-Odoo MCP Server")
-    parser.add_argument("--transport", choices=["stdio", "sse"], default="stdio",
+    parser.add_argument("--transport", choices=["stdio", "streamable-http"],
+                        default="stdio",
                         help="Transport mode (default: stdio)")
     parser.add_argument("--port", type=int, default=8084,
-                        help="Port for SSE transport (default: 8084)")
+                        help="Port for HTTP transport (default: 8084)")
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -238,8 +234,9 @@ def main():
 
     if args.transport == "stdio":
         mcp.run(transport="stdio")
-    elif args.transport == "sse":
-        mcp.run(transport="sse", sse_params={"port": args.port})
+    elif args.transport == "streamable-http":
+        mcp.run(transport="streamable-http",
+                streamable_http_params={"port": args.port})
 
 
 if __name__ == "__main__":
