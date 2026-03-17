@@ -116,7 +116,7 @@ class ModernFormMain(ctk.CTk):
         self.mcp_manager = MCPManager(
             autocad_dispatcher=self.autocad_dispatcher,
             odoo_util=self.odoo_util,
-            transport="sse",
+            transport="streamable-http",
             port=8084
         )
         self.mcp_manager.set_status_callback(self.on_mcp_status_update)
@@ -979,7 +979,8 @@ class ModernFormMain(ctk.CTk):
     def _log_mcp_connection_guide(self):
         """在 log 顯示 MCP 連線設定指引"""
         port = self.mcp_manager.port
-        url = f"http://localhost:{port}/sse"
+        endpoint = "/mcp" if self.mcp_manager.transport == "streamable-http" else "/sse"
+        url = f"http://localhost:{port}{endpoint}"
         log = self.log_util.safe_log_insert
         log("─" * 60 + "\n")
         log("📋 MCP 連線設定指引\n")

@@ -70,20 +70,25 @@ class MCPManager:
             logger.info("[MCP Manager] Server already running")
             return
 
-        if self.transport == "sse":
-            self._start_sse_in_thread()
+        if self.transport in ("sse", "streamable-http"):
+            self._start_http_in_thread()
         else:
             logger.info("[MCP Manager] stdio transport — no background server needed")
 
-    def _start_sse_in_thread(self):
-        """Start MCP SSE server in a background thread (in-process)"""
+    def _start_http_in_thread(self):
+        """Start MCP HTTP server in a background thread (in-process)"""
         def _run():
             try:
                 import uvicorn
                 import mcp_server_autocad
 
-                # Get the Starlette app from our MCP server
-                starlette_app = mcp_server_autocad.mcp.sse_app()
+                # Use streamable-http (modern) or sse (legacy) transport
+                if self.transport == "sse":
+                    starlette_app = mcp_server_autocad.mcp.sse_app()
+                    endpoint = "/sse"
+                else:
+                    starlette_app = mcp_server_autocad.mcp.streamable_http_app()
+                    endpoint = "/mcp"
 
                 config = uvicorn.Config(
                     starlette_app,
@@ -93,13 +98,14 @@ class MCPManager:
                 )
                 self._uvicorn_server = uvicorn.Server(config)
 
-                logger.info(f"[MCP Manager] Starting MCP server on port {self.port}")
+                logger.info(f"[MCP Manager] Starting MCP server ({self.transport}) on port {self.port}")
 
                 # Create a new event loop for this thread
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
 
-                self._notify_status(True, f"MCP server running on port {self.port}")
+                self._notify_status(True,
+                    f"MCP server running on port {self.port} ({self.transport}, endpoint: {endpoint})")
                 loop.run_until_complete(self._uvicorn_server.serve())
                 loop.close()
 
