@@ -66,17 +66,21 @@ installer\odoo-autocad-integration-6.0-setup.exe
 
 ### 3.3 安裝完成後的檔案
 
+安裝程式只會產生主程式與解除安裝程式：
+
 ```
 C:\odoo\Odoo and AutoCAD Integration\
 ├── odoo-autocad-integration.exe    ← 主程式（已簽章）
-├── config\                         ← 連線設定
-│   ├── server.yaml
-│   └── token.yaml
-├── db\                             ← 本機快取資料庫
-│   └── database.db
-├── icon\                           ← 程式圖示
-│   └── odoo_autocad.ico
-└── fonts\                          ← 中文字型
+├── unins000.exe                    ← 解除安裝程式
+└── unins000.dat
+```
+
+連線設定檔獨立存放在 `C:\odoo\config\`（需手動設定，非安裝程式管理）：
+
+```
+C:\odoo\config\
+├── server.yaml                     ← Odoo 伺服器位址
+└── token.yaml                      ← API 認證金鑰
 ```
 
 ---
@@ -186,7 +190,7 @@ C:\odoo\Odoo and AutoCAD Integration\odoo-autocad-integration.exe
 ### 5.2 連線 Odoo
 
 1. 點選左側 **「連接到 Odoo」**
-2. 系統會使用 `config\` 中的設定連線
+2. 系統會使用 `C:\odoo\config\` 中的 `server.yaml` 及 `token.yaml` 連線
 3. 右上角顯示 **「Odoo: 已連線」** 表示成功
 
 ### 5.3 連線 AutoCAD
@@ -211,30 +215,30 @@ C:\odoo\Odoo and AutoCAD Integration\odoo-autocad-integration.exe
 ### 完整安裝後的目錄
 
 ```
-C:\odoo\Odoo and AutoCAD Integration\
+C:\odoo\
 │
-├── odoo-autocad-integration.exe    ← 主程式（已簽章）
+├── Odoo and AutoCAD Integration\   ← 安裝程式產生
+│   ├── odoo-autocad-integration.exe    ← 主程式（已簽章）
+│   ├── vlx\                            ← AutoCAD 擴充（手動複製）
+│   │   ├── McpDispatch.vlx             ← IPC 核心（先載入）
+│   │   └── OdooAutoCAD.vlx             ← Odoo 模組（後載入）
+│   ├── logs\                           ← 執行日誌（程式自動產生）
+│   │   └── odoo_autocad_YYYY-MM-DD.log
+│   ├── unins000.exe
+│   └── unins000.dat
 │
-├── vlx\                            ← AutoCAD 擴充功能
-│   ├── McpDispatch.vlx             ← IPC 核心（先載入）
-│   └── OdooAutoCAD.vlx             ← Odoo 模組（後載入）
-│
-├── config\                         ← 連線設定
+├── config\                         ← 連線設定（手動管理）
 │   ├── server.yaml                 ← Odoo 伺服器位址
 │   └── token.yaml                  ← API 認證金鑰
 │
-├── db\                             ← 本機快取
-│   └── database.db                 ← SQLite 資料庫
-│
-├── icon\                           ← 程式圖示
-│   └── odoo_autocad.ico
-│
-├── fonts\                          ← 中文字型
-│   └── *.ttf
-│
-└── logs\                           ← 執行日誌（自動產生）
-    └── odoo_autocad_YYYY-MM-DD.log
+└── autocad_source\                 ← 原始碼（僅開發人員需要）
+    └── ...
 ```
+
+> **注意：**
+> - `vlx\` 目錄需手動建立並複製 VLX 檔案（見 Step 2）
+> - `logs\` 目錄由程式執行時自動產生
+> - `config\` 位於 `C:\odoo\config\`，不在安裝目錄內
 
 ### AutoCAD 設定路徑
 
@@ -295,8 +299,16 @@ AutoCAD APPLOAD → Startup Suite:
 
 ### Q: 日誌檔在哪裡？
 
+日誌由程式產生在安裝目錄的 `logs\` 子目錄，或原始碼目錄的 `logs\`：
+
 ```
 C:\odoo\Odoo and AutoCAD Integration\logs\odoo_autocad_YYYY-MM-DD.log
+```
+
+若從原始碼執行（開發模式），日誌在：
+
+```
+C:\odoo\autocad_source\logs\odoo_autocad_YYYY-MM-DD.log
 ```
 
 開啟日誌檔可查看詳細的操作記錄與錯誤訊息。
