@@ -196,8 +196,15 @@ def odoo_status() -> Dict[str, Any]:
 
     if _autocad_dispatcher is not None:
         try:
-            result["autocad"]["connected"] = _autocad_dispatcher.connected_autocad()
             result["autocad"]["mode"] = _autocad_dispatcher.mode
+            # Avoid calling connected_autocad() which does a sync IPC ping
+            # and conflicts with the MCP server's async event loop.
+            # Instead, check if the backend was initialized successfully.
+            backend = _autocad_dispatcher.active_backend
+            if _autocad_dispatcher.mode == "ipc":
+                result["autocad"]["connected"] = getattr(backend, '_initialized', False)
+            else:
+                result["autocad"]["connected"] = getattr(backend, 'acad', None) is not None
         except Exception:
             pass
 
