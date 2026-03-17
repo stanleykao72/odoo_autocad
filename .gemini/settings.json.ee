@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "autocad": {
-      "url": "http://localhost:8084",
-      "timeout": 10000,
-      "description": "AutoCAD-Odoo Integration MCP Server"
-    }
-  }
-}

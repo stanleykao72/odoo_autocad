@@ -4,9 +4,27 @@
       "WebSearch",
       "WebFetch(domain:help.autodesk.com)",
       "WebFetch(domain:www.opendcl.com)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(wc -l C:/odoo/autocad_source/docs/**/*.md C:/odoo/autocad_source/docs/*.md 2>/dev/null | tail -5)",
+      "Bash(ls -lh C:odooautocad_sourceforms*.py)",
+      "Bash(ls -lh C:odooautocad_sourceutility*.py)",
+      "Bash(xargs -I {} basename {})",
+      "Bash(pip show:*)",
+      "mcp__autocad-odoo__odoo_status",
+      "Bash(powershell -ExecutionPolicy Bypass -File build_and_package.ps1)",
+      "Bash(find /c/odoo/autocad_source -maxdepth 3 -name *.pyc -o -name __pycache__)",
+      "Bash(grep -r import.*util_mcp_sse /c/odoo/autocad_source --include=*.py)",
+      "Bash(grep -r mcp_server_fastmcp /c/odoo/autocad_source --include=*.py)",
+      "Bash(grep -r \"old SSE\\\\|mcp_server_fastmcp\\\\|util_mcp_sse\" /c/odoo/autocad_source/*.md)",
+      "Bash(grep -E \"\\\\.py$\")",
+      "Bash(ls -la /c/odoo/autocad_source/*.py)"
     ]
   },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "autocad-odoo"
+  ],
   "disabledMcpjsonServers": [
     "python-sdk",
     "docker",

@@ -199,7 +199,7 @@ powershell "Stop-Process -Id <PID3> -Force"
 powershell "Test-NetConnection -ComputerName localhost -Port 8083 -InformationLevel Quiet"
 
 # Test MCP tools using Gemini CLI (需要先設定Gemini CLI)
-# 參考 doc/GEMINI_CLI_SETUP.md 進行設定
+# 參考 docs/GEMINI_CLI_SETUP.md 進行設定
 ```
 
 ### MCP工具說明 (v5.0新增)
@@ -410,7 +410,7 @@ The application includes Chinese language support throughout the UI and uses app
 ### Code Signing
 - **Certificates**: Store certificates in `certs/` directory
 - **Configuration**: Use `config/odoo-autocad-setup-with-signing.iss` for signed installers
-- **Antivirus**: Follow `doc/ANTIVIRUS_SOLUTION.md` and `doc/CODE_SIGNING_GUIDE.md` for deployment best practices
+- **Antivirus**: Follow `docs/ANTIVIRUS_SOLUTION.md` and `docs/CODE_SIGNING_GUIDE.md` for deployment best practices
 - **Build info**: Generated builds include SHA256 hashes and metadata in `output/build_info.json`
 
 ### File Structure for Deployment
@@ -448,13 +448,13 @@ output/
 1. 確保conda環境: `conda activate odoo_autocad && conda install tk`
 2. 安裝測試依賴: `pip install pytest pytest-cov pytest-mock`
 3. 測試UI: `python -m pytest tests/ui/`
-4. 查看詳細計劃: `doc/UI_IMPROVEMENT_PLAN.md`
+4. 查看詳細計劃: `docs/UI_IMPROVEMENT_PLAN.md`
 
 ### 新增的UI檔案
 - `ui/` - UI主題和字體管理模組
 - `forms/form_main_modern.py` - 現代化主表單 (含MCP SSE整合)
 - `tests/` - UI測試檔案目錄
-- `doc/UI_IMPROVEMENT_PLAN.md` - 完整改善計劃
+- `docs/UI_IMPROVEMENT_PLAN.md` - 完整改善計劃
 
 ### v5.1 GUI代理執行系統 (新增)
 - `utility/util_gui_proxy.py` - **GUI代理執行系統核心**，消息隊列架構，線程安全COM操作
@@ -502,15 +502,19 @@ python -m pytest tests/performance/ -v
 
 ## 📚 文檔結構
 
-專案文檔統一存放在 `doc/` 目錄下：
+專案文檔統一存放在 `docs/` 目錄下：
 
 ```
-doc/
-├── MCP_INTEGRATION_PLAN.md      # MCP整合完整計劃與進度
-├── DEPLOYMENT_GUIDE.md          # 部署和建置指南  
+docs/
+├── ARCHITECTURE.md              # 系統架構 (Python 側)
+├── API_REFERENCE.md             # API 參考
+├── FILE_MAP.md                  # 檔案對照表
+├── WORKFLOWS.md                 # 工作流程圖
+├── COM_IPC_ISOLATION.md         # COM/IPC 模式隔離架構
+├── INSTALL_GUIDE_USER.md        # 使用者安裝手冊
+├── MCP_INTEGRATION_PLAN.md      # MCP整合計劃與進度
+├── DEPLOYMENT_GUIDE.md          # 部署和建置指南
 ├── GEMINI_CLI_SETUP.md          # Gemini CLI配置說明
-├── RELEASE_NOTES_v5.0.md        # v5.0版本發布說明
-├── README-DEVELOPMENT.md        # 開發環境設定指南
 ├── UI_IMPROVEMENT_PLAN.md       # UI現代化計劃
 ├── ANTIVIRUS_SOLUTION.md        # 防毒軟體解決方案
 ├── CODE_SIGNING_GUIDE.md        # 代碼簽名指南
@@ -520,7 +524,7 @@ doc/
 ### 快速導航
 
 - **🚀 開始使用**: 參考根目錄 `README.md`
-- **🤖 AI助手設定**: `doc/GEMINI_CLI_SETUP.md`
-- **🏗️ 建置部署**: `doc/DEPLOYMENT_GUIDE.md`
-- **📋 完整計劃**: `doc/MCP_INTEGRATION_PLAN.md`
+- **🤖 AI助手設定**: `docs/GEMINI_CLI_SETUP.md`
+- **🏗️ 建置部署**: `docs/DEPLOYMENT_GUIDE.md`
+- **📋 完整計劃**: `docs/MCP_INTEGRATION_PLAN.md`
 - **🔧 開發指引**: 本檔案 `CLAUDE.md`

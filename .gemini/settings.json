@@ -1,13 +1,10 @@
 {
   "mcpServers": {
     "autocad": {
-      "httpUrl": "http://localhost:8084/messages",
+      "httpUrl": "http://localhost:8084/mcp",
       "trust": false,
       "timeout": 30000,
       "description": "AutoCAD-Odoo Integration"
-    },
-    "odoo": {
-      "httpUrl": "https://e-smith.odoo.com/mcp/v1/message"
     }
   }
 }
