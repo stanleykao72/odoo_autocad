@@ -470,6 +470,7 @@ class ModernFormMain(ctk.CTk):
             font=("Microsoft JhengHei UI", 11),
             text_color=dim,
             anchor="w",
+            justify="left",
             wraplength=170
         )
         self.lbl_project.pack(fill="x", padx=8, pady=(1, 5))
@@ -724,6 +725,12 @@ class ModernFormMain(ctk.CTk):
                     layout = self.autocad_util.get_active_layout()
                 except Exception:
                     pass
+            # COM mode may return COM object — extract .Name or convert to str
+            if layout and not isinstance(layout, str):
+                try:
+                    layout = layout.Name if hasattr(layout, 'Name') else str(layout)
+                except Exception:
+                    layout = None
             if layout:
                 self.lbl_layout.configure(text=f"配置 (Layout): {layout}", text_color=active)
             else:
