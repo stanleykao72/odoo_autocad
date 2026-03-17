@@ -23,7 +23,25 @@ class UtilAutoCADDispatcher:
         self._mode = mode
         self._com_backend = None
         self._ipc_backend = None
+        # Version selection: COM progid or IPC target HWND
+        self._com_progid = "AutoCAD.Application"
+        self._ipc_target_hwnd = None
         self._init_backend(mode)
+
+    def set_autocad_version(self, progid=None, target_hwnd=None):
+        """Set target AutoCAD version for next connection.
+        Args:
+            progid: COM ProgID (e.g. "AutoCAD.Application.19" for 2014)
+            target_hwnd: IPC window HWND for specific AutoCAD instance
+        """
+        if progid:
+            self._com_progid = progid
+            if self._com_backend:
+                self._com_backend.autocad_progid = progid
+        if target_hwnd:
+            self._ipc_target_hwnd = target_hwnd
+            if self._ipc_backend:
+                self._ipc_backend._target_hwnd = target_hwnd
 
     def _init_backend(self, mode):
         """Initialize the backend for the given mode"""
@@ -31,11 +49,13 @@ class UtilAutoCADDispatcher:
             if self._com_backend is None:
                 from utility.util_autocad import UtilAutoCAD
                 self._com_backend = UtilAutoCAD(self.odoo_util, self.log_util)
+                self._com_backend.autocad_progid = self._com_progid
             self._active = self._com_backend
         elif mode == self.MODE_IPC:
             if self._ipc_backend is None:
                 from utility.util_autocad_ipc import UtilAutoCADIPC
-                self._ipc_backend = UtilAutoCADIPC(log_util=self.log_util)
+                self._ipc_backend = UtilAutoCADIPC(
+                    log_util=self.log_util, target_hwnd=self._ipc_target_hwnd)
             self._active = self._ipc_backend
         else:
             raise ValueError(f"Unknown AutoCAD mode: {mode}")

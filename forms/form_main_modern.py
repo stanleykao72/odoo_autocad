@@ -375,6 +375,51 @@ class ModernFormMain(ctk.CTk):
         )
         self.mode_switch.pack(side="left", fill="x", expand=True)
 
+        # AutoCAD 版本選擇
+        self._create_version_selector()
+
+    def _create_version_selector(self):
+        """建立 AutoCAD 版本選擇下拉選單"""
+        from utility.util_autocad import detect_autocad_versions
+        versions = detect_autocad_versions()
+
+        if len(versions) <= 1:
+            # Only "auto" available, no need for selector
+            return
+
+        ver_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        ver_frame.pack(fill="x", padx=15, pady=(0, 3))
+
+        ctk.CTkLabel(
+            ver_frame, text="版本:",
+            font=("Microsoft JhengHei UI", 11),
+            text_color="#B0B0B0"
+        ).pack(side="left", padx=(0, 5))
+
+        self._autocad_versions = versions
+        ver_names = [v["name"] for v in versions]
+        self.version_var = ctk.StringVar(value=ver_names[0])
+        self.version_menu = ctk.CTkOptionMenu(
+            ver_frame,
+            values=ver_names,
+            variable=self.version_var,
+            command=self._on_version_change,
+            font=("Microsoft JhengHei UI", 10),
+            height=26,
+            corner_radius=6
+        )
+        self.version_menu.pack(side="left", fill="x", expand=True)
+
+    def _on_version_change(self, selected):
+        """處理 AutoCAD 版本選擇變更"""
+        for v in self._autocad_versions:
+            if v["name"] == selected:
+                progid = v["progid"]
+                self.autocad_dispatcher.set_autocad_version(progid=progid)
+                self.log_util.safe_log_insert(
+                    f"[AutoCAD] 版本切換: {selected} (ProgID: {progid})\n")
+                break
+
     def _on_mode_switch(self, selected):
         """處理 COM/IPC 模式切換"""
         new_mode = selected.lower()

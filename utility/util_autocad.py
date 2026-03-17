@@ -8,6 +8,69 @@ import time
 from utility.util_odoo import UtilOdoo
 from utility.util_log import UtilLog
 
+def detect_autocad_versions():
+    """Detect installed AutoCAD versions from Windows registry.
+    Returns list of dicts: [{"version": "2014", "progid": "AutoCAD.Application.19", "name": "AutoCAD 2014"}, ...]
+    """
+    # version_num → (release_year, product_name)
+    KNOWN_VERSIONS = {
+        "19": ("2014", "AutoCAD 2014"),
+        "20": ("2015", "AutoCAD 2015"),
+        "20.1": ("2016", "AutoCAD 2016"),
+        "21": ("2017", "AutoCAD 2017"),
+        "22": ("2018", "AutoCAD 2018"),
+        "23": ("2019-2021", "AutoCAD 2019-2021"),
+        "24": ("2022-2024", "AutoCAD 2022-2024"),
+        "25": ("2025", "AutoCAD 2025"),
+        "26": ("2026", "AutoCAD 2026"),
+    }
+    versions = []
+    try:
+        import winreg
+        # Check CLSID for AutoCAD.Application.XX
+        for ver_num, (year, name) in KNOWN_VERSIONS.items():
+            progid = f"AutoCAD.Application.{ver_num}"
+            try:
+                key = winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, f"{progid}\\CLSID")
+                winreg.CloseKey(key)
+                versions.append({
+                    "version": ver_num, "year": year,
+                    "progid": progid, "name": name
+                })
+            except FileNotFoundError:
+                pass
+    except Exception:
+        pass
+
+    # Always include the generic one (connects to default/latest)
+    versions.insert(0, {
+        "version": "auto", "year": "自動",
+        "progid": "AutoCAD.Application", "name": "AutoCAD (自動偵測)"
+    })
+    return versions
+
+
+def detect_autocad_windows():
+    """Detect running AutoCAD windows for IPC mode.
+    Returns list of dicts: [{"hwnd": 12345, "title": "Autodesk AutoCAD 2014 - drawing.dwg"}, ...]
+    """
+    windows = []
+    try:
+        import win32gui
+
+        def callback(hwnd, result):
+            if win32gui.IsWindowVisible(hwnd):
+                text = win32gui.GetWindowText(hwnd)
+                if "autocad" in text.lower() and ("drawing" in text.lower() or ".dwg" in text.lower()):
+                    result.append({"hwnd": hwnd, "title": text})
+            return True
+
+        win32gui.EnumWindows(callback, windows)
+    except Exception:
+        pass
+    return windows
+
+
 class UtilAutoCAD:
     def __init__(self, odoo_util, log_util):
         self.acad = None
@@ -19,6 +82,7 @@ class UtilAutoCAD:
         self.job_working_plan_name = None
         self.log = log_util
         self.odoo_util = odoo_util
+        self.autocad_progid = "AutoCAD.Application"  # default
 
     def connected_autocad(self):
         if self.acad:
@@ -36,11 +100,11 @@ class UtilAutoCAD:
 
             try:
                 # 嘗試連接到已開啟的 AutoCAD 應用程序
-                self.acad = client.GetActiveObject("AutoCAD.Application")
-                self.log.safe_log_insert("已連接到現有的 AutoCAD 應用程序。\n")
+                self.acad = client.GetActiveObject(self.autocad_progid)
+                self.log.safe_log_insert(f"已連接到現有的 AutoCAD 應用程序 ({self.autocad_progid})。\n")
             except client.pythoncom.com_error:
                 # 如果未運行，則啟動 AutoCAD
-                self.acad = client.Dispatch("AutoCAD.Application")
+                self.acad = client.Dispatch(self.autocad_progid)
                 self.log.safe_log_insert("啟動新的 AutoCAD 應用程序。\n")
                 self.acad.Visible = True  # 確保 AutoCAD 窗口可見
 

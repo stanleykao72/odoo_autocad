@@ -25,11 +25,12 @@ _logger = logging.getLogger(__name__)
 class UtilAutoCADIPC:
     """AutoCAD IPC 後端 — 使用 autocad-mcp File IPC"""
 
-    def __init__(self, log_util=None):
+    def __init__(self, log_util=None, target_hwnd=None):
         self.log = log_util
         self._backend = None
         self._initialized = False
         self._loop = None
+        self._target_hwnd = target_hwnd  # specific AutoCAD window HWND
         self.acad = None  # Compatibility: None means not COM-connected
         self.project_id = None
         self.project_name = None
@@ -60,6 +61,11 @@ class UtilAutoCADIPC:
             try:
                 from autocad_mcp.backends.file_ipc import FileIPCBackend
                 self._backend = FileIPCBackend()
+                # Override HWND if a specific target was requested
+                if self._target_hwnd:
+                    self._backend._hwnd = self._target_hwnd
+                    self._backend._command_hwnd = self._backend._find_command_line_hwnd()
+                    self._log(f"[IPC] Using target HWND: {self._target_hwnd}\n")
                 init_result = await self._backend.initialize()
                 if hasattr(init_result, 'ok') and init_result.ok:
                     self._initialized = True
