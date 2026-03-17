@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
+import os
+import sys
 import base64
 import queue
 import threading
@@ -981,25 +983,51 @@ class ModernFormMain(ctk.CTk):
         port = self.mcp_manager.port
         endpoint = "/mcp" if self.mcp_manager.transport == "streamable-http" else "/sse"
         url = f"http://localhost:{port}{endpoint}"
+        # Python executable path for stdio mode
+        python_exe = sys.executable.replace("\\", "/")
+        server_script = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "mcp_server_autocad.py"
+        ).replace("\\", "/")
         log = self.log_util.safe_log_insert
         log("─" * 60 + "\n")
-        log("📋 MCP 連線設定指引\n")
-        log(f"   MCP Server URL: {url}\n")
+        log(f"📋 MCP 連線設定 (共 13 個工具, port {port})\n")
         log("─" * 60 + "\n")
-        log("【Claude Code】在專案目錄建立 .mcp.json:\n")
+        log("方式一：Streamable HTTP（推薦，GUI 已自動啟動）\n")
+        log(f"  URL: {url}\n\n")
+        log("【Claude Code .mcp.json】\n")
         log('  {\n')
         log('    "mcpServers": {\n')
         log('      "autocad-odoo": {\n')
         log(f'        "url": "{url}"\n')
         log('      }\n')
         log('    }\n')
-        log('  }\n')
-        log("\n")
-        log("【Gemini CLI】在 ~/.gemini/settings.json 加入:\n")
+        log('  }\n\n')
+        log("【Gemini CLI ~/.gemini/settings.json】\n")
         log('  {\n')
         log('    "mcpServers": {\n')
         log('      "autocad-odoo": {\n')
         log(f'        "url": "{url}"\n')
+        log('      }\n')
+        log('    }\n')
+        log('  }\n\n')
+        log("─" * 40 + "\n")
+        log("方式二：stdio（不需 GUI，獨立執行）\n\n")
+        log("【Claude Code .mcp.json】\n")
+        log('  {\n')
+        log('    "mcpServers": {\n')
+        log('      "autocad-odoo": {\n')
+        log(f'        "command": "{python_exe}",\n')
+        log(f'        "args": ["{server_script}"]\n')
+        log('      }\n')
+        log('    }\n')
+        log('  }\n\n')
+        log("【Gemini CLI ~/.gemini/settings.json】\n")
+        log('  {\n')
+        log('    "mcpServers": {\n')
+        log('      "autocad-odoo": {\n')
+        log(f'        "command": "{python_exe}",\n')
+        log(f'        "args": ["{server_script}"]\n')
         log('      }\n')
         log('    }\n')
         log('  }\n')
