@@ -107,6 +107,14 @@ if exist "installer\odoo-autocad-integration-6.0-setup.exe" (
 )
 echo.
 
+REM Step 4: Clean up intermediate EXE
+echo [BUILD] Step 4: Cleaning up...
+if exist "output\odoo-autocad-integration.exe" (
+    del /f "output\odoo-autocad-integration.exe"
+    echo [SUCCESS] Removed output\odoo-autocad-integration.exe (included in installer)
+)
+echo.
+
 echo [TIPS] Recommendations:
 echo    1. Test installer on clean system
 echo    2. Check antivirus software compatibility

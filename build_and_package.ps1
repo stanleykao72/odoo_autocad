@@ -127,6 +127,14 @@ if (Test-Path $installerPath) {
 }
 
 Write-Host ""
+# Step 4: Clean up intermediate EXE (installer already contains it)
+Write-Host "[BUILD] Step 4: Cleaning up..." -ForegroundColor Cyan
+if (Test-Path "output\odoo-autocad-integration.exe") {
+    Remove-Item "output\odoo-autocad-integration.exe" -Force
+    Write-Host "[SUCCESS] Removed output\odoo-autocad-integration.exe (included in installer)" -ForegroundColor Green
+}
+Write-Host ""
+
 Write-Host "[TIPS] Recommendations:" -ForegroundColor Yellow
 Write-Host "   1. Test installer on clean system" -ForegroundColor White
 Write-Host "   2. Check antivirus software compatibility" -ForegroundColor White  
