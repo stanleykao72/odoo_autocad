@@ -73,6 +73,10 @@
       "command": "mcp-code-graph",
       "args": [],
       "env": {}
+    },
+    "autocad-odoo": {
+      "type": "streamable-http",
+      "url": "http://localhost:8084/mcp"
     }
   }
 }
