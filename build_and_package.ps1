@@ -1,7 +1,7 @@
 # Complete build and package process script v5.0 (PowerShell version)
 # One-click build from source code to installer
 
-Write-Host "[BUILD] Odoo-AutoCAD Integration System v5.0 - Complete Build Process" -ForegroundColor Green
+Write-Host "[BUILD] Odoo-AutoCAD Integration System v6.0 - Complete Build Process" -ForegroundColor Green
 Write-Host "===============================================" -ForegroundColor Green
 Write-Host ""
 
@@ -45,7 +45,7 @@ Write-Host ""
 Write-Host "[BUILD] Step 1/3: Building executable..." -ForegroundColor Cyan
 try {
     # Direct PyInstaller build, no dependency on build_windows.ps1
-    & python -m PyInstaller --onefile --windowed --name "odoo-autocad-integration" --icon "icon/odoo_autocad.ico" --add-data "config;config" --add-data "fonts;fonts" --add-data "icon;icon" --add-data "db;db" --hidden-import "customtkinter" --hidden-import "win32com.client" --hidden-import "win32com.gen_py" --hidden-import "pywintypes" --hidden-import "win32api" --hidden-import "tkinter" --hidden-import "tkinter.ttk" --hidden-import "sqlalchemy" --hidden-import "sqlalchemy.ext.declarative" --hidden-import "sqlalchemy.orm" --exclude-module "pytest" --exclude-module "unittest" --exclude-module "doctest" --exclude-module "pdb" --exclude-module "matplotlib" --exclude-module "numpy" --exclude-module "pandas" --clean --noconfirm --distpath "output" odoo.py
+    & python -m PyInstaller --onefile --windowed --name "odoo-autocad-integration" --icon "icon/odoo_autocad.ico" --add-data "config;config" --add-data "fonts;fonts" --add-data "icon;icon" --add-data "db;db" --add-data "libs/autocad-mcp/src;autocad_mcp_src" --add-data "libs/autocad-mcp/lisp-code;lisp-code" --hidden-import "customtkinter" --hidden-import "win32com.client" --hidden-import "win32com.gen_py" --hidden-import "pywintypes" --hidden-import "win32api" --hidden-import "tkinter" --hidden-import "tkinter.ttk" --hidden-import "sqlalchemy" --hidden-import "sqlalchemy.ext.declarative" --hidden-import "sqlalchemy.orm" --hidden-import "mcp" --hidden-import "mcp.server.fastmcp" --hidden-import "mcp.types" --hidden-import "uvicorn" --hidden-import "starlette" --hidden-import "structlog" --hidden-import "httpx" --hidden-import "anyio" --hidden-import "sniffio" --hidden-import "httpx_sse" --hidden-import "pydantic" --hidden-import "pydantic_settings" --hidden-import "sse_starlette" --exclude-module "pytest" --exclude-module "unittest" --exclude-module "doctest" --exclude-module "pdb" --exclude-module "matplotlib" --exclude-module "numpy" --exclude-module "pandas" --clean --noconfirm --distpath "output" odoo.py
     if ($LASTEXITCODE -eq 0) {
         # Copy additional files to output directory
         Copy-Item "doc\ANTIVIRUS_SOLUTION.md" "output\" -ErrorAction SilentlyContinue
@@ -119,7 +119,7 @@ if (Test-Path $exePath) {
 }
 
 # Installer file information
-$installerPath = "installer\odoo-autocad-integration-5.0-setup.exe"
+$installerPath = "installer\odoo-autocad-integration-6.0-setup.exe"
 if (Test-Path $installerPath) {
     $installerInfo = Get-Item $installerPath
     Write-Host "   Installer: $installerPath" -ForegroundColor White

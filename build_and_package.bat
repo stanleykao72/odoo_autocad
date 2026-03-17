@@ -2,7 +2,7 @@
 REM Complete build and package process script v5.0
 REM One-click build from source code to installer
 
-echo [BUILD] Odoo-AutoCAD Integration System v5.0 - Complete Build Process
+echo [BUILD] Odoo-AutoCAD Integration System v6.0 - Complete Build Process
 echo ===============================================
 echo.
 
@@ -42,7 +42,7 @@ REM Step 1: Build EXE
 echo [BUILD] Step 1/3: Building executable...
 echo [LOG] Starting PyInstaller...
 REM Direct PyInstaller build, no dependency on build_windows.bat
-python -m PyInstaller --onefile --windowed --name "odoo-autocad-integration" --icon "icon/odoo_autocad.ico" --add-data "config;config" --add-data "fonts;fonts" --add-data "icon;icon" --add-data "db;db" --hidden-import "customtkinter" --hidden-import "win32com.client" --hidden-import "win32com.gen_py" --hidden-import "pywintypes" --hidden-import "win32api" --hidden-import "tkinter" --hidden-import "tkinter.ttk" --hidden-import "sqlalchemy" --hidden-import "sqlalchemy.ext.declarative" --hidden-import "sqlalchemy.orm" --exclude-module "pytest" --exclude-module "unittest" --exclude-module "doctest" --exclude-module "pdb" --exclude-module "matplotlib" --exclude-module "numpy" --exclude-module "pandas" --clean --noconfirm --distpath "output" odoo.py
+python -m PyInstaller --onefile --windowed --name "odoo-autocad-integration" --icon "icon/odoo_autocad.ico" --add-data "config;config" --add-data "fonts;fonts" --add-data "icon;icon" --add-data "db;db" --add-data "libs/autocad-mcp/src;autocad_mcp_src" --add-data "libs/autocad-mcp/lisp-code;lisp-code" --hidden-import "customtkinter" --hidden-import "win32com.client" --hidden-import "win32com.gen_py" --hidden-import "pywintypes" --hidden-import "win32api" --hidden-import "tkinter" --hidden-import "tkinter.ttk" --hidden-import "sqlalchemy" --hidden-import "sqlalchemy.ext.declarative" --hidden-import "sqlalchemy.orm" --hidden-import "mcp" --hidden-import "mcp.server.fastmcp" --hidden-import "mcp.types" --hidden-import "uvicorn" --hidden-import "starlette" --hidden-import "structlog" --hidden-import "httpx" --hidden-import "anyio" --hidden-import "sniffio" --hidden-import "httpx_sse" --hidden-import "pydantic" --hidden-import "pydantic_settings" --hidden-import "sse_starlette" --exclude-module "pytest" --exclude-module "unittest" --exclude-module "doctest" --exclude-module "pdb" --exclude-module "matplotlib" --exclude-module "numpy" --exclude-module "pandas" --clean --noconfirm --distpath "output" odoo.py
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] EXE build failed!
     pause
@@ -95,15 +95,15 @@ echo [SUCCESS] Build completed!
 echo ==========================================
 echo [INFO] Output file locations:
 echo    EXE: output\odoo-autocad-integration.exe
-if exist "installer\odoo-autocad-integration-5.0-setup.exe" (
-    echo    Installer: installer\odoo-autocad-integration-5.0-setup.exe
+if exist "installer\odoo-autocad-integration-6.0-setup.exe" (
+    echo    Installer: installer\odoo-autocad-integration-6.0-setup.exe
 )
 echo.
 
 REM Display file sizes
 for %%I in (output\odoo-autocad-integration.exe) do echo [INFO] EXE size: %%~zI bytes
-if exist "installer\odoo-autocad-integration-5.0-setup.exe" (
-    for %%I in (installer\odoo-autocad-integration-5.0-setup.exe) do echo [INFO] Installer size: %%~zI bytes
+if exist "installer\odoo-autocad-integration-6.0-setup.exe" (
+    for %%I in (installer\odoo-autocad-integration-6.0-setup.exe) do echo [INFO] Installer size: %%~zI bytes
 )
 echo.
 
