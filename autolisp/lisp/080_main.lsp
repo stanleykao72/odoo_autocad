@@ -1,4 +1,4 @@
-;;; 080_main.lsp — Entry point: loads all modules and registers user commands
+;;; 080_main.lsp - Entry point: loads all modules and registers user commands
 ;;; Usage: (load "080_main.lsp") then OB:MCP-DISPATCH to execute IPC/MCP commands
 ;;;
 ;;; AutoCAD LT 2024+ compatible (no vlax-create-object / vlax-get-or-create-object)
@@ -44,13 +44,14 @@
 ;; Check if modules already loaded (VLX mode: all .fas run before main)
 (if (and (eval '(and dmc:json:json_to_list T))
          (eval '(and ob:mcp-dispatch-command T)))
-  ;; VLX mode — modules already loaded by VLX packaging
+  ;; VLX mode - modules already loaded by VLX packaging
   (princ "\n[OB] VLX mode - modules already loaded")
 
-  ;; Loose .lsp mode — load modules from disk
+  ;; Loose .lsp mode - load modules from disk
   (progn
     (princ "\n[OB] Loading modules...")
     (ob:load-module "010_json_util.lsp")
+    (ob:load-module "015_log_util.lsp")
     (ob:load-module "020_file_util.lsp")
     (ob:load-module "030_config.lsp")
     (ob:load-module "040_strip_mtext.lsp")
@@ -63,12 +64,21 @@
 ;; Initialize configuration
 (config:init)
 
+;; Start logging session
+(if (eval '(and ob:log T))
+  (progn
+    (ob:log-session-start)
+    (ob:log (strcat "[OB] Root: " (if *ob:root* *ob:root* "(nil)")))
+    (ob:log (strcat "[OB] IPC dir: " (if (boundp '*mcp-ipc-dir*) *mcp-ipc-dir* "(not set)")))
+  )
+)
+
 ;;; ============================================================
 ;;; User commands
 ;;; ============================================================
 
 (defun c:OB:MCP-DISPATCH ()
-  "Executes IPC/MCP dispatch — reads command JSON, executes, writes result JSON."
+  "Executes IPC/MCP dispatch - reads command JSON, executes, writes result JSON."
   (c:mcp-dispatch)
   (princ)
 )

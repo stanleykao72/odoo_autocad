@@ -159,10 +159,7 @@ class UtilAutoCADDispatcher:
         return self._active.get_layouts_values()
 
     def get_single_layout_values(self, layout_name):
-        if hasattr(self._active, 'get_single_layout_values'):
-            return self._active.get_single_layout_values(layout_name)
-        # COM fallback: not supported, caller should use get_layouts_values
-        return {}
+        return self._active.get_single_layout_values(layout_name)
 
     def set_layouts_tables_id(self, boq_list):
         return self._active.set_layouts_tables_id(boq_list)
@@ -240,7 +237,7 @@ class UtilAutoCADDispatcher:
         except Exception as e:
             self._log(f"[IPC] process_pr_no failed: {e}\n")
 
-    # === COM-only methods (graceful fallback for IPC) ===
+    # === COM-only methods (forwarded; only available when COM backend is active) ===
 
     def clear_main_body(self, main_body):
         if hasattr(self._active, 'clear_main_body'):

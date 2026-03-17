@@ -227,8 +227,7 @@ def setup_gui_proxy_handlers(autocad_util, logger):
                 return {
                     "success": True,
                     "current_layout": {
-                        "name": current_layout.Name,
-                        "tab_order": getattr(current_layout, 'TabOrder', 0)
+                        "name": current_layout,
                     }
                 }
             else:
@@ -346,27 +345,20 @@ def setup_gui_proxy_handlers(autocad_util, logger):
                 return {"success": False, "error": "AutoCAD 未連接"}
             
             # 首先獲取當前layout以便稍後恢復
-            original_layout = autocad_util.get_active_layout()
-            original_name = original_layout.Name if original_layout else None
-            
+            original_name = autocad_util.get_active_layout()
+
             try:
                 # 切換到指定layout
                 if original_name != layout_name:
-                    # 獲取所有layouts
+                    # 獲取所有layouts (returns list of strings)
                     layouts = autocad_util.get_doc_layouts()
-                    target_layout = None
-                    
-                    for layout in layouts:
-                        if layout.Name == layout_name:
-                            target_layout = layout
-                            break
-                    
-                    if not target_layout:
+
+                    if layout_name not in layouts:
                         return {
                             "success": False,
                             "error": f"找不到名為 '{layout_name}' 的layout"
                         }
-                    
+
                     # 使用CTAB切換layout
                     if hasattr(autocad_util, 'acad') and autocad_util.acad:
                         active_doc = autocad_util.acad.ActiveDocument
@@ -475,29 +467,22 @@ def setup_gui_proxy_handlers(autocad_util, logger):
                 return {"success": False, "error": "AutoCAD 未連接"}
             
             # 首先獲取當前layout以便稍後恢復
-            original_layout = autocad_util.get_active_layout()
-            original_name = original_layout.Name if original_layout else None
+            original_name = autocad_util.get_active_layout()
             log_message(f"[GUI Proxy] 當前layout: {original_name}")
-            
+
             try:
                 # 切換到指定layout
                 if original_name != layout_name:
                     log_message(f"[GUI Proxy] 切換到目標layout: {layout_name}")
-                    # 獲取所有layouts
+                    # 獲取所有layouts (returns list of strings)
                     layouts = autocad_util.get_doc_layouts()
-                    target_layout = None
-                    
-                    for layout in layouts:
-                        if layout.Name == layout_name:
-                            target_layout = layout
-                            break
-                    
-                    if not target_layout:
+
+                    if layout_name not in layouts:
                         return {
                             "success": False,
                             "error": f"找不到名為 '{layout_name}' 的layout"
                         }
-                    
+
                     # 使用CTAB切換layout
                     if hasattr(autocad_util, 'acad') and autocad_util.acad:
                         active_doc = autocad_util.acad.ActiveDocument
@@ -505,73 +490,24 @@ def setup_gui_proxy_handlers(autocad_util, logger):
                             active_doc.SetVariable("CTAB", layout_name)
                             time.sleep(0.1)  # 等待切換完成
                 
-                # 提取當前layout的參數
+                # 提取當前layout的參數（使用統一的 get_single_layout_values）
                 log_message(f"[GUI Proxy] 開始提取layout '{layout_name}' 的參數")
-                
-                # 獲取當前活動layout的參數
-                current_layout = autocad_util.get_active_layout()
-                if not current_layout:
-                    return {"success": False, "error": "無法獲取當前layout"}
-                
-                # 提取layout的標題區塊資訊
-                tag_list = [
-                    'pr_no', 'project_name', 'job_working_plan_name',
-                    'product_name', 'product_catelog', 'product_no',
-                    'unit', 'quantity', 'length', 'width', 'height',
-                    'specification', 'remark', 'position'
-                ]
-                
-                # 提取標題區塊資料
-                header_parameters = autocad_util.get_layout_attribute_blocks_value(current_layout, tag_list)
-                log_message(f"[GUI Proxy] 成功提取標題區塊資料")
-                
-                # 提取表格資料
-                table_data = {}
-                try:
-                    # 獲取layout中的所有區塊
-                    if hasattr(autocad_util, 'acad') and autocad_util.acad:
-                        active_doc = autocad_util.acad.ActiveDocument
-                        if current_layout.Name == "Model":
-                            blocks = active_doc.ModelSpace
-                        else:
-                            blocks = active_doc.PaperSpace
-                        
-                        # 獲取表格區塊
-                        block_list = autocad_util.get_layout_table_block(blocks)
-                        
-                        # 提取表格資料
-                        if block_list:
-                            header_id, detail_list = autocad_util.get_table_data(block_list)
-                            table_data = {
-                                'header_id': header_id,
-                                'detail_list': detail_list,
-                                'table_count': len(block_list) if block_list else 0
-                            }
-                            log_message(f"[GUI Proxy] 成功提取表格資料: {len(detail_list) if detail_list else 0} 筆明細")
-                        else:
-                            table_data = {
-                                'header_id': None,
-                                'detail_list': [],
-                                'table_count': 0
-                            }
-                            log_message(f"[GUI Proxy] 未找到表格資料")
-                            
-                except Exception as table_error:
-                    log_message(f"[GUI Proxy] 提取表格資料時發生錯誤: {table_error}")
-                    table_data = {
-                        'header_id': None,
-                        'detail_list': [],
-                        'table_count': 0,
-                        'error': str(table_error)
-                    }
-                
+
+                data = autocad_util.get_single_layout_values(layout_name)
+                if not data:
+                    return {"success": False, "error": f"layout '{layout_name}' 無資料"}
+
                 log_message(f"[GUI Proxy] 成功提取layout '{layout_name}' 的完整參數")
-                
+
                 return {
                     "success": True,
                     "layout_name": layout_name,
-                    "parameters": header_parameters,  # 標題區塊資料
-                    "table_data": table_data,         # 表格資料
+                    "parameters": {k: v for k, v in data.items()
+                                   if k not in ('layout_name', 'header_id', 'detail')},
+                    "table_data": {
+                        'header_id': data.get('header_id'),
+                        'detail_list': data.get('detail', []),
+                    },
                     "extraction_method": "single_layout"
                 }
                 

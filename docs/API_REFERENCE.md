@@ -22,8 +22,9 @@ dispatcher = UtilAutoCADDispatcher(odoo_util, log_util, mode="com")
 | `set_layouts_tables_id(boq_list)` | — | Write header_id/detail_id back |
 | `get_layouts_header_id_to_pr()` | `list` | Collect header_ids for PR |
 | `get_block_attributes()` | `dict` | Read attribute block values |
-| `set_block_attributes(attrs, layout_name)` | — | Write attribute block values |
-| `get_active_layout()` | `object` | Current layout |
+| `set_block_attributes(attrs, layout_name)` | — | Write attribute block values (targets specific layout if name given) |
+| `get_active_layout()` | `str \| None` | Current layout name (IPC: from block attrs cache) |
+| `layout_name` | `str \| None` | Layout name (set during connect from block attrs) |
 | `get_doc_layouts()` | `list` | All layouts (exclude Model) |
 | `clear_table_id(layout)` | — | Clear IDs in one layout |
 | `clear_all_tables_id()` | — | Clear IDs in all layouts |
@@ -162,9 +163,13 @@ Dispatched via `mcp-dispatch-command`:
 | `odoo_extract_tables` | — | Get all TABLE data as JSON |
 | `odoo_get_header_ids` | — | Get header_ids from all TABLEs |
 | `odoo_write_ids` | `{boq_list: [...]}` | Write header_id/detail_id to TABLEs |
-| `odoo_get_block_attrs` | — | Read attribute block values |
-| `odoo_set_block_attrs` | `{attrs: {...}, layout: "..."}` | Write attribute block values |
+| `odoo_get_block_attrs` | — | Read attribute block values + pr_no block text + layout_name |
+| `odoo_set_block_attrs` | `{layout_name: "...", tag: "value", ...}` | Write attributes to specific layout (or all if no layout_name) |
 | `odoo_clear_ids` | — | Clear all IDs from TABLEs |
+
+> **IPC JSON Wrapper**: All action handlers extract the `params` sub-object from the full IPC JSON
+> (`cadr (assoc "params" full-data)`) before processing. The IPC protocol wraps user params inside
+> `{"request_id": "...", "command": "...", "params": {...}, "ts": ...}`.
 
 JSON format:
 ```json

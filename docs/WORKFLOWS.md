@@ -51,6 +51,11 @@ User clicks "連接到 AutoCAD LT"
   │    ├─ backend.status() → ping via JSON file exchange
   │    └─ Set connected = True
   │
+  ├─ Dispatcher._process_pr_no_ipc()
+  │    ├─ odoo_get_block_attrs → read attrs + pr_no + layout_name
+  │    ├─ Look up project from Odoo by pr_no
+  │    └─ Set project_id, project_name, layout_name on backend
+  │
   └─ Requires: AutoCAD LT running with mcp_dispatch.lsp loaded
 ```
 
@@ -102,8 +107,9 @@ User clicks "取得參數"
   │    ├─ odoo_util.get_setup() → products, specs, operations
   │    ├─ odoo_util.get_color() → color options
   │    ├─ Show selection form (dropdowns)
-  │    └─ autocad_util.set_block_attributes(selected_values)
-  │         └─ Write to attribute block in all layouts
+  │    └─ autocad_util.set_block_attributes(selected_values, layout_name)
+  │         └─ Write to attribute block in specified layout
+  │              (uses cached layout_name from connect; falls back to all layouts)
   │
   └─ Tags written: product_name, spec, product_catelog,
      operation_flow, surface_treatment, color_name, color_no

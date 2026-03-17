@@ -116,6 +116,7 @@ autolisp/
 │   ├── 080_main.lsp              # 進入點，載入所有模組，定義使用者指令
 │   ├── 030_config.lsp            # 路徑常數、YAML 設定讀取
 │   ├── 010_json_util.lsp         # JSON 解析/序列化（diegomcas 版本）
+│   ├── 015_log_util.lsp         # 檔案 Log（寫入 logs/autolisp_YYYY-MM-DD.log）
 │   ├── 020_file_util.lsp         # 檔案讀寫 + 唯一檔名 + 刪除
 │   ├── 060_table_util.lsp        # TABLE 實體讀寫（遍歷 Layout, 讀取/回寫 ID）
 │   ├── 050_block_util.lsp        # Block 屬性讀寫（get/set attribute）
@@ -285,6 +286,8 @@ mcp_server_fastmcp.py              # 刪除，由 mcp_server_autocad.py 取代
 | `(block:set-attributes obj attr-list)` | 批量寫入屬性 |
 | `(block:find-attribute-block)` | 在目前 Layout 找到屬性 Block |
 | `(block:find-attribute-block-in-layout layout)` | 在指定 Layout 找到屬性 Block |
+| `(block:find-block-by-name name)` | 依 Block 名稱（非 attribute tag）搜尋 Block Reference |
+| `(block:get-block-text obj)` | 取得 Block 定義中第一個 AcDbText 的 TextString |
 | `(block:get-header-attrs block layout-name)` | 取得 header 屬性（用於 BOQ 匯出） |
 | `(block:set-attributes-all-layouts attr-list)` | 寫入屬性到所有 Layout |
 
@@ -307,12 +310,13 @@ mcp_server_fastmcp.py              # 刪除，由 mcp_server_autocad.py 取代
 
 **載入順序:**
 1. 010_json_util.lsp
-2. 020_file_util.lsp
-3. 030_config.lsp
-4. 040_strip_mtext.lsp
-5. 050_block_util.lsp
-6. 060_table_util.lsp
-7. 070_ob_mcp_dispatch.lsp
+2. 015_log_util.lsp
+3. 020_file_util.lsp
+4. 030_config.lsp
+5. 040_strip_mtext.lsp
+6. 050_block_util.lsp
+7. 060_table_util.lsp
+8. 070_ob_mcp_dispatch.lsp
 
 **使用者指令（1 個）:**
 
@@ -338,8 +342,8 @@ mcp_server_fastmcp.py              # 刪除，由 mcp_server_autocad.py 取代
 | `odoo_extract_tables` | 收集所有 Layout TABLE + Block 資料 | `table:get-all-layouts-data` |
 | `odoo_get_header_ids` | 收集所有 Layout 的 header_id | `table:get-all-header-ids` |
 | `odoo_write_ids` | 回寫 header_id + detail_id 到 TABLE | `table:update-ids-from-response` |
-| `odoo_get_block_attrs` | 讀取屬性 Block 的所有屬性 | `block:find-attribute-block` + `block:get-all-attributes` |
-| `odoo_set_block_attrs` | 寫入屬性到所有 Layout 的 Block | `block:set-attributes-all-layouts` |
+| `odoo_get_block_attrs` | 讀取屬性 Block 的所有屬性 + pr_no block text + layout_name | `block:find-attribute-block` + `block:get-all-attributes` + `block:find-block-by-name` + `block:get-block-text` |
+| `odoo_set_block_attrs` | 寫入屬性到指定 Layout（或所有 Layout）的 Block | `block:find-attribute-block-in-layout` + `block:set-attributes-all-layouts` |
 | `odoo_clear_ids` | 清除 TABLE ID | `table:clear-all-layouts-ids` |
 
 **載入流程:**
@@ -352,6 +356,19 @@ mcp_server_fastmcp.py              # 刪除，由 mcp_server_autocad.py 取代
 (mcp:register-action "odoo_get_header_ids" 'ob:action-get-header-ids)
 ;; ... 其他 Odoo actions
 ```
+
+### 3.9 lisp/015_log_util.lsp — 檔案 Log
+
+寫入 `logs/autolisp_YYYY-MM-DD.log`，與 Python 端的 log 存放在同一 `logs/` 目錄。
+
+| 函數 | 說明 |
+|------|------|
+| `(ob:log msg)` | 寫 log 到檔案 + 命令列印出 |
+| `(ob:log-session-start)` | 寫 session 開始標記 |
+| `(log:get-log-dir)` | 取得 logs/ 目錄路徑（自動建立） |
+| `(log:get-log-file)` | 取得今天的 log 檔路徑 |
+| `(log:get-timestamp)` | 取得 HH:MM:SS 時間字串 |
+| `(log:get-date-str)` | 取得 YYYY-MM-DD 日期字串 |
 
 ---
 
@@ -372,13 +389,13 @@ Phase 1-5 實作了 DCL 對話框 + Python Bridge.exe 的獨立模式架構。
 此模式已被 Phase 6 的 IPC/MCP 模式取代，相關程式碼已刪除。
 舊版檔案保留在 `legacy/` 目錄供參考。
 
-### Phase 6: autocad-mcp Submodule + IPC/MCP Mode — TODO
-- [ ] `libs/autocad-mcp/` — git submodule (puran-water/autocad-mcp)
-- [ ] `lisp/070_ob_mcp_dispatch.lsp` — Odoo 擴展 dispatcher
-- [ ] `utility/util_autocad_ipc.py` — Python File IPC client
-- [ ] `utility/util_autocad_dispatcher.py` — COM/IPC 模式切換
-- [ ] `mcp_server_autocad.py` — MCP Server（autocad-mcp + Odoo tools）
-- [ ] `lisp/080_main.lsp` — 新增 OB:MCP-DISPATCH 指令
+### Phase 6: autocad-mcp Submodule + IPC/MCP Mode — DONE
+- [x] `libs/autocad-mcp/` — git submodule (puran-water/autocad-mcp)
+- [x] `lisp/070_ob_mcp_dispatch.lsp` — Odoo 擴展 dispatcher
+- [x] `utility/util_autocad_ipc.py` — Python File IPC client
+- [x] `utility/util_autocad_dispatcher.py` — COM/IPC 模式切換
+- [x] `mcp_server_autocad.py` — MCP Server（autocad-mcp + Odoo tools）
+- [x] `lisp/080_main.lsp` — 新增 OB:MCP-DISPATCH 指令
 
 ### 待辦（Future）
 - [ ] AutoCAD 內端對端測試
@@ -495,8 +512,8 @@ autocad-mcp 使用可配置的 IPC 目錄：
 | `odoo_extract_tables` | 收集所有 Layout TABLE + Block 資料 |
 | `odoo_get_header_ids` | 收集所有 Layout 的 header_id |
 | `odoo_write_ids` | 回寫 header_id + detail_id 到 TABLE |
-| `odoo_get_block_attrs` | 讀取屬性 Block 的所有屬性 |
-| `odoo_set_block_attrs` | 寫入屬性到所有 Layout 的 Block |
+| `odoo_get_block_attrs` | 讀取屬性 Block 的所有屬性 + pr_no + layout_name |
+| `odoo_set_block_attrs` | 寫入屬性到指定 Layout（或所有 Layout）的 Block |
 | `odoo_clear_ids` | 清除 TABLE ID |
 
 ### 7.6 超時與並發控制
@@ -507,7 +524,7 @@ autocad-mcp 使用可配置的 IPC 目錄：
 | asyncio.Lock | Python 端防止並行 dispatch 競態 |
 | PostMessageW(WM_CHAR) | Win32 API 送字元到 MDIClient 窗口，不搶焦點 |
 | ESC 前置 | 2×ESC 取消殘留命令 |
-| UTF-8 / cp1252 fallback | 自動處理編碼差異 |
+| Command: CP950 + ensure_ascii=False (Python→AutoCAD); Result: UTF-8→CP950→CP1252 fallback (AutoCAD→Python) | 自動處理編碼差異 |
 
 ---
 

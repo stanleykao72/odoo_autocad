@@ -11,7 +11,7 @@ from utility.util_autocad import UtilAutoCAD
 from utility.util_push_to_boq import UtilPushToBoq
 from utility.util_transfer_boq_to_pr import UtilTransferBoqToPr
 from utility.util_log import UtilLog
-from utility.util_mcp_sse_manager import MCPSSEManager
+# MCPSSEManager removed (v6.0 uses util_mcp_manager.MCPManager instead)
 from forms.form_autocad_param import FormAutoCADParam
 from bravado.requests_client import RequestsClient
 from bravado.client import SwaggerClient

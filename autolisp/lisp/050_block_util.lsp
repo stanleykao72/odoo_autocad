@@ -58,7 +58,7 @@
 
 (defun block:find-attribute-block (/ doc layout blocks block result)
   "Finds the AcDbBlockReference with attributes in the current layout.
-   Identifies by presence of 'project_name' or 'job_working_plan_name' tag.
+   Identifies by presence of 'pr_no', 'project_name', or 'job_working_plan_name' tag.
    Returns VLA block reference object or nil."
   (setq result nil)
   (if (setq doc (vla-get-activedocument (vlax-get-acad-object)))
@@ -68,7 +68,8 @@
       (vlax-for block blocks
         (if (= (vla-get-objectname block) "AcDbBlockReference")
           (progn
-            (if (or (block:get-attribute block "project_name")
+            (if (or (block:get-attribute block "pr_no")
+                    (block:get-attribute block "project_name")
                     (block:get-attribute block "job_working_plan_name"))
               (setq result block)
             )
@@ -89,7 +90,8 @@
       (vlax-for block blocks
         (if (= (vla-get-objectname block) "AcDbBlockReference")
           (progn
-            (if (or (block:get-attribute block "project_name")
+            (if (or (block:get-attribute block "pr_no")
+                    (block:get-attribute block "project_name")
                     (block:get-attribute block "job_working_plan_name"))
               (setq result block)
             )
@@ -99,6 +101,52 @@
     )
   )
   result
+)
+
+;;; ============================================================
+;;; Find block by name and read text (for pr_no block)
+;;; ============================================================
+
+(defun block:find-block-by-name (name / doc layout blocks block result)
+  "Finds a block reference by its Name (not attribute tag) in the current layout.
+   Returns VLA block reference object or nil."
+  (setq result nil)
+  (if (setq doc (vla-get-activedocument (vlax-get-acad-object)))
+    (progn
+      (setq layout (vla-get-activelayout doc))
+      (setq blocks (vla-get-block layout))
+      (vlax-for block blocks
+        (if (and (= (vla-get-objectname block) "AcDbBlockReference")
+                 (= (strcase (vla-get-name block)) (strcase name)))
+          (setq result block)
+        )
+      )
+    )
+  )
+  result
+)
+
+(defun block:get-block-text (obj / block-name block-def text-val)
+  "Gets the first AcDbText string from a block reference's definition.
+   Used for blocks like 'pr_no' that contain text instead of attributes."
+  (setq text-val nil)
+  (if obj
+    (progn
+      (setq block-name (vla-get-effectivename obj))
+      (setq block-def
+        (vla-item
+          (vla-get-blocks
+            (vla-get-activedocument (vlax-get-acad-object)))
+          block-name))
+      (vlax-for item block-def
+        (if (and (not text-val)
+                 (= (vla-get-objectname item) "AcDbText"))
+          (setq text-val (vla-get-textstring item))
+        )
+      )
+    )
+  )
+  text-val
 )
 
 ;;; ============================================================
@@ -112,7 +160,7 @@
 
 ;; Additional header tags
 (setq *ob:header-tags*
-  '("job_working_plan_name" "project_name"))
+  '("pr_no" "job_working_plan_name" "project_name"))
 
 (defun block:get-header-attrs (block layout-name / attrs result tag val)
   "Gets header attributes from a block for BOQ JSON.
@@ -124,7 +172,8 @@
     (progn
       (setq attrs (block:get-all-attributes block))
       ;; Only return if this is a recognized attribute block
-      (if (or (assoc "project_name" attrs)
+      (if (or (assoc "pr_no" attrs)
+              (assoc "project_name" attrs)
               (assoc "job_working_plan_name" attrs))
         (progn
           (setq result (list (cons "layout_name" layout-name)))

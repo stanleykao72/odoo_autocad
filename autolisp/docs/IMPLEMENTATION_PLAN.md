@@ -2,7 +2,7 @@
 
 > 版本: 3.0 (DCL 獨立模式已移除)
 > 日期: 2026-03-10
-> 狀態: Phase 1-5 已移除（DCL 獨立模式）；Phase 6 計畫中（13 項目: 6 新增 + 4 修改 + 3 刪除）
+> 狀態: Phase 1-5 已移除（DCL 獨立模式）；Phase 6 完成（10/13 DONE，3 待刪除）
 
 ---
 
@@ -34,14 +34,15 @@ Phase 1-5 曾實作 DCL 對話框 + Python Bridge.exe 的獨立模式架構（�
 |---|------|------|------|
 | 1 | `lisp/030_config.lsp` | 路徑常數、YAML 設定讀取 | DONE |
 | 2 | `lisp/010_json_util.lsp` | JSON 解析/序列化 | DONE |
+| 1.5 | `lisp/015_log_util.lsp` | 檔案 Log（寫入 logs/ 目錄，與 Python log 並存） | DONE |
 | 3 | `lisp/020_file_util.lsp` | 檔案讀寫 + 唯一檔名 | DONE |
 | 4 | `lisp/060_table_util.lsp` | TABLE 遍歷 + 資料收集 + ID 回寫 + 清除 | DONE |
-| 5 | `lisp/050_block_util.lsp` | Block 屬性讀寫 + 搜尋 | DONE |
+| 5 | `lisp/050_block_util.lsp` | Block 屬性讀寫 + 搜尋 + 命名 Block 搜尋 + AcDbText 讀取 | DONE |
 | 6 | `lisp/040_strip_mtext.lsp` | MText 格式清除（RegExp + LT fallback） | DONE |
 
 ---
 
-## 3. Phase 6: autocad-mcp Submodule + IPC/MCP Mode — IN PROGRESS
+## 3. Phase 6: autocad-mcp Submodule + IPC/MCP Mode — DONE
 
 ### 背景
 

@@ -9,6 +9,7 @@ odoo.py                        Entry point (CLI + GUI launcher)
 mcp_server_autocad.py          MCP server (5 Odoo tools, FastMCP)
 mcp_server_fastmcp.py          [deprecated] Legacy SSE MCP server
 CLAUDE.md                      Project instructions for Claude Code
+version.py                     Single source of truth for APP_VERSION
 ```
 
 ## forms/ — GUI
@@ -71,6 +72,7 @@ lisp/030_config.lsp            Path resolution, config directories
 lisp/060_table_util.lsp        9-column TABLE read/write
 lisp/050_block_util.lsp        Attribute block read/write
 lisp/010_json_util.lsp         JSON parser (pure AutoLISP)
+lisp/015_log_util.lsp          File logging (logs/autolisp_YYYY-MM-DD.log)
 lisp/020_file_util.lsp         File I/O utilities
 lisp/040_strip_mtext.lsp       MText formatting cleanup
 build_vlx.lsp                  VLX build script (BUILD-ALL command)

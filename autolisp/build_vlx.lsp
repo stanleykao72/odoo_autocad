@@ -71,6 +71,7 @@
   ;; Compile in dependency order
   (setq fas-list (list
     (build:compile-one (strcat *build:lisp-dir* "010_json_util.lsp"))
+    (build:compile-one (strcat *build:lisp-dir* "015_log_util.lsp"))
     (build:compile-one (strcat *build:lisp-dir* "020_file_util.lsp"))
     (build:compile-one (strcat *build:lisp-dir* "030_config.lsp"))
     (build:compile-one (strcat *build:lisp-dir* "040_strip_mtext.lsp"))
@@ -89,6 +90,7 @@
     (nth 2 fas-list) (nth 3 fas-list)
     (nth 4 fas-list) (nth 5 fas-list)
     (nth 6 fas-list) (nth 7 fas-list)
+    (nth 8 fas-list)
     ""
   )
 

@@ -876,7 +876,10 @@ class ModernFormMain(ctk.CTk):
         )
 
     def _run_with_progress(self, title, message, worker, success_msg, fail_msg):
-        """通用：ProgressDialog + 背景 thread 執行帶進度回調的工作
+        """通用：根據模式選擇線程策略
+
+        COM 模式: 主線程同步執行（COM STA 安全）
+        IPC 模式: ProgressDialog + 背景 thread
 
         Args:
             title: 對話框標題
@@ -884,9 +887,52 @@ class ModernFormMain(ctk.CTk):
             worker: callable(progress_callback) -> bool
             success_msg / fail_msg: 結束時的訊息
         """
+        if self.autocad_mode == "com":
+            self._run_with_progress_main_thread(title, message, worker, success_msg, fail_msg)
+        else:
+            self._run_with_progress_background(title, message, worker, success_msg, fail_msg)
+
+    def _run_with_progress_main_thread(self, title, message, worker, success_msg, fail_msg):
+        """COM 模式: 主線程同步執行（COM STA 安全）
+
+        COM 操作快速（秒級），短暫 UI 凍結可接受。
+        透過 progress_callback 中呼叫 update_idletasks() 保持 UI 回應。
+        """
+        self.log_util.safe_log_insert(f"[Progress/COM] 開始: {title}\n")
+
+        # Simple status label (no modal dialog needed for fast COM ops)
+        from ui.enhanced_widgets import ProgressDialog
+        dialog = ProgressDialog(self, title=title, message=message)
+
+        def on_progress(value, msg):
+            dialog.update_progress(value, msg)
+            self.update_idletasks()
+
+        on_progress._cancelled = False
+
+        try:
+            result = worker(on_progress)
+            dialog.update_progress(1.0, "完成")
+            self.update_idletasks()
+            dialog.grab_release()
+            dialog.destroy()
+            if result:
+                self.log_util.safe_log_insert(f"[Progress/COM] ✔ 成功: {success_msg}\n")
+                self.show_info_message("完成", success_msg)
+            else:
+                self.log_util.safe_log_insert(f"[Progress/COM] ⚠ 結束但無資料: {fail_msg}\n")
+                self.show_info_message("提示", fail_msg)
+        except Exception as e:
+            dialog.grab_release()
+            dialog.destroy()
+            self.log_util.safe_log_insert(f"[Progress/COM] ✘ 錯誤: {e}\n")
+            self.show_error_message("錯誤", f"執行失敗: {e}")
+
+    def _run_with_progress_background(self, title, message, worker, success_msg, fail_msg):
+        """IPC 模式: ProgressDialog + 背景 thread 執行帶進度回調的工作"""
         from ui.enhanced_widgets import ProgressDialog
 
-        self.log_util.safe_log_insert(f"[Progress] 開始: {title}\n")
+        self.log_util.safe_log_insert(f"[Progress/IPC] 開始: {title}\n")
         dialog = ProgressDialog(self, title=title, message=message)
         progress_queue = queue.Queue()
 
@@ -898,14 +944,14 @@ class ModernFormMain(ctk.CTk):
 
         def _worker_thread():
             try:
-                self.log_util.safe_log_insert(f"[Progress] Worker thread 啟動\n")
+                self.log_util.safe_log_insert(f"[Progress/IPC] Worker thread 啟動\n")
                 result = worker(on_progress)
-                self.log_util.safe_log_insert(f"[Progress] Worker thread 結束, result={result}\n")
+                self.log_util.safe_log_insert(f"[Progress/IPC] Worker thread 結束, result={result}\n")
                 progress_queue.put(("done", result))
             except Exception as e:
-                self.log_util.safe_log_insert(f"[Progress] Worker thread 例外: {e}\n")
+                self.log_util.safe_log_insert(f"[Progress/IPC] Worker thread 例外: {e}\n")
                 import traceback
-                self.log_util.safe_log_insert(f"[Progress] {traceback.format_exc()}\n")
+                self.log_util.safe_log_insert(f"[Progress/IPC] {traceback.format_exc()}\n")
                 progress_queue.put(("error", str(e)))
 
         t = threading.Thread(target=_worker_thread, daemon=True)
@@ -915,7 +961,7 @@ class ModernFormMain(ctk.CTk):
             # Check if dialog was cancelled
             if dialog.cancelled:
                 on_progress._cancelled = True
-                self.log_util.safe_log_insert(f"[Progress] 使用者取消: {title}\n")
+                self.log_util.safe_log_insert(f"[Progress/IPC] 使用者取消: {title}\n")
                 return
 
             try:
@@ -926,16 +972,16 @@ class ModernFormMain(ctk.CTk):
                         dialog.grab_release()
                         dialog.destroy()
                         if item[1]:
-                            self.log_util.safe_log_insert(f"[Progress] ✔ 成功: {success_msg}\n")
+                            self.log_util.safe_log_insert(f"[Progress/IPC] ✔ 成功: {success_msg}\n")
                             self.show_info_message("完成", success_msg)
                         else:
-                            self.log_util.safe_log_insert(f"[Progress] ⚠ 結束但無資料: {fail_msg}\n")
+                            self.log_util.safe_log_insert(f"[Progress/IPC] ⚠ 結束但無資料: {fail_msg}\n")
                             self.show_info_message("提示", fail_msg)
                         return
                     elif item[0] == "error":
                         dialog.grab_release()
                         dialog.destroy()
-                        self.log_util.safe_log_insert(f"[Progress] ✘ 錯誤: {item[1]}\n")
+                        self.log_util.safe_log_insert(f"[Progress/IPC] ✘ 錯誤: {item[1]}\n")
                         self.show_error_message("錯誤", f"執行失敗: {item[1]}")
                         return
                     else:

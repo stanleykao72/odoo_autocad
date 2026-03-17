@@ -20,13 +20,14 @@
 
 ## 2. 檔案清單
 
-### 2.1 Odoo 模組（8 個 .lsp）
+### 2.1 Odoo 模組（9 個 .lsp）
 
 位於 `autolisp/lisp/`，檔名前綴數字代表編譯/載入順序：
 
 | 順序 | 檔案 | 說明 |
 |------|------|------|
 | 010 | `010_json_util.lsp` | JSON 解析器（純 AutoLISP） |
+| 015 | `015_log_util.lsp` | 檔案 Log（寫入 `logs/autolisp_YYYY-MM-DD.log`） |
 | 020 | `020_file_util.lsp` | 檔案 I/O 工具 |
 | 030 | `030_config.lsp` | 路徑與設定管理 |
 | 040 | `040_strip_mtext.lsp` | MText 格式清理 |
@@ -136,13 +137,14 @@ VLIDE
 2. 加入源碼（順序重要 — 依賴關係，按檔名前綴排序）：
    ```
    1. lisp/010_json_util.lsp
-   2. lisp/020_file_util.lsp
-   3. lisp/030_config.lsp
-   4. lisp/040_strip_mtext.lsp
-   5. lisp/050_block_util.lsp
-   6. lisp/060_table_util.lsp
-   7. lisp/070_ob_mcp_dispatch.lsp
-   8. lisp/080_main.lsp              ← Entry Point
+   2. lisp/015_log_util.lsp
+   3. lisp/020_file_util.lsp
+   4. lisp/030_config.lsp
+   5. lisp/040_strip_mtext.lsp
+   6. lisp/050_block_util.lsp
+   7. lisp/060_table_util.lsp
+   8. lisp/070_ob_mcp_dispatch.lsp
+   9. lisp/080_main.lsp              ← Entry Point
    ```
 3. Project → Build Project
 4. 輸出檔：`autolisp/dist/OdooAutoCAD.vlx`
@@ -264,7 +266,7 @@ AutoCAD 可能顯示「此檔案未經簽署」警告。
 
 ### 散裝 .lsp 部署
 
-- [ ] 複製 `autolisp/lisp/` 下 8 個 .lsp（010~080）至目標機器
+- [ ] 複製 `autolisp/lisp/` 下 9 個 .lsp（010~080）至目標機器
 - [ ] 複製 `libs/autocad-mcp/lisp-code/mcp_dispatch.lsp` 至目標機器
 - [ ] AutoCAD `OPTIONS` 設定 Support File Search Path
 - [ ] `APPLOAD` 載入 `080_main.lsp` → 確認所有模組載入成功

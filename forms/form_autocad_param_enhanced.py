@@ -524,38 +524,35 @@ class EnhancedFormAutoCADParam:
         return values
     
     def submit(self):
-        """提交表單"""
+        """提交表單 — 支援 COM 和 IPC 模式"""
         values = self.get_form_values()
-        
+
         # 檢查是否至少填寫了一個欄位
         filled_values = {k: v for k, v in values.items() if v}
         if not filled_values:
             messagebox.showwarning("提示", "請至少填寫一個參數欄位。")
             return
-        
+
         try:
-            # 獲取AutoCAD塊
-            active_layout = self.autocad_util.get_active_layout()
-            block = self.autocad_util.get_attribute_block(active_layout)
-            self.autocad_util.process_pr_no(active_layout)
-            
-            if block:
-                # 更新屬性
-                for attr_key, value in filled_values.items():
-                    if value:  # 只更新有值的屬性
-                        self.autocad_util.set_attribute_value(block, attr_key, value)
-                
-                filled_count = len(filled_values)
-                self.util_log.safe_log_insert(f"已更新 {filled_count} 個參數到 AutoCAD\n")
-                
-                # 顯示成功訊息
-                messagebox.showinfo("成功", f"已成功更新 {filled_count} 個參數到 AutoCAD。")
-                self.clear_main_content()
-                
-            else:
-                self.util_log.safe_log_insert("未找到指定的塊來更新屬性\n")
-                messagebox.showerror("錯誤", "未找到指定的塊來更新屬性。")
-                
+            # 取得目前 layout 名稱，只更新目前配置
+            # 優先使用已從 block attrs 取得的 layout_name（可靠）
+            # 僅在無值時 fallback 到 get_active_layout()
+            layout_name = getattr(self.autocad_util, 'layout_name', None)
+            if not layout_name:
+                try:
+                    layout_name = self.autocad_util.get_active_layout()
+                except Exception:
+                    pass
+
+            # 使用 dispatcher 相容的 set_block_attributes（支援 COM/IPC）
+            self.autocad_util.set_block_attributes(filled_values, layout_name)
+
+            filled_count = len(filled_values)
+            layout_info = f" (配置: {layout_name})" if layout_name else ""
+            self.util_log.safe_log_insert(f"已更新 {filled_count} 個參數到 AutoCAD{layout_info}\n")
+            messagebox.showinfo("成功", f"已成功更新 {filled_count} 個參數到 AutoCAD。{layout_info}")
+            self.clear_main_content()
+
         except Exception as e:
             error_msg = f"更新 AutoCAD 屬性時發生錯誤: {str(e)}"
             self.util_log.safe_log_insert(error_msg + "\n")

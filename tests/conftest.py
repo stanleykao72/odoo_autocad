@@ -106,7 +106,8 @@ def mcp_test_config():
 def pytest_configure(config):
     """Configure test markers"""
     config.addinivalue_line("markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')")
-    config.addinivalue_line("markers", "autocad: marks tests as AutoCAD-related")
+    config.addinivalue_line("markers", "autocad: marks tests requiring live AutoCAD COM connection")
+    config.addinivalue_line("markers", "ipc: marks tests requiring live AutoCAD IPC connection")
     config.addinivalue_line("markers", "odoo: marks tests as Odoo-related")
     config.addinivalue_line("markers", "mcp: marks tests as MCP-related")
     config.addinivalue_line("markers", "integration: marks tests as integration tests")

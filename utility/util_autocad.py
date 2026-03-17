@@ -7,6 +7,7 @@ import time
 
 from utility.util_odoo import UtilOdoo
 from utility.util_log import UtilLog
+from utility.autocad_backend_interface import AutoCADBackendInterface
 
 def detect_autocad_versions():
     """Detect installed AutoCAD versions from Windows registry.
@@ -71,7 +72,7 @@ def detect_autocad_windows():
     return windows
 
 
-class UtilAutoCAD:
+class UtilAutoCAD(AutoCADBackendInterface):
     def __init__(self, odoo_util, log_util):
         self.acad = None
         self.doc = None
@@ -153,10 +154,19 @@ class UtilAutoCAD:
         except Exception as e:
             main_body.after(1000, lambda e=e: self.log.safe_log_insert(f"連接 AutoCAD 時發生錯誤: {str(e)}\n"))
 
-    def process_pr_no(self, layout):
+    def process_pr_no(self, layout_name):
         """
         獲取並處理 PR No 及相關專案資料。
+
+        Args:
+            layout_name: layout 名稱（字串）
         """
+        # 取得 COM layout 物件
+        layout = self.get_layout_from_name(layout_name) if layout_name else None
+        if not layout:
+            self.log.safe_log_insert(f"process_pr_no: 找不到佈局 {layout_name}\n")
+            return
+
         # 獲取 PR No
         return_block = self.get_attribute_block_with_name(layout, 'pr_no')
         pr_no = self.get_block_text(return_block)
@@ -397,12 +407,18 @@ class UtilAutoCAD:
     def clear_table_id(self, layout=None):
         """
         清除表格中的 ID 列。
+
+        Args:
+            layout: layout 名稱（字串）或 None（使用目前啟用的 layout）
         """
         try:
-            if not layout:
-                layout = self.get_active_layout()
-            block_list = self.get_layout_table_block(layout.Block)
-            for table in block_list:           
+            layout_name = layout if isinstance(layout, str) else self.get_active_layout()
+            layout_obj = self.get_layout_from_name(layout_name) if layout_name else None
+            if not layout_obj:
+                self.log.safe_log_insert(f"clear_table_id: 找不到佈局 {layout_name}\n")
+                return
+            block_list = self.get_layout_table_block(layout_obj.Block)
+            for table in block_list:
                 rows = table.Rows
                 for i in range(rows):
                     if i != 1:
@@ -415,9 +431,9 @@ class UtilAutoCAD:
         清除所有表格中的 ID 列。
         """
         try:
-            layout_list = self.get_doc_layouts()
-            for layout in layout_list:
-                self.clear_table_id(layout)
+            layout_names = self.get_doc_layouts()
+            for name in layout_names:
+                self.clear_table_id(name)
         except Exception as e:
             self.log.safe_log_insert(f"清除所有表格 ID 時發生錯誤: {str(e)}\n")
 
@@ -519,7 +535,7 @@ class UtilAutoCAD:
 
     def get_doc_layouts(self):
         """
-        獲取文檔中的所有佈局。
+        獲取文檔中的所有佈局名稱（字串列表）。
         """
         layout_lst = []
         try:
@@ -531,11 +547,11 @@ class UtilAutoCAD:
                 layout_name = layout.Name
                 self.log.safe_log_insert(f"Layout Name: {layout_name}\n")
                 if layout_name != "Model":
-                     layout_lst.append(layout)
+                     layout_lst.append(layout_name)
             return layout_lst
         except Exception as e:
             self.log.safe_log_insert(f"獲取佈局時發生錯誤: {str(e)}\n")
-            return
+            return []
 
     def get_layout_attribute_blocks_value(self, layout, tag_list):
         """
@@ -556,63 +572,108 @@ class UtilAutoCAD:
             return block_values
         except Exception as e:
             self.log.safe_log_insert(f"獲取佈局中塊的屬性值時發生錯誤: {str(e)}\n")
+            return {}
+
+    def get_single_layout_values(self, layout_name):
+        """提取單一 layout 的 TABLE + Block 資料。
+
+        Args:
+            layout_name: layout 名稱（字串）
+        Returns:
+            dict with keys: layout_name, header_id, detail, pr_no, ...
+        """
+        block_dict = {}
+        try:
+            layout = self.get_layout_from_name(layout_name)
+            if not layout:
+                self.log.safe_log_insert(f"未找到佈局: {layout_name}\n")
+                return block_dict
+
+            self.log.safe_log_insert(f"Layout Name: {layout_name}\n")
+
+            have_blocks = getattr(layout, 'Block', None)
+            if have_blocks:
+                try:
+                    blocks = layout.Block
+
+                    tag_list = [
+                        'pr_no', 'project_name', 'job_working_plan_name',
+                        'product_name', 'product_catelog', 'spec',
+                        'surface_treatment', 'operation_flow',
+                        'color_name', 'color_no',
+                    ]
+                    block_dict = self.get_layout_attribute_blocks_value(layout, tag_list) or {}
+
+                    block_list = self.get_layout_table_block(blocks)
+                    header_id, detail_list = self.get_table_data(block_list)
+
+                    block_dict['layout_name'] = layout_name
+                    block_dict['header_id'] = header_id
+                    block_dict['detail'] = detail_list
+                except Exception:
+                    self.log.safe_log_insert(f"無塊可供處理: {layout_name}\n")
+                    return {}
+
+            return block_dict
+
+        except Exception as e:
+            self.log.safe_log_insert(f"get_single_layout_values({layout_name}) 錯誤: {str(e)}\n")
+            return {}
+
+    def get_block_attributes(self):
+        """讀取目前啟用 layout 的屬性區塊值（COM 模式）。
+
+        Returns:
+            dict of {tag: value} — 與 IPC 端 get_block_attributes() 格式一致
+        """
+        try:
+            if not self.acad:
+                return {}
+            doc = self.acad.ActiveDocument
+            layout = doc.ActiveLayout
+            if not layout or layout.Name == "Model":
+                return {}
+
+            result = {}
+            # Read attribute block
+            attr_block = self.get_attribute_block(layout)
+            if attr_block:
+                attributes = attr_block.GetAttributes()
+                for att in attributes:
+                    result[att.TagString] = att.TextString
+
+            # Read pr_no from text block
+            pr_block = self.get_attribute_block_with_name(layout, 'pr_no')
+            if pr_block:
+                pr_no = self.get_block_text(pr_block)
+                if pr_no:
+                    result['pr_no'] = pr_no
+
+            # Add layout_name for consistency with IPC
+            result['layout_name'] = layout.Name
+
+            return result
+        except Exception as e:
+            self.log.safe_log_insert(f"get_block_attributes 錯誤: {str(e)}\n")
+            return {}
 
     def get_layouts_values(self):
         """
-        獲取所有佈局中的合法表格，返回 header_id 列表。
+        獲取所有佈局中的合法表格，返回 {"all": [layout_dict, ...]}。
         """
         layout_list = []
         layout_dict = {}
         try:
             self.log.safe_log_insert("開始獲取資料...\n")
-            layout_lst = self.get_doc_layouts()
-            if not layout_lst:
+            layout_names = self.get_doc_layouts()
+            if not layout_names:
                 self.log.safe_log_insert("無佈局可供處理。\n")
                 return layout_dict
-            for layout in layout_lst:
-                block_dict = {}
-                try:
-                    layout_name = layout.Name
-                    self.log.safe_log_insert(f"Layout Name: {layout_name}\n")
+            for layout_name in layout_names:
+                block_dict = self.get_single_layout_values(layout_name)
+                if block_dict:
+                    layout_list.append(block_dict)
 
-                    have_blocks = getattr(layout, 'Block', None)
-                    if have_blocks:
-                        try:
-                            blocks = layout.Block
-
-                            # get blocks value
-                            tag_list = [
-                                'pr_no',
-                                'project_name',
-                                'job_working_plan_name',
-                                'product_name',
-                                'product_catelog',
-                                'spec',
-                                'surface_treatment',
-                                'operation_flow',
-                                'color_name',
-                                'color_no',
-                            ]
-                            block_dict = self.get_layout_attribute_blocks_value(layout, tag_list)
-
-                            # get table content
-                            block_list = self.get_layout_table_block(blocks)
-                            header_id, detail_list = self.get_table_data(block_list)
-
-                            block_dict['layout_name'] = layout_name
-                            block_dict['header_id'] = header_id
-                            block_dict['detail'] = detail_list
-                        except Exception:
-                            self.log.safe_log_insert("無塊可供處理1。\n")
-                            continue
-                    # self.log.safe_log_insert(f"Layout Name: {layout_name}, Table Count: {table_count}, laoyout_dict: {layout_dict}\n")
-
-                except Exception as e:
-                    self.log.safe_log_insert(f"Layout Name: {layout_name}, 獲取資料時發生錯誤: {str(e)}\n")
-                    continue
-
-                layout_list.append(block_dict)
-                # self.log.safe_log_insert(f"獲取資料完成: \n 資料為: {layout_list}\n")
             layout_dict['all'] = layout_list
             return layout_dict
 
@@ -712,56 +773,39 @@ class UtilAutoCAD:
 
     def get_layouts_header_id_to_pr(self):
         """
-        獲取佈局中的 header_id 列。
+        獲取佈局中的 header_id 列，回傳 {"all": [header_id, ...]}。
         """
         header_dict = {}
         header_id_list = []
         try:
-            layout_lst = self.get_doc_layouts()
-            if not layout_lst:
+            layout_names = self.get_doc_layouts()
+            if not layout_names:
                 self.log.safe_log_insert("無佈局可供處理。\n")
                 return header_dict
-            for layout in layout_lst:
-                # block_dict = {}
+            for layout_name in layout_names:
                 try:
-                    layout_name = layout.Name
+                    layout = self.get_layout_from_name(layout_name)
+                    if not layout:
+                        continue
                     self.log.safe_log_insert(f"Layout Name: {layout_name}\n")
 
                     have_blocks = getattr(layout, 'Block', None)
                     if have_blocks:
                         try:
                             blocks = layout.Block
-
-                            # get blocks value
-                            tag_list = [
-                                'pr_no',
-                                'project_name',
-                                'job_working_plan_name',
-                                'product_name',
-                                'product_catelog',
-                                'spec',
-                                'surface_treatment',
-                                'operation_flow',
-                                'color_name',
-                                'color_no',
-                            ]
-                            block_dict = self.get_layout_attribute_blocks_value(layout, tag_list)
-
-                            # get table content
                             block_list = self.get_layout_table_block(blocks)
                             header_id, detail_list = self.get_table_data(block_list)
-
                         except Exception:
-                            self.log.safe_log_insert("無塊可供處理1。\n")
+                            self.log.safe_log_insert(f"無塊可供處理: {layout_name}\n")
                             continue
-                    # self.log.safe_log_insert(f"Layout Name: {layout_name}, Table Count: {table_count}, laoyout_dict: {layout_dict}\n")
+
+                    if detail_list:
+                        header_id_list.append(header_id)
 
                 except Exception as e:
                     self.log.safe_log_insert(f"Layout Name: {layout_name}, 獲取資料時發生錯誤: {str(e)}\n")
                     continue
 
-                if detail_list:
-                    header_id_list.append(header_id)
             header_dict = {'all': header_id_list}
             return header_dict
 

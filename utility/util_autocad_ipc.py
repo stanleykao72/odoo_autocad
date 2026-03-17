@@ -11,6 +11,8 @@ import logging
 import sys
 import os
 
+from utility.autocad_backend_interface import AutoCADBackendInterface
+
 # Add autocad-mcp to path
 _autocad_mcp_path = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -22,7 +24,7 @@ if _autocad_mcp_path not in sys.path:
 _logger = logging.getLogger(__name__)
 
 
-class UtilAutoCADIPC:
+class UtilAutoCADIPC(AutoCADBackendInterface):
     """AutoCAD IPC 後端 — 使用 autocad-mcp File IPC"""
 
     def __init__(self, log_util=None, target_hwnd=None):
@@ -347,16 +349,23 @@ class UtilAutoCADIPC:
     # === Odoo-specific Operations (via ob_mcp_dispatch.lsp) ===
 
     def get_layouts_values(self):
-        """Extract TABLE + Block data from all layouts (Odoo action) — fallback"""
+        """Extract TABLE + Block data from all layouts (Odoo action).
+        Returns {"all": [layout_dict, ...]} to match COM mode format."""
         try:
             result = self._run_async(self._dispatch("odoo_extract_tables"))
             if hasattr(result, 'ok') and result.ok:
-                return result.payload if result.payload else []
+                payload = result.payload if result.payload else []
+                # Ensure {"all": [...]} format
+                if isinstance(payload, list):
+                    return {"all": payload}
+                if isinstance(payload, dict) and "all" in payload:
+                    return payload
+                return {"all": [payload] if payload else []}
             self._log(f"[IPC] get_layouts_values failed: {getattr(result, 'error', 'unknown')}\n")
-            return []
+            return {}
         except Exception as e:
             self._log(f"[IPC] get_layouts_values error: {e}\n")
-            return []
+            return {}
 
     def get_single_layout_values(self, layout_name):
         """Extract TABLE + Block data from a single layout by name"""

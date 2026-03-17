@@ -56,6 +56,8 @@ Python                              AutoCAD LT
   |<-- poll result JSON -----------------|
 ```
 
+**Encoding**: Command files (Python→AutoCAD) written in CP950 with `ensure_ascii=False` to avoid `\uXXXX` escapes breaking AutoLISP `(read)`. Result files (AutoCAD→Python) read with UTF-8→CP950→CP1252 fallback chain.
+
 ## 3. Component Map
 
 ### Entry Point
@@ -108,11 +110,12 @@ Python                              AutoCAD LT
 | File | Description |
 |------|-------------|
 | `080_main.lsp` | Entry point. Loads modules, registers `OB:MCP-DISPATCH` |
-| `070_ob_mcp_dispatch.lsp` | 6 Odoo IPC actions (extract_tables, write_ids, etc.) |
+| `070_ob_mcp_dispatch.lsp` | 6 Odoo IPC actions with params extraction from IPC JSON wrapper |
 | `030_config.lsp` | Path resolution, YAML config locations |
 | `060_table_util.lsp` | 9-column TABLE entity read/write |
-| `050_block_util.lsp` | Attribute block read/write |
+| `050_block_util.lsp` | Attribute block read/write + named block search |
 | `010_json_util.lsp` | Pure AutoLISP JSON parser |
+| `015_log_util.lsp` | File logging (writes to `logs/autolisp_YYYY-MM-DD.log`) |
 | `020_file_util.lsp` | File I/O utilities |
 | `040_strip_mtext.lsp` | MText formatting cleanup |
 
