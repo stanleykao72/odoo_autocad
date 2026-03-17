@@ -75,7 +75,7 @@
       "env": {}
     },
     "autocad-odoo": {
-      "type": "streamable-http",
+      "type": "http",
       "url": "http://localhost:8084/mcp"
     }
   }

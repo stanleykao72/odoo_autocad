@@ -999,7 +999,7 @@ class ModernFormMain(ctk.CTk):
         log('  {\n')
         log('    "mcpServers": {\n')
         log('      "autocad-odoo": {\n')
-        log(f'        "type": "streamable-http",\n'
+        log(f'        "type": "http",\n'
             f'      "url": "{url}"\n')
         log('      }\n')
         log('    }\n')
@@ -1008,7 +1008,7 @@ class ModernFormMain(ctk.CTk):
         log('  {\n')
         log('    "mcpServers": {\n')
         log('      "autocad-odoo": {\n')
-        log(f'        "type": "streamable-http",\n'
+        log(f'        "type": "http",\n'
             f'      "url": "{url}"\n')
         log('      }\n')
         log('    }\n')
@@ -1123,7 +1123,7 @@ AutoCAD 模式: {self.autocad_mode.upper()}
             f'{{\n'
             f'  "mcpServers": {{\n'
             f'    "autocad-odoo": {{\n'
-            f'      "type": "streamable-http",\n'
+            f'      "type": "http",\n'
             f'      "url": "{url}"\n'
             f'    }}\n'
             f'  }}\n'
@@ -1133,7 +1133,7 @@ AutoCAD 模式: {self.autocad_mode.upper()}
             f'{{\n'
             f'  "mcpServers": {{\n'
             f'    "autocad-odoo": {{\n'
-            f'      "type": "streamable-http",\n'
+            f'      "type": "http",\n'
             f'      "url": "{url}"\n'
             f'    }}\n'
             f'  }}\n'
