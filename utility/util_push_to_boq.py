@@ -27,15 +27,18 @@ class UtilPushToBoq:
         _log("[BOQ] ========== 開始推送到 BOQ ==========\n")
         _progress(0.02, "取得 layout 清單...")
 
-        # Try per-layout extraction (IPC mode with new Odoo extensions)
-        use_per_layout = hasattr(self.autocad_util, 'get_single_layout_values')
-        _log(f"[BOQ] per-layout 支援: {use_per_layout}\n")
+        # Per-layout extraction only works in IPC mode (COM uses bulk call)
+        is_ipc = hasattr(self.autocad_util, 'mode') and self.autocad_util.mode == 'ipc'
+        use_per_layout = is_ipc and hasattr(self.autocad_util, 'get_single_layout_values')
+        _log(f"[BOQ] per-layout 支援: {use_per_layout} (mode={getattr(self.autocad_util, 'mode', 'unknown')})\n")
         layout_dic = []
 
         if use_per_layout:
             # Step 1: Get layout list
             _log("[BOQ] 呼叫 get_doc_layouts()...\n")
             layouts = self.autocad_util.get_doc_layouts()
+            if layouts is None:
+                layouts = []
             _log(f"[BOQ] get_doc_layouts() 回傳 {len(layouts)} 個 layout: {layouts}\n")
 
             if layouts:
