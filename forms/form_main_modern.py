@@ -561,7 +561,7 @@ class ModernFormMain(ctk.CTk):
 
         self.btn_sse_control = ctk.CTkButton(
             self.sidebar,
-            text="🌊 SSE 伺服器控制",
+            text="🤖 MCP 伺服器控制",
             command=self.create_sse_control_panel,
             height=34,
             font=("Microsoft JhengHei UI", 12, "bold"),
@@ -1006,7 +1006,7 @@ AutoCAD 模式: {self.autocad_mode.upper()}
         # 標題
         title_label = ctk.CTkLabel(
             panel_frame,
-            text="🌊 SSE 伺服器控制面板",
+            text="🤖 MCP 伺服器控制面板",
             font=get_app_font('title'),
             text_color=theme.get_color('text_primary')
         )
@@ -1031,7 +1031,7 @@ AutoCAD 模式: {self.autocad_mode.upper()}
         # 啟動/停止按鈕
         self.sse_panel_toggle_button = ctk.CTkButton(
             button_frame,
-            text="🚀 啟動 SSE 伺服器",
+            text="🚀 啟動 MCP 伺服器",
             command=self.toggle_sse_server,
             height=40,
             font=get_app_font('button'),
@@ -1115,7 +1115,7 @@ MCP 配置:
         
         help_text = ctk.CTkLabel(
             help_frame,
-            text="1. 點擊 '🚀 啟動 SSE 伺服器' 來啟動伺服器\n2. 伺服器啟動後，可以在 Gemini CLI 中使用 SSE 模式\n3. 使用 '🧪 測試連接' 來驗證伺服器是否正常運行\n4. 查看頂部橫幅的 SSE 狀態指示器瞭解即時狀態",
+            text="1. 點擊 '🚀 啟動 MCP 伺服器' 來啟動伺服器\n2. 伺服器啟動後，可以在 Claude Code / Gemini CLI 中連接\n3. 使用 '🧪 測試連接' 來驗證伺服器是否正常運行\n4. 查看頂部橫幅的 MCP 狀態指示器瞭解即時狀態",
             font=get_app_font('body'),
             text_color=theme.get_color('text_secondary'),
             justify="left"
@@ -1133,7 +1133,7 @@ MCP 配置:
                 self.sse_panel_status_label.configure(text="狀態: 🟢 運行中")
                 if hasattr(self, 'sse_panel_toggle_button'):
                     self.sse_panel_toggle_button.configure(
-                        text="⏹️ 停止 SSE 伺服器",
+                        text="⏹️ 停止 MCP 伺服器",
                         fg_color="#f44336",  # 紅色停止按鈕
                         hover_color="#d32f2f"
                     )
@@ -1141,7 +1141,7 @@ MCP 配置:
                 self.sse_panel_status_label.configure(text="狀態: 🔴 已停止")
                 if hasattr(self, 'sse_panel_toggle_button'):
                     self.sse_panel_toggle_button.configure(
-                        text="🚀 啟動 SSE 伺服器",
+                        text="🚀 啟動 MCP 伺服器",
                         fg_color="#4CAF50",  # 綠色啟動按鈕
                         hover_color="#388E3C"
                     )
