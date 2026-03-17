@@ -1054,133 +1054,111 @@ AutoCAD 模式: {self.autocad_mode.upper()}
         messagebox.showinfo("MCP 連接測試", f"MCP Server: {status}\nPort: {self.mcp_manager.port}")
     
     def create_sse_control_panel(self):
-        """創建 SSE 控制面板"""
-        # 清除主要內容
-        self.clear_main_content()
-        
-        # 創建 SSE 控制面板
-        panel_frame = ctk.CTkFrame(self.main_content)
-        panel_frame.pack(fill="both", expand=True, padx=20, pady=20)
-        
-        # 標題
-        title_label = ctk.CTkLabel(
-            panel_frame,
-            text="🤖 MCP 伺服器控制面板",
-            font=get_app_font('title'),
+        """創建 MCP 控制面板"""
+        # 清除主要內容（移除歡迎畫面）
+        for widget in self.main_content.winfo_children():
+            widget.destroy()
+
+        panel_frame = ctk.CTkFrame(self.main_content, fg_color="transparent")
+        panel_frame.pack(fill="both", expand=True, padx=10, pady=5)
+
+        # 頂部：標題 + 狀態 + 按鈕（緊湊排列）
+        top_row = ctk.CTkFrame(panel_frame, fg_color="transparent")
+        top_row.pack(fill="x", pady=(5, 5))
+
+        ctk.CTkLabel(
+            top_row, text="🤖 MCP 伺服器",
+            font=("Microsoft JhengHei UI", 16, "bold"),
             text_color=theme.get_color('text_primary')
-        )
-        title_label.pack(pady=(20, 10))
-        
-        # 狀態顯示
-        status_frame = ctk.CTkFrame(panel_frame)
-        status_frame.pack(fill="x", padx=20, pady=10)
-        
+        ).pack(side="left", padx=(5, 10))
+
         self.sse_panel_status_label = ctk.CTkLabel(
-            status_frame,
-            text="狀態: 未知",
-            font=get_app_font('body'),
-            text_color=theme.get_color('text_secondary')
+            top_row, text="🟢 運行中",
+            font=("Microsoft JhengHei UI", 13),
+            text_color="#4CAF50"
         )
-        self.sse_panel_status_label.pack(pady=10)
-        
-        # 控制按鈕
-        button_frame = ctk.CTkFrame(panel_frame)
-        button_frame.pack(fill="x", padx=20, pady=10)
-        
-        # 啟動/停止按鈕
+        self.sse_panel_status_label.pack(side="left", padx=5)
+
+        # 按鈕靠右
         self.sse_panel_toggle_button = ctk.CTkButton(
-            button_frame,
-            text="🚀 啟動 MCP 伺服器",
-            command=self.toggle_sse_server,
-            height=40,
-            font=get_app_font('button'),
-            corner_radius=8,
-            fg_color="#4CAF50",  # 綠色啟動按鈕
-            hover_color="#388E3C"
+            top_row, text="⏹️ 停止", command=self.toggle_sse_server,
+            height=30, width=80, font=("Microsoft JhengHei UI", 12),
+            corner_radius=6, fg_color="#f44336", hover_color="#d32f2f"
         )
-        self.sse_panel_toggle_button.pack(side="left", padx=5)
-        
-        # 測試連接按鈕
-        test_button = ctk.CTkButton(
-            button_frame,
-            text="🧪 測試連接",
-            command=self.test_sse_connection,
-            height=40,
-            font=get_app_font('button'),
-            corner_radius=8,
-            fg_color="#2196F3",  # 藍色測試按鈕
-            hover_color="#1976D2"
+        self.sse_panel_toggle_button.pack(side="right", padx=3)
+
+        ctk.CTkButton(
+            top_row, text="📊 狀態", command=self.show_sse_status,
+            height=30, width=80, font=("Microsoft JhengHei UI", 12),
+            corner_radius=6, fg_color="#9C27B0", hover_color="#7B1FA2"
+        ).pack(side="right", padx=3)
+
+        ctk.CTkButton(
+            top_row, text="🧪 測試", command=self.test_sse_connection,
+            height=30, width=80, font=("Microsoft JhengHei UI", 12),
+            corner_radius=6, fg_color="#2196F3", hover_color="#1976D2"
+        ).pack(side="right", padx=3)
+
+        # 配置文字框（佔滿剩餘空間）
+        port = self.mcp_manager.port
+        transport = self.mcp_manager.transport
+        endpoint = "/mcp" if transport == "streamable-http" else "/sse"
+        url = f"http://localhost:{port}{endpoint}"
+        python_exe = sys.executable.replace("\\", "/")
+        server_script = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "mcp_server_autocad.py"
+        ).replace("\\", "/")
+
+        config_text = (
+            f"MCP Server: {url}  |  Transport: {transport}  |  "
+            f"AutoCAD: {self.autocad_mode.upper()}  |  工具數: 13\n"
+            f"{'─' * 70}\n"
+            f"\n"
+            f"方式一：Streamable HTTP（推薦，GUI 已自動啟動）\n"
+            f"\n"
+            f"【Claude Code】專案目錄建立 .mcp.json:\n"
+            f'{{\n'
+            f'  "mcpServers": {{\n'
+            f'    "autocad-odoo": {{\n'
+            f'      "url": "{url}"\n'
+            f'    }}\n'
+            f'  }}\n'
+            f'}}\n'
+            f"\n"
+            f"【Gemini CLI】~/.gemini/settings.json:\n"
+            f'{{\n'
+            f'  "mcpServers": {{\n'
+            f'    "autocad-odoo": {{\n'
+            f'      "url": "{url}"\n'
+            f'    }}\n'
+            f'  }}\n'
+            f'}}\n'
+            f"\n"
+            f"{'─' * 70}\n"
+            f"\n"
+            f"方式二：stdio（不需 GUI，AI 工具自動啟動）\n"
+            f"\n"
+            f"【Claude Code / Gemini CLI】.mcp.json 或 settings.json:\n"
+            f'{{\n'
+            f'  "mcpServers": {{\n'
+            f'    "autocad-odoo": {{\n'
+            f'      "command": "{python_exe}",\n'
+            f'      "args": ["{server_script}"]\n'
+            f'    }}\n'
+            f'  }}\n'
+            f'}}\n'
         )
-        test_button.pack(side="left", padx=5)
-        
-        # 查看狀態按鈕
-        status_button = ctk.CTkButton(
-            button_frame,
-            text="📊 查看狀態",
-            command=self.show_sse_status,
-            height=40,
-            font=get_app_font('button'),
-            corner_radius=8,
-            fg_color="#9C27B0",  # 紫色狀態按鈕
-            hover_color="#7B1FA2"
+
+        config_box = ctk.CTkTextbox(
+            panel_frame,
+            font=("Consolas", 13),
+            wrap="none"
         )
-        status_button.pack(side="left", padx=5)
-        
-        # 配置信息
-        config_frame = ctk.CTkFrame(panel_frame)
-        config_frame.pack(fill="x", padx=20, pady=10)
-        
-        config_title = ctk.CTkLabel(
-            config_frame,
-            text="⚙️ 配置信息",
-            font=get_app_font('heading'),
-            text_color=theme.get_color('text_primary')
-        )
-        config_title.pack(pady=(10, 5))
-        
-        # 配置詳情
-        config_details = ctk.CTkTextbox(
-            config_frame,
-            height=100,
-            font=get_app_font('body')
-        )
-        config_details.pack(fill="x", padx=10, pady=5)
-        
-        # 插入配置信息
-        config_text = f"""端口: {self.mcp_manager.port}
-AutoCAD 模式: {self.autocad_mode.upper()}
-MCP 配置:
-{{
-  "autocad-odoo": {{
-    "command": "python",
-    "args": ["mcp_server_autocad.py"],
-    "description": "AutoCAD-Odoo Integration MCP Server"
-  }}
-}}"""
-        config_details.insert("0.0", config_text)
-        config_details.configure(state="disabled")
-        
-        # 使用說明
-        help_frame = ctk.CTkFrame(panel_frame)
-        help_frame.pack(fill="x", padx=20, pady=10)
-        
-        help_title = ctk.CTkLabel(
-            help_frame,
-            text="💡 使用說明",
-            font=get_app_font('heading'),
-            text_color=theme.get_color('text_primary')
-        )
-        help_title.pack(pady=(10, 5))
-        
-        help_text = ctk.CTkLabel(
-            help_frame,
-            text="1. 點擊 '🚀 啟動 MCP 伺服器' 來啟動伺服器\n2. 伺服器啟動後，可以在 Claude Code / Gemini CLI 中連接\n3. 使用 '🧪 測試連接' 來驗證伺服器是否正常運行\n4. 查看頂部橫幅的 MCP 狀態指示器瞭解即時狀態",
-            font=get_app_font('body'),
-            text_color=theme.get_color('text_secondary'),
-            justify="left"
-        )
-        help_text.pack(padx=10, pady=5)
-        
+        config_box.pack(fill="both", expand=True, pady=(5, 5))
+        config_box.insert("0.0", config_text)
+        config_box.configure(state="disabled")
+
         # 更新面板狀態
         self.update_sse_panel_status()
     
