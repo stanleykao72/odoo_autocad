@@ -6,7 +6,7 @@
 ;;; Log file setup
 ;;; ============================================================
 
-(setq *ob:log-version* "6.0.0.13")
+(setq *ob:log-version* "6.0.0.15")
 
 (defun log:get-log-dir ( / root)
   "Returns the logs/ directory path (creates if needed)"

@@ -136,6 +136,10 @@ class ModernFormMain(ctk.CTk):
 
         # 自動啟動 MCP 伺服器
         self.auto_start_mcp_server()
+
+        # 啟動 Layout 變更偵測輪詢
+        self._last_polled_layout = None
+        self.start_layout_polling()
     
     def create_ui(self):
         """創建使用者介面"""
@@ -1302,6 +1306,28 @@ AutoCAD 模式: {self.autocad_mode.upper()}
         # 每100毫秒檢查一次
         self.after(100, self.process_gui_proxy_requests)
     
+    def start_layout_polling(self):
+        """啟動 Layout 變更偵測輪詢（COM: 3秒, IPC: 10秒）"""
+        interval = 3000 if self.autocad_mode == "com" else 10000
+        self.after(interval, self._poll_layout_change)
+
+    def _poll_layout_change(self):
+        """偵測 AutoCAD 中 Layout 是否已切換，自動刷新圖面資訊"""
+        interval = 3000 if self.autocad_mode == "com" else 10000
+        try:
+            if hasattr(self, 'autocad_util') and self.autocad_util.connected_autocad():
+                new_layout = self.autocad_util.refresh_active_layout()
+                if new_layout:
+                    self.log_util.safe_log_insert(
+                        f"[Layout] 偵測到配置切換 → {new_layout}，已自動刷新專案資訊\n"
+                    )
+                    self._update_drawing_info()
+        except Exception as e:
+            _logger = logging.getLogger(__name__)
+            _logger.debug(f"Layout polling error: {e}")
+        # 持續輪詢
+        self.after(interval, self._poll_layout_change)
+
     def on_closing(self):
         """視窗關閉事件"""
         # 停止 MCP 伺服器

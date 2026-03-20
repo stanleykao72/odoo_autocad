@@ -39,6 +39,7 @@ class UtilAutoCADIPC(AutoCADBackendInterface):
         self.pr_no = None
         self.job_working_plan_id = None
         self.job_working_plan_name = None
+        self.layout_name = None
 
     def _log(self, msg):
         if self.log:
@@ -266,11 +267,21 @@ class UtilAutoCADIPC(AutoCADBackendInterface):
     # === Connection & Status ===
 
     def connected_autocad(self):
-        """Check if IPC connection to AutoCAD is available"""
+        """Check if IPC connection to AutoCAD is available.
+
+        Uses cached state after successful connect to avoid sending a ping
+        on every poll cycle.  The cache is invalidated if an IPC call fails.
+        """
+        if self._initialized and self._backend is not None:
+            return True
         try:
             result = self._run_async(self._dispatch("ping"))
-            return result.ok if hasattr(result, 'ok') else bool(result)
+            ok = result.ok if hasattr(result, 'ok') else bool(result)
+            if ok:
+                self._initialized = True
+            return ok
         except Exception:
+            self._initialized = False
             return False
 
     def connect_autocad(self, main_body=None):
@@ -311,23 +322,42 @@ class UtilAutoCADIPC(AutoCADBackendInterface):
     # === Layout Management ===
 
     def get_active_layout(self):
-        """Get the current active layout name"""
+        """Get the current active layout name.
+
+        Tries drawing-info first (has active_layout if mcp_dispatch.lsp is
+        up-to-date).  Falls back to odoo_get_block_attrs which always returns
+        layout_name via (getvar "CTAB").
+        """
         try:
             result = self._run_async(self._dispatch("drawing-info"))
             if hasattr(result, 'ok') and result.ok and result.payload:
                 payload = result.payload
-                # payload may be dict or JSON string
                 if isinstance(payload, str):
                     import json
                     payload = json.loads(payload)
                 layout = payload.get('active_layout')
-                self._log(f"[IPC] active_layout: {layout}\n")
-                return layout
-            self._log(f"[IPC] get_active_layout: no payload (ok={getattr(result, 'ok', '?')})\n")
-            return None
+                if layout:
+                    self._log(f"[IPC] active_layout: {layout}\n")
+                    return layout
+            # Fallback: odoo_get_block_attrs always includes layout_name
+            return self._get_active_layout_from_block_attrs()
         except Exception as e:
             self._log(f"[IPC] get_active_layout failed: {e}\n")
             return None
+
+    def _get_active_layout_from_block_attrs(self):
+        """Fallback: get layout name from odoo_get_block_attrs"""
+        try:
+            attrs = self.get_block_attributes()
+            if attrs:
+                layout = attrs.get('layout_name')
+                if layout:
+                    self._log(f"[IPC] active_layout (from block_attrs): {layout}\n")
+                    return layout
+        except Exception:
+            pass
+        self._log("[IPC] get_active_layout: could not determine layout\n")
+        return None
 
     def get_doc_layouts(self):
         """Get list of layout names (excluding Model) via Odoo extension"""

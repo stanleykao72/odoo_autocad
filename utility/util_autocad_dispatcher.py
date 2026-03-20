@@ -196,6 +196,70 @@ class UtilAutoCADDispatcher:
     def scan_elements(self, element_type="all", **kwargs):
         return self._active.scan_elements(element_type, **kwargs)
 
+    # === Layout change detection & refresh ===
+
+    def refresh_active_layout(self):
+        """Re-read current active layout and project info.
+
+        Returns the new layout name if it changed, else None.
+        Used by the GUI polling loop to detect layout switches.
+
+        COM mode: get_active_layout() is cheap (in-process COM).
+        IPC mode: uses single get_block_attributes() call to minimise
+                  IPC round-trips (returns layout_name + pr_no in one shot).
+        """
+        try:
+            old_layout = getattr(self._active, 'layout_name', None)
+
+            if self._mode == self.MODE_IPC:
+                return self._refresh_active_layout_ipc(old_layout)
+
+            # --- COM mode ---
+            new_layout = self.get_active_layout()
+            if new_layout and not isinstance(new_layout, str):
+                new_layout = getattr(new_layout, 'Name', str(new_layout))
+
+            if not new_layout or new_layout == old_layout:
+                return None
+
+            self._active.layout_name = new_layout
+            self._log(f"[Dispatcher] Layout changed: {old_layout} → {new_layout}\n")
+            self._active.process_pr_no(new_layout)
+            return new_layout
+        except Exception as e:
+            self._log(f"[Dispatcher] refresh_active_layout failed: {e}\n")
+            return None
+
+    def _refresh_active_layout_ipc(self, old_layout):
+        """IPC-optimised refresh: single get_block_attributes() call
+        returns layout_name + pr_no, avoiding multiple IPC round-trips."""
+        attrs = self._active.get_block_attributes()
+        if not attrs:
+            return None
+
+        new_layout = attrs.get('layout_name', '')
+        if not new_layout or new_layout == old_layout:
+            return None
+
+        self._active.layout_name = new_layout
+        self._log(f"[Dispatcher] Layout changed: {old_layout} → {new_layout}\n")
+
+        # pr_no + project lookup (reuse attrs already fetched)
+        pr_no = attrs.get('pr_no', '')
+        if pr_no:
+            self._active.pr_no = pr_no
+            self._log(f"[IPC] PR No: {pr_no}\n")
+            if self.odoo_util:
+                project = self.odoo_util.get_project(pr_no)
+                if project:
+                    self._active.project_id = project.get('id')
+                    self._active.project_name = project.get('name')
+                    self._active.job_working_plan_id = project.get('job_working_plan_id')
+                    self._active.job_working_plan_name = project.get('job_working_plan_name')
+                    self._log(f"[IPC] Project: {self._active.project_name}\n")
+
+        return new_layout
+
     # === IPC project initialization ===
 
     def _process_pr_no_ipc(self):

@@ -81,12 +81,13 @@ class UtilAutoCAD(AutoCADBackendInterface):
         self.project_name = None
         self.job_working_plan_id = None
         self.job_working_plan_name = None
+        self.layout_name = None
         self.log = log_util
         self.odoo_util = odoo_util
         self.autocad_progid = "AutoCAD.Application"  # default
 
     def connected_autocad(self):
-        if self.acad:
+        if self.acad and self.doc:
             return True
         else:
             return False
@@ -145,6 +146,7 @@ class UtilAutoCAD(AutoCADBackendInterface):
                 
                 # 獲取並處理 PR No 及相關專案資料
                 active_layout = self.get_active_layout()
+                self.layout_name = active_layout
                 self.process_pr_no(active_layout)
                 
                 self.log.safe_log_insert("成功連接到 AutoCAD。\n")

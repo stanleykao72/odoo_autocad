@@ -24,15 +24,19 @@ class EnhancedFormAutoCADParam:
         self.job_working_plan_name = self.autocad_util.job_working_plan_name
         self.util_log = log_util
         self.root = root
-        
+
         # 資料快取
         self._data_cache = {}
         self._loading_status = {}
-        
+
         # UI元件
         self.entries = {}
         self.comboboxes = {}
         self.readonly_entries = {}
+
+        # Layout 多選
+        self._layout_checkboxes = {}   # {layout_name: ctk.BooleanVar}
+        self._active_layout = None
         
     def get_parameters_from_odoo(self):
         """顯示改進的參數選擇界面"""
@@ -64,6 +68,7 @@ class EnhancedFormAutoCADParam:
         info_label.pack(pady=(0, 20))
         
         # 創建各個區塊
+        self.create_layout_selector(main_frame)
         self.create_material_section(main_frame)
         self.create_process_section(main_frame)
         self.create_color_section(main_frame)
@@ -72,6 +77,141 @@ class EnhancedFormAutoCADParam:
         # 異步載入資料
         self.load_data_async()
     
+    def create_layout_selector(self, parent):
+        """創建 Layout 多選區塊 — 下拉式可捲動多選面板"""
+        layout_frame = ctk.CTkFrame(parent, fg_color=theme.get_color('surface'))
+        layout_frame.pack(fill="x", pady=(0, 15))
+
+        section_title = ctk.CTkLabel(
+            layout_frame,
+            text="📐 選擇要更新的配置 (Layout)",
+            font=get_app_font('heading'),
+            text_color=theme.get_color('text_primary')
+        )
+        section_title.pack(pady=(15, 10))
+
+        # 取得 active layout
+        self._active_layout = getattr(self.autocad_util, 'layout_name', None)
+        if not self._active_layout:
+            try:
+                self._active_layout = self.autocad_util.get_active_layout()
+            except Exception:
+                pass
+
+        # 取得所有 layouts
+        all_layouts = []
+        try:
+            all_layouts = self.autocad_util.get_doc_layouts() or []
+        except Exception as e:
+            self.util_log.safe_log_insert(f"取得 Layout 列表失敗: {e}\n")
+
+        if not all_layouts:
+            no_layout_label = ctk.CTkLabel(
+                layout_frame,
+                text="（無法取得配置列表，將僅更新目前配置）",
+                font=("Microsoft JhengHei UI", 13),
+                text_color=theme.get_color('text_secondary')
+            )
+            no_layout_label.pack(pady=(0, 10))
+            return
+
+        # --- 操作列：下拉按鈕 + 全選 / 取消全選 ---
+        ctrl_row = ctk.CTkFrame(layout_frame, fg_color="transparent")
+        ctrl_row.pack(fill="x", padx=20, pady=(0, 5))
+
+        # 已選摘要標籤（顯示在下拉按鈕上）
+        self._layout_summary_label = ctk.CTkLabel(
+            ctrl_row,
+            text="",
+            font=("Microsoft JhengHei UI", 13),
+            text_color=theme.get_color('text_primary'),
+            anchor="w"
+        )
+        self._layout_summary_label.pack(side="left", fill="x", expand=True)
+
+        select_all_btn = ctk.CTkButton(
+            ctrl_row, text="全選", width=70, height=28,
+            font=("Microsoft JhengHei UI", 12),
+            fg_color="#546E7A", hover_color="#37474F",
+            command=lambda: self._toggle_all_layouts(True)
+        )
+        select_all_btn.pack(side="right", padx=(5, 0))
+
+        deselect_all_btn = ctk.CTkButton(
+            ctrl_row, text="取消全選", width=90, height=28,
+            font=("Microsoft JhengHei UI", 12),
+            fg_color="#546E7A", hover_color="#37474F",
+            command=lambda: self._toggle_all_layouts(False)
+        )
+        deselect_all_btn.pack(side="right", padx=(5, 0))
+
+        # --- 可捲動 checkbox 列表 ---
+        list_height = min(200, max(100, len(all_layouts) * 32))
+        scroll_frame = ctk.CTkScrollableFrame(
+            layout_frame,
+            height=list_height,
+            fg_color="#1A2A3A",
+            corner_radius=6,
+            border_width=1,
+            border_color="#4A6A8A"
+        )
+        scroll_frame.pack(fill="x", padx=20, pady=(0, 10))
+
+        for layout_name in all_layouts:
+            is_active = (layout_name == self._active_layout)
+            var = ctk.BooleanVar(value=is_active)
+
+            display_text = f"{layout_name}  ★ (目前)" if is_active else layout_name
+            font = ("Microsoft JhengHei UI", 14, "bold") if is_active else ("Microsoft JhengHei UI", 14)
+            text_color = "#FFD54F" if is_active else "#E0E0E0"
+
+            cb = ctk.CTkCheckBox(
+                scroll_frame,
+                text=display_text,
+                variable=var,
+                font=font,
+                text_color=text_color,
+                hover_color="#455A64",
+                border_color="#78909C",
+                fg_color="#2E7D32" if is_active else "#1976D2",
+                command=self._update_layout_summary,
+            )
+            cb.pack(anchor="w", padx=10, pady=2)
+            self._layout_checkboxes[layout_name] = var
+
+        # 初始摘要
+        self._update_layout_summary()
+
+    def _toggle_all_layouts(self, state: bool):
+        """全選或取消全選所有 Layout"""
+        for var in self._layout_checkboxes.values():
+            var.set(state)
+        self._update_layout_summary()
+
+    def _update_layout_summary(self):
+        """更新已選配置的摘要文字"""
+        if not hasattr(self, '_layout_summary_label'):
+            return
+        selected = self.get_selected_layouts()
+        total = len(self._layout_checkboxes)
+        if not selected:
+            self._layout_summary_label.configure(text="⚠ 未選擇任何配置")
+        elif len(selected) == total and total > 0:
+            self._layout_summary_label.configure(text=f"已選擇: 全部 ({total} 個配置)")
+        else:
+            names = ", ".join(selected[:5])
+            suffix = f" ...等 {len(selected)} 個" if len(selected) > 5 else ""
+            self._layout_summary_label.configure(text=f"已選擇: {names}{suffix}")
+
+    def get_selected_layouts(self) -> list:
+        """取得使用者勾選的 Layout 名稱列表"""
+        selected = [name for name, var in self._layout_checkboxes.items() if var.get()]
+        if not selected:
+            # 沒有任何勾選時 fallback 到 active layout
+            if self._active_layout:
+                return [self._active_layout]
+        return selected
+
     def create_material_section(self, parent):
         """創建材料選擇區塊"""
         material_frame = ctk.CTkFrame(parent, fg_color=theme.get_color('surface'))
@@ -524,7 +664,7 @@ class EnhancedFormAutoCADParam:
         return values
     
     def submit(self):
-        """提交表單 — 支援 COM 和 IPC 模式"""
+        """提交表單 — 支援多 Layout 同時更新"""
         values = self.get_form_values()
 
         # 檢查是否至少填寫了一個欄位
@@ -533,25 +673,41 @@ class EnhancedFormAutoCADParam:
             messagebox.showwarning("提示", "請至少填寫一個參數欄位。")
             return
 
+        # 取得使用者勾選的 Layout 列表
+        selected_layouts = self.get_selected_layouts()
+        if not selected_layouts:
+            messagebox.showwarning("提示", "請至少選擇一個配置 (Layout)。")
+            return
+
         try:
-            # 取得目前 layout 名稱，只更新目前配置
-            # 優先使用已從 block attrs 取得的 layout_name（可靠）
-            # 僅在無值時 fallback 到 get_active_layout()
-            layout_name = getattr(self.autocad_util, 'layout_name', None)
-            if not layout_name:
+            success_layouts = []
+            fail_layouts = []
+
+            for layout_name in selected_layouts:
                 try:
-                    layout_name = self.autocad_util.get_active_layout()
-                except Exception:
-                    pass
+                    self.autocad_util.set_block_attributes(filled_values, layout_name)
+                    success_layouts.append(layout_name)
+                    self.util_log.safe_log_insert(
+                        f"✅ 配置 {layout_name}: 已更新 {len(filled_values)} 個參數\n")
+                except Exception as e:
+                    fail_layouts.append(layout_name)
+                    self.util_log.safe_log_insert(
+                        f"❌ 配置 {layout_name}: 更新失敗 — {e}\n")
 
-            # 使用 dispatcher 相容的 set_block_attributes（支援 COM/IPC）
-            self.autocad_util.set_block_attributes(filled_values, layout_name)
-
+            # 顯示結果
             filled_count = len(filled_values)
-            layout_info = f" (配置: {layout_name})" if layout_name else ""
-            self.util_log.safe_log_insert(f"已更新 {filled_count} 個參數到 AutoCAD{layout_info}\n")
-            messagebox.showinfo("成功", f"已成功更新 {filled_count} 個參數到 AutoCAD。{layout_info}")
-            self.clear_main_content()
+            if success_layouts and not fail_layouts:
+                layout_list = ", ".join(success_layouts)
+                msg = f"已成功更新 {filled_count} 個參數到 {len(success_layouts)} 個配置。\n配置: {layout_list}"
+                messagebox.showinfo("成功", msg)
+                self.clear_main_content()
+            elif success_layouts and fail_layouts:
+                msg = (f"部分更新完成:\n"
+                       f"✅ 成功: {', '.join(success_layouts)}\n"
+                       f"❌ 失敗: {', '.join(fail_layouts)}")
+                messagebox.showwarning("部分成功", msg)
+            else:
+                messagebox.showerror("失敗", f"所有配置更新失敗: {', '.join(fail_layouts)}")
 
         except Exception as e:
             error_msg = f"更新 AutoCAD 屬性時發生錯誤: {str(e)}"
