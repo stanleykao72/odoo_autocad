@@ -1307,9 +1307,10 @@ AutoCAD 模式: {self.autocad_mode.upper()}
         self.after(100, self.process_gui_proxy_requests)
     
     def start_layout_polling(self):
-        """啟動 Layout 變更偵測輪詢（COM: 3秒, IPC: 10秒）"""
-        interval = 3000 if self.autocad_mode == "com" else 10000
-        self.after(interval, self._poll_layout_change)
+        """啟動 Layout 變更偵測輪詢（僅 IPC 模式，COM 模式不輪詢）"""
+        if self.autocad_mode == "com":
+            return  # COM 模式不需要輪詢 layout
+        self.after(10000, self._poll_layout_change)
 
     def _poll_layout_change(self):
         """偵測 AutoCAD 中 Layout 是否已切換，自動刷新圖面資訊"""

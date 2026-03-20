@@ -95,48 +95,62 @@ class UtilAutoCAD(AutoCADBackendInterface):
     def connect_autocad(self, main_body):
         self.clear_main_body(main_body)
         self.log.safe_log_insert("連接到 AutoCAD...\n")
-        
+
         try:
-            # 初始化 COM 物件
+            # 初始化 COM — STA 模式
             pythoncom.CoInitialize()
 
-            try:
-                # 嘗試連接到已開啟的 AutoCAD 應用程序
-                self.acad = client.GetActiveObject(self.autocad_progid)
-                self.log.safe_log_insert(f"已連接到現有的 AutoCAD 應用程序 ({self.autocad_progid})。\n")
-            except client.pythoncom.com_error:
-                # 如果未運行，則啟動 AutoCAD
-                self.acad = client.Dispatch(self.autocad_progid)
-                self.log.safe_log_insert("啟動新的 AutoCAD 應用程序。\n")
-                self.acad.Visible = True  # 確保 AutoCAD 窗口可見
+            # 連接策略：GetActiveObject + 低階 pythoncom 重試
+            # GetActiveObject 連接到使用者已開啟的 AutoCAD（非新實例）
+            # AutoCAD 忙碌時 COM 呼叫會被 RPC_E_CALL_REJECTED 拒絕，需重試
+            RPC_E_CALL_REJECTED = -2147418111
 
-            # 調試：列出 AutoCAD COM 物件的屬性
             try:
-                attrs = dir(self.acad)
-                self.log.safe_log_insert(f"AutoCAD COM 屬性: {attrs}\n")
-            except Exception as e:
-                self.log.safe_log_insert(f"列舉 AutoCAD COM 屬性時發生錯誤: {str(e)}\n")
+                raw = pythoncom.GetActiveObject(self.autocad_progid)
+            except pythoncom.com_error:
+                self.log.safe_log_insert(
+                    "未偵測到執行中的 AutoCAD，請先開啟 AutoCAD 並載入圖檔。\n")
+                self.acad = None
+                return
 
-            # 獲取文檔集合
-            try:
-                # 嘗試獲取 ActiveDocument，並增加重試機制
-                retry_count = 5
-                for attempt in range(retry_count):
-                    try:
-                        self.doc = self.acad.ActiveDocument
-                        if self.doc:
-                            self.log.safe_log_insert(f"已獲取 ActiveDocument: {self.doc.Name}。\n")
-                            break
-                    except AttributeError:
-                        self.log.safe_log_insert(f"嘗試獲取 ActiveDocument 失敗，等待 1 秒後重試 ({attempt + 1}/{retry_count})。\n")
-                        time.sleep(1)
-                else:
-                    self.log.safe_log_insert("無法獲取 ActiveDocument，可能文檔尚未完全加載。\n")
-                    self.doc = None
-            except AttributeError:
-                self.log.safe_log_insert("無法訪問 AutoCAD 的文檔集合。\n")
+            self.log.safe_log_insert(
+                f"已偵測到 AutoCAD 應用程式 ({self.autocad_progid})\n")
+
+            # 重試取得 IDispatch + ActiveDocument（低階 COM 呼叫繞過 pywin32 封裝）
+            retry_count = 10
+            retry_delay = 1  # 秒
+            self.doc = None
+            self.acad = None
+            for attempt in range(retry_count):
+                try:
+                    idisp = raw.QueryInterface(pythoncom.IID_IDispatch)
+                    dispid = idisp.GetIDsOfNames(0, "ActiveDocument")
+                    doc_idisp = idisp.Invoke(dispid, 0, 2, True)  # DISPATCH_PROPERTYGET=2
+                    if doc_idisp:
+                        self.acad = client.Dispatch(idisp)
+                        self.doc = client.Dispatch(doc_idisp)
+                        self.log.safe_log_insert(
+                            f"已獲取 ActiveDocument: {self.doc.Name}\n")
+                        break
+                except pythoncom.com_error as e:
+                    hr = e.args[0] if e.args else None
+                    if hr == RPC_E_CALL_REJECTED:
+                        self.log.safe_log_insert(
+                            f"AutoCAD 忙碌中，重試... ({attempt + 1}/{retry_count})\n")
+                    else:
+                        self.log.safe_log_insert(
+                            f"COM 錯誤: {e} ({attempt + 1}/{retry_count})\n")
+                    time.sleep(retry_delay)
+                except (AttributeError, Exception) as e:
+                    self.log.safe_log_insert(
+                        f"等待 AutoCAD 就緒... ({attempt + 1}/{retry_count}) [{type(e).__name__}]\n")
+                    time.sleep(retry_delay)
+            else:
+                self.log.safe_log_insert(
+                    "無法獲取 ActiveDocument，請確認 AutoCAD 已開啟且有文件。\n")
                 self.doc = None
-            
+                self.acad = None
+
             if self.acad and self.doc:
                 # 獲取檔案名稱及路徑
                 file_path = self.doc.FullName

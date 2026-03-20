@@ -95,6 +95,7 @@ class MCPManager:
                     host="0.0.0.0",
                     port=self.port,
                     log_level="warning",
+                    log_config=None,
                 )
                 self._uvicorn_server = uvicorn.Server(config)
 
