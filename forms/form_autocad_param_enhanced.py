@@ -90,13 +90,11 @@ class EnhancedFormAutoCADParam:
         )
         section_title.pack(pady=(15, 10))
 
-        # 取得 active layout
-        self._active_layout = getattr(self.autocad_util, 'layout_name', None)
-        if not self._active_layout:
-            try:
-                self._active_layout = self.autocad_util.get_active_layout()
-            except Exception:
-                pass
+        # 取得 active layout（從 AutoCAD 即時讀取，確保與實際一致）
+        try:
+            self._active_layout = self.autocad_util.get_active_layout()
+        except Exception:
+            self._active_layout = getattr(self.autocad_util, 'layout_name', None)
 
         # 取得所有 layouts
         all_layouts = []
