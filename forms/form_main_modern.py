@@ -139,6 +139,7 @@ class ModernFormMain(ctk.CTk):
 
         # 啟動 Layout 變更偵測輪詢
         self._last_polled_layout = None
+        self._layout_polling_active = False
         self.start_layout_polling()
     
     def create_ui(self):
@@ -462,6 +463,10 @@ class ModernFormMain(ctk.CTk):
         # 自動連接新模式的 AutoCAD（包含讀取 pr_no 等初始化）
         self.connect_autocad()
         self.update_connection_status()
+
+        # IPC 模式需要啟動 Layout 輪詢偵測
+        if new_mode == "ipc":
+            self.start_layout_polling()
 
     def _update_autocad_button_label(self):
         """根據模式更新 AutoCAD 按鈕文字"""
@@ -1310,6 +1315,9 @@ AutoCAD 模式: {self.autocad_mode.upper()}
         """啟動 Layout 變更偵測輪詢（僅 IPC 模式，COM 模式不輪詢）"""
         if self.autocad_mode == "com":
             return  # COM 模式不需要輪詢 layout
+        if self._layout_polling_active:
+            return  # 避免重複啟動輪詢迴圈
+        self._layout_polling_active = True
         self.after(10000, self._poll_layout_change)
 
     def _poll_layout_change(self):

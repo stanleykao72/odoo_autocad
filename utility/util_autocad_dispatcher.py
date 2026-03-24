@@ -252,18 +252,29 @@ class UtilAutoCADDispatcher:
             if self.odoo_util:
                 project = self.odoo_util.get_project(pr_no)
                 if project:
+                    odoo_project_name = project.get('name', '')
+                    odoo_jwp_name = project.get('job_working_plan_name', '')
+
                     self._active.project_id = project.get('id')
-                    self._active.project_name = project.get('name')
+                    self._active.project_name = odoo_project_name
                     self._active.job_working_plan_id = project.get('job_working_plan_id')
-                    self._active.job_working_plan_name = project.get('job_working_plan_name')
+                    self._active.job_working_plan_name = odoo_jwp_name
                     self._log(f"[IPC] Project: {self._active.project_name}\n")
+
+                    # Compare with drawing values — update ALL layouts if different
+                    self._sync_project_attrs_if_differ(attrs, odoo_project_name, odoo_jwp_name)
 
         return new_layout
 
     # === IPC project initialization ===
 
     def _process_pr_no_ipc(self):
-        """Read pr_no + layout_name from block attributes via IPC, look up project from Odoo"""
+        """Read pr_no + layout_name from block attributes via IPC, look up project from Odoo.
+
+        When Odoo returns project_name or job_working_plan_name that differ from
+        the values already stored in the drawing, update ALL layouts at once
+        (set_block_attributes without layout_name → AutoLISP writes all layouts).
+        """
         try:
             attrs = self._active.get_block_attributes()
             self._log(f"[IPC] Block attributes: {attrs}\n")
@@ -289,17 +300,60 @@ class UtilAutoCADDispatcher:
             if self.odoo_util:
                 project = self.odoo_util.get_project(pr_no)
                 if project:
+                    odoo_project_name = project.get('name', '')
+                    odoo_jwp_name = project.get('job_working_plan_name', '')
+
                     self._active.project_id = project.get('id')
-                    self._active.project_name = project.get('name')
+                    self._active.project_name = odoo_project_name
                     self._active.job_working_plan_id = project.get('job_working_plan_id')
-                    self._active.job_working_plan_name = project.get('job_working_plan_name')
+                    self._active.job_working_plan_name = odoo_jwp_name
                     self._log(f"[IPC] Project: {self._active.project_name} (ID: {self._active.project_id})\n")
+
+                    # Compare with drawing values — update ALL layouts if different
+                    self._sync_project_attrs_if_differ(attrs, odoo_project_name, odoo_jwp_name)
                 else:
                     self._log(f"[IPC] No project found for PR No: {pr_no}\n")
             else:
                 self._log("[IPC] Odoo not connected, cannot look up project\n")
         except Exception as e:
             self._log(f"[IPC] process_pr_no failed: {e}\n")
+
+    def _sync_project_attrs_if_differ(self, drawing_attrs, odoo_project_name, odoo_jwp_name,
+                                       layout_name=None):
+        """Compare Odoo project_name / job_working_plan_name with drawing values.
+
+        Args:
+            drawing_attrs: block attribute dict from current layout
+            odoo_project_name: project name from Odoo
+            odoo_jwp_name: job_working_plan_name from Odoo
+            layout_name: if provided, update only this layout;
+                         if None, update ALL layouts at once.
+        """
+        dwg_project_name = drawing_attrs.get('project_name', '')
+        dwg_jwp_name = drawing_attrs.get('job_working_plan_name', '')
+
+        need_update = (
+            (odoo_project_name and odoo_project_name != dwg_project_name)
+            or (odoo_jwp_name and odoo_jwp_name != dwg_jwp_name)
+        )
+        if not need_update:
+            return
+
+        diff_parts = []
+        if odoo_project_name != dwg_project_name:
+            diff_parts.append(f"project_name: '{dwg_project_name}' → '{odoo_project_name}'")
+        if odoo_jwp_name != dwg_jwp_name:
+            diff_parts.append(f"job_working_plan_name: '{dwg_jwp_name}' → '{odoo_jwp_name}'")
+
+        target = layout_name if layout_name else "所有 Layout"
+        self._log(f"[IPC] Odoo 與圖面不同，更新 {target}: {'; '.join(diff_parts)}\n")
+
+        update_attrs = {
+            'project_name': odoo_project_name,
+            'job_working_plan_name': odoo_jwp_name,
+        }
+        self._active.set_block_attributes(update_attrs, layout_name=layout_name)
+        self._log(f"[IPC] 已同步 project_name / job_working_plan_name 至 {target}\n")
 
     # === COM-only methods (forwarded; only available when COM backend is active) ===
 
