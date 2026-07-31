@@ -167,9 +167,10 @@ class UtilAutoCAD(AutoCADBackendInterface):
                 self.log.safe_log_insert(f"AutoCAD 檔案路徑: {file_path}\n")
                 
                 # 獲取並處理 PR No 及相關專案資料
-                active_layout = self.get_active_layout()
+                active_layout = self._resolve_working_layout()
                 self.layout_name = active_layout
-                self.process_pr_no(active_layout)
+                if active_layout:
+                    self.process_pr_no(active_layout)
                 
                 self.log.safe_log_insert("成功連接到 AutoCAD。\n")
             else:
@@ -177,6 +178,32 @@ class UtilAutoCAD(AutoCADBackendInterface):
                 
         except Exception as e:
             main_body.after(1000, lambda e=e: self.log.safe_log_insert(f"連接 AutoCAD 時發生錯誤: {str(e)}\n"))
+
+    def _resolve_working_layout(self):
+        """決定要讀取 pr_no／專案資料的配置，一律排除 Model 空間。
+
+        Odoo 流程的標題欄與 TABLE 都放在配置的圖紙空間，Model 不在處理範圍內。
+        另外實測發現，某些圖面的 Model 內含 proxy／未載入物件，透過 COM 列舉
+        會使 AutoCAD 2014 直接崩潰 —— 更不應該去掃它。
+
+        Returns:
+            str 配置名稱，或 None（圖面沒有任何配置）
+        """
+        active = self.get_active_layout()
+        if active and active != "Model":
+            return active
+
+        layouts = self.get_doc_layouts()      # 已排除 Model
+        if not layouts:
+            self.log.safe_log_insert(
+                "此圖面沒有任何配置 (Layout)，無法讀取 pr_no —— "
+                "Odoo 流程的標題欄需放在配置的圖紙空間\n")
+            return None
+
+        chosen = layouts[0]
+        self.log.safe_log_insert(
+            f"目前位於 Model 空間（不在處理範圍），改用配置「{chosen}」讀取 pr_no\n")
+        return chosen
 
     def _log_com_rejected_help(self):
         """AutoCAD 持續以 RPC_E_CALL_REJECTED 拒絕所有 COM 呼叫時的說明。
@@ -208,6 +235,13 @@ class UtilAutoCAD(AutoCADBackendInterface):
         Args:
             layout_name: layout 名稱（字串）
         """
+        # Model 不在處理範圍 —— 正常路徑已由 _resolve_working_layout() 擋掉，
+        # 這裡是給 Dispatcher.refresh_active_layout() 等其他呼叫端的防護。
+        if layout_name == "Model":
+            self.log.safe_log_insert(
+                "process_pr_no: Model 空間不在處理範圍，已略過\n")
+            return
+
         # 取得 COM layout 物件
         layout = self.get_layout_from_name(layout_name) if layout_name else None
         if not layout:
@@ -476,6 +510,13 @@ class UtilAutoCAD(AutoCADBackendInterface):
         """
         try:
             layout_name = layout if isinstance(layout, str) else self.get_active_layout()
+            # Model 不在處理範圍：TABLE 放在配置的圖紙空間。
+            # 清除是破壞性操作，這裡不猜要清哪個配置，直接請使用者切換。
+            if layout_name == "Model":
+                self.log.safe_log_insert(
+                    "目前位於 Model 空間（不在處理範圍），"
+                    "請先切換到要清除的配置後再執行\n")
+                return
             layout_obj = self.get_layout_from_name(layout_name) if layout_name else None
             if not layout_obj:
                 self.log.safe_log_insert(f"clear_table_id: 找不到佈局 {layout_name}\n")
@@ -647,6 +688,13 @@ class UtilAutoCAD(AutoCADBackendInterface):
         """
         block_dict = {}
         try:
+            # Model 不在處理範圍：Odoo 流程的標題欄與 TABLE 都在配置的圖紙空間。
+            # （此方法可由 GUI Proxy / MCP 傳入任意名稱，需自行防護。）
+            if layout_name == "Model":
+                self.log.safe_log_insert(
+                    "get_single_layout_values: Model 空間不在處理範圍，已略過\n")
+                return block_dict
+
             layout = self.get_layout_from_name(layout_name)
             if not layout:
                 self.log.safe_log_insert(f"未找到佈局: {layout_name}\n")
