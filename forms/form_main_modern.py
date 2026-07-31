@@ -836,15 +836,14 @@ class ModernFormMain(ctk.CTk):
         
         try:
             odoo, requestOptions, token = self.odoo_util.connect_odoo(self.odoo_connection)
-            self.update_connection_status()
             if self.log_util:
                 self.log_util.safe_log_insert("✅ 與 Odoo 連線成功\n")
-        except requests.exceptions.ConnectionError:
-            if self.log_util:
-                self.log_util.safe_log_insert("❌ 無法與 Odoo 連線，請檢查網路連接或稍後重試\n")
-        except Exception as e:
-            if self.log_util:
-                self.log_util.safe_log_insert(f"❌ 連接 Odoo 時發生錯誤: {str(e)}\n")
+        except Exception:
+            # 失敗原因已由 UtilOdoo 以明確訊息寫入日誌（例如 token 無效），
+            # 這裡不再重複輸出，避免出現「❌ ...錯誤: ❌ ...」這種疊字。
+            pass
+        finally:
+            self.update_connection_status()
     
     def connect_autocad(self):
         """連接到AutoCAD"""
