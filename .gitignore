@@ -57,12 +57,18 @@ csharp/installer/*.exe
 !csharp/installer/*.iss
 
 # Certificates directory - exclude sensitive files but keep documentation
+# 注意：certs/*.pfx 只匹配直接子檔案，子目錄需另外處理（重簽時的 backup-* 內含私鑰）
 certs/*.pfx
 certs/*.p12
 certs/*.key
 certs/*.pem
 certs/codesign.*
 certs/*.zip
+certs/**/*.pfx
+certs/**/*.p12
+certs/**/*.key
+certs/**/*.pem
+certs/backup-*/
 # Keep documentation and configuration
 !certs/README.txt
 !certs/*.txt
