@@ -1,8 +1,21 @@
 # AutoCAD MCP 整合方案 v5.0
 
-> **版本**: 5.0  
-> **發布日期**: 2024年7月15日  
-> **狀態**: ✅ 已完成 - 完整MCP整合與AI助手功能
+> **版本**: 5.0
+> **發布日期**: 2024年7月15日
+> **狀態**: ⚠️ **歷史文件 —— 描述的是已被取代的 v5.0 架構，勿當作現況參考**
+
+> ## 這份文件已過時（2026-07-31 註記）
+>
+> 本文描述的 TCP Socket + Named Pipe MCP 架構（`ai_assistant/`、
+> `MCPServerManager`、`MCPRequestHandler`）已整個移除，改由
+> `mcp_server_autocad.py`（FastMCP，13 個工具）+ `utility/util_mcp_manager.py`
+> 取代。文中所有 ✅ 標記反映的是當時的狀態。
+>
+> 特別注意：下方標為「✅ 擴展MCP整合功能」的
+> `scan_entities` / `search_products` / `push_boq_data` 從來只是回傳假資料的
+> stub，且已於 2026-07-31 刪除（真實對應為 `get_product()` / `import2boq()`）。
+>
+> **現況請看 `CLAUDE.md` 與 `docs/ARCHITECTURE.md`。**
 
 ## 專案概述
 
