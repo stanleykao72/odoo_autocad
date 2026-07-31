@@ -95,6 +95,8 @@ Write-Host "[BUILD] Step 2/3: Code signing..." -ForegroundColor Cyan
 $certPath = "certs\codesign.pfx"
 $signtoolPath = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe"
 
+$canSign = $false      # 內層 EXE 與外層安裝包共用的判斷
+
 if (-not (Test-Path $certPath)) {
     Write-Host "[INFO] Certificate file $certPath not found, skipping signing" -ForegroundColor Gray
 } elseif (-not $env:CODESIGN_PASSWORD) {
@@ -103,6 +105,7 @@ if (-not (Test-Path $certPath)) {
     Write-Host "          設定方式（僅本次工作階段）: `$env:CODESIGN_PASSWORD = '<pfx 密碼>'" -ForegroundColor Gray
     Write-Host "          永久設定: setx CODESIGN_PASSWORD ""<pfx 密碼>""" -ForegroundColor Gray
 } else {
+    $canSign = $true
     Write-Host "[INFO] Signing output\odoo-autocad-integration.exe..." -ForegroundColor Yellow
     try {
         & $signtoolPath sign /f $certPath /p $env:CODESIGN_PASSWORD /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 "output\odoo-autocad-integration.exe"
@@ -120,9 +123,26 @@ Write-Host ""
 # Step 3: Create installer package
 Write-Host "[BUILD] Step 3/3: Creating Inno Setup installer..." -ForegroundColor Cyan
 try {
-    # Use unsigned version to avoid certificate password issues
-    # Pass version from version.py via /D define
-    & $innoPath "/DMyAppVersion=$appVersion" "installer\odoo-autocad-setup.iss"
+    # 版本號由 version.py 透過 /D 傳入
+    $isccArgs = @("/DMyAppVersion=$appVersion")
+
+    # 外層安裝包簽章：憑證與密碼都具備時才啟用。
+    # .iss 內是 #ifdef SIGN -> SignTool=byparam，命令由 /Sbyparam= 提供。
+    # Inno Setup 的替換符號：$q = 引號、$f = 待簽檔案（需以反引號避免 PS 展開）
+    if ($canSign) {
+        $q = '$q'
+        $signCmd = "$q$signtoolPath$q sign /f $q$((Resolve-Path $certPath).Path)$q " +
+                   "/p $q$($env:CODESIGN_PASSWORD)$q /fd sha256 " +
+                   "/tr http://timestamp.digicert.com /td sha256 `$f"
+        $isccArgs += "/DSIGN"
+        $isccArgs += "/Sbyparam=$signCmd"
+        Write-Host "[INFO] 安裝包外層將一併簽章" -ForegroundColor Yellow
+    } else {
+        Write-Host "[INFO] 未提供憑證/密碼，安裝包外層不簽章" -ForegroundColor Gray
+    }
+
+    $isccArgs += "installer\odoo-autocad-setup.iss"
+    & $innoPath @isccArgs
     if ($LASTEXITCODE -eq 0) {
         Write-Host "[SUCCESS] Installer build completed" -ForegroundColor Green
     } else {

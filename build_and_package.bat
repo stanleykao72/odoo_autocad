@@ -95,6 +95,7 @@ if not exist "certs\codesign.pfx" (
     echo [INFO] This session only:  set CODESIGN_PASSWORD=your_pfx_password
     echo [INFO] Permanent:          setx CODESIGN_PASSWORD "your_pfx_password"
 ) else (
+    set CAN_SIGN=1
     echo [LOG] Certificate file found, starting signing...
     echo [INFO] Signing output\odoo-autocad-integration.exe...
     "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe" sign /f "certs\codesign.pfx" /p "%CODESIGN_PASSWORD%" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 "output\odoo-autocad-integration.exe"
@@ -110,9 +111,18 @@ echo.
 REM Step 3: Create installer package
 echo [BUILD] Step 3/3: Creating Inno Setup installer...
 echo [LOG] Starting Inno Setup...
-REM Use unsigned version to avoid certificate password issues
-REM Pass version from version.py via /D define
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=%APP_VERSION% "installer\odoo-autocad-setup.iss"
+REM Pass version from version.py via /D define.
+REM When a certificate and CODESIGN_PASSWORD are available, also sign the
+REM installer itself: the .iss has "#ifdef SIGN -> SignTool=byparam" and the
+REM actual command is supplied here via /Sbyparam=.
+REM Inno Setup placeholders: $q = quote, $f = file being signed.
+if "%CAN_SIGN%"=="1" (
+    echo [INFO] Installer will be signed as well
+    "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=%APP_VERSION% /DSIGN "/Sbyparam=$qC:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe$q sign /f $q%CD%\certs\codesign.pfx$q /p $q%CODESIGN_PASSWORD%$q /fd sha256 /tr http://timestamp.digicert.com /td sha256 $f" "installer\odoo-autocad-setup.iss"
+) else (
+    echo [INFO] No certificate/password - installer will not be signed
+    "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=%APP_VERSION% "installer\odoo-autocad-setup.iss"
+)
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Installer build failed!
     pause

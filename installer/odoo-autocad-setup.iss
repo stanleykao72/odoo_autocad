@@ -31,13 +31,18 @@ VersionInfoVersion={#MyAppVersion}
 VersionInfoTextVersion={#MyAppVersion}
 VersionInfoDescription=Odoo AutoCAD Integration Tool
 VersionInfoCopyright=Copyright (C) 2026 承暉精品股份有限公司
-; 數位簽章配置 (需要有效的程式碼簽章憑證)
-; 方法1: 使用 PFX 檔案
-; SignTool=signtool /f "C:\path\to\certificate.pfx" /p "password" /t "http://timestamp.digicert.com" $f
-; 方法2: 使用憑證存放區中的憑證
-; SignTool=signtool /n "Certificate Subject Name" /t "http://timestamp.digicert.com" $f
-; 方法3: 使用 SHA256 簽章
-; SignTool=signtool /sha1 "thumbprint" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
+; 數位簽章配置
+;
+; 由建置腳本控制：憑證存在且 CODESIGN_PASSWORD 已設定時，
+; build_and_package.* 會以下列參數呼叫 ISCC —
+;   /DSIGN  /Sbyparam=<signtool 完整命令>
+; 於是這裡的 SignTool=byparam 生效，安裝包外層也會被簽章。
+; 未設定時則整段跳過，產生未簽章的安裝包（建置不會失敗）。
+;
+; 密碼一律不寫在檔案裡 —— 本檔在 git 中。
+#ifdef SIGN
+SignTool=byparam
+#endif
 ; "ArchitecturesAllowed=x64compatible" specifies that Setup cannot run
 ; on anything but x64 and Windows 11 on Arm.
 ArchitecturesAllowed=x64compatible
