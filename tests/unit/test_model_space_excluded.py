@@ -109,3 +109,43 @@ class TestAlreadyExcludedPaths:
         backend.acad.ActiveDocument.ActiveLayout = layout
 
         assert backend.get_block_attributes() == {}
+
+
+class TestScanElementsNotSilentlyEmpty:
+    """COM 端未實作 scan_elements —— 不可回傳空結果假裝成功
+
+    舊版回傳 {"elements": [], "summary": {"total_count": 0, ...}}，呼叫端
+    無法分辨「圖面真的沒有元素」與「這個功能根本沒做」。
+    """
+
+    def test_raises_not_implemented(self, backend):
+        with pytest.raises(NotImplementedError):
+            backend.scan_elements()
+
+    def test_message_points_to_ipc_mode(self, backend):
+        with pytest.raises(NotImplementedError, match="IPC"):
+            backend.scan_elements()
+
+    def test_still_satisfies_abc_contract(self, backend):
+        """必須仍是 UtilAutoCAD 的方法，否則 ABC 會讓類別無法實例化"""
+        assert callable(backend.scan_elements)
+
+
+class TestFakeStubsRemoved:
+    """已刪除的假資料 stub 不可復活 —— 真實對應為 get_product / import2boq"""
+
+    @pytest.mark.parametrize("name", ["search_products", "push_boq_data"])
+    def test_fake_odoo_stub_is_gone(self, name):
+        from utility.util_odoo import UtilOdoo
+        assert not hasattr(UtilOdoo, name), (
+            f"{name} 是回傳假資料的死碼，真實對應為 "
+            "get_product() / import2boq()")
+
+    def test_real_counterparts_exist(self):
+        from utility.util_odoo import UtilOdoo
+        for name in ("get_product", "get_setup", "get_color",
+                     "import2boq", "boq2pr"):
+            assert callable(getattr(UtilOdoo, name))
+
+    def test_scan_entities_is_gone(self, backend):
+        assert not hasattr(backend, "scan_entities")

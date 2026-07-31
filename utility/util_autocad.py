@@ -1219,43 +1219,19 @@ class UtilAutoCAD(AutoCADBackendInterface):
             self.log.safe_log_insert(f"列出圖層時發生錯誤: {str(e)}\n")
             raise e
     
-    def scan_elements(self, element_type="all", include_geometry=True, 
+    def scan_elements(self, element_type="all", include_geometry=True,
                      include_properties=True, layer_filter=None, bounds=None):
-        """掃描圖面元素 - 最小實現"""
-        try:
-            # 確保 AutoCAD 連接
-            if not self.acad or not self.doc:
-                raise Exception("AutoCAD 連接未建立")
-            
-            self.log.safe_log_insert(f"開始掃描元素，類型: {element_type}，圖層過濾: {layer_filter}\n")
-            
-            # 模擬返回空結果（Green階段的最小實現）
-            elements = []
-            element_counts = {}
-            layers = set()
-            
-            # 為了通過測試，創建一些模擬數據
-            if element_type == "all":
-                # 返回空結果
-                pass
-            
-            summary = {
-                "total_count": len(elements),
-                "element_counts": element_counts,
-                "layers": list(layers),
-                "bounds": None
-            }
-            
-            self.log.safe_log_insert(f"成功掃描 {len(elements)} 個元素\n")
-            
-            return {
-                "elements": elements,
-                "summary": summary
-            }
-            
-        except Exception as e:
-            self.log.safe_log_insert(f"掃描元素時發生錯誤: {str(e)}\n")
-            raise e
+        """掃描圖面元素 —— COM 模式尚未實作。
+
+        必須存在以滿足 AutoCADBackendInterface 的契約，但 COM 端沒有實作。
+        舊版回傳 {"elements": [], "summary": {"total_count": 0, ...}}，呼叫端
+        無法分辨「圖面真的沒有元素」與「這個功能根本沒做」—— 明確拋出例外。
+
+        IPC 模式有實作（UtilAutoCADIPC.scan_elements → entity-list）。
+        """
+        raise NotImplementedError(
+            "COM 模式尚未實作 scan_elements()，請改用 IPC 模式"
+            "（左側「模式」切換為 IPC）")
 
     def _ensure_layer_exists(self, layer_name):
         """確保圖層存在，如不存在則創建"""

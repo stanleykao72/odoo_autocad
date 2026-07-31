@@ -190,6 +190,8 @@ class TestCOMListLayers:
 
 
 class TestCOMScanElements:
-    def test_returns_dict(self, com_backend):
-        result = com_backend.scan_elements()
-        assert isinstance(result, dict)
+    def test_raises_not_implemented(self, com_backend):
+        """COM 端未實作 —— 不可回傳空結果讓呼叫端誤以為圖面沒有元素"""
+        import pytest as _pytest
+        with _pytest.raises(NotImplementedError, match="IPC"):
+            com_backend.scan_elements()

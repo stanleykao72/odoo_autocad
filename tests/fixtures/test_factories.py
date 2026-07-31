@@ -86,7 +86,7 @@ def create_test_odoo_product(
 
 
 def create_test_mcp_request(
-    method: str = "scan_entities",
+    method: str = "drawing-info",
     params: Dict = None,
     request_id: str = "test_request_1"
 ) -> Dict[str, Any]:
