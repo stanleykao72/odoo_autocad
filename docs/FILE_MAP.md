@@ -124,3 +124,16 @@ utility/util_com_server.py      → legacy COM server（呼叫者 autolisp/legac
 utility/util_nlp_processor.py   → 未使用
 utility/util_get_product_config.py → 未使用
 ```
+
+## Removed Methods
+
+已刪除的方法（皆無呼叫者，且都有真實對應）：
+
+```
+UtilOdoo.search_products()   假資料（寫死 pipe/valve）→ 真實對應 get_product()
+UtilOdoo.push_boq_data()     只印 log 就回 True      → 真實對應 import2boq()
+UtilAutoCAD.scan_entities()  死碼，且會列舉 Model 空間
+```
+
+`UtilAutoCAD.scan_elements()` 保留但改拋 `NotImplementedError`
+（ABC 契約要求存在；IPC 端有真實作）。

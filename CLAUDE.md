@@ -107,11 +107,40 @@ libs/autocad-mcp/                    git submodule (puran-water/autocad-mcp)
 
 ## 已知限制
 
-- `utility/util_odoo.py` 的 `search_products()` / `push_boq_data()` 目前是回傳假資料的 stub
-- `utility/util_autocad.py` 的 `scan_elements()` 是空實作（回傳空結果）
+- `UtilAutoCAD.scan_elements()`（COM）未實作，會拋 `NotImplementedError` 並指向 IPC 模式。
+  它是 ABC 契約的一部分故不能刪；IPC 端有真實作（`entity-list`）
 - autocad-mcp 需要 `pip install structlog`
 - 不可 import 上游 autocad-mcp 的 tools 模組：其 `ToolResult = str | list` 型別別名會讓 FastMCP 產生 ForwardRef 錯誤
   （`mcp_server_autocad.py` 以注入 `builtins.ToolResult` 迴避）
+- `utility/util_gui_proxy.py` 註冊了 8 個 handler 且 GUI 每 100ms 輪詢，但
+  `execute_in_gui()` 目前除測試外沒有呼叫者 —— 使用它的舊 MCP SSE 伺服器已移除
+
+## Model 空間不在處理範圍
+
+Odoo 流程的標題欄與 TABLE 都放在**配置的圖紙空間**，Model 一律排除：
+
+- `get_doc_layouts` / `get_layouts_values` / `get_layouts_header_id_to_pr` /
+  `clear_all_tables_id` / `get_block_attributes` / `set_block_attributes`(寫全配置)
+- `connect_autocad` 經由 `_resolve_working_layout()` 挑選非 Model 的配置
+- `clear_table_id` / `get_single_layout_values` / `process_pr_no` 各自防護
+
+除了語意正確外還有實務理由：某些圖面的 Model 內含 proxy／未載入物件，
+透過 COM 列舉會使 AutoCAD 2014 直接崩潰（實測 E169A-203.dwg）。
+
+`draw_line` / `draw_circle` / `create_text` / `add_dimension` 使用 `ModelSpace`
+是繪圖工具的既定用途，不屬於 Odoo 流程。
+
+## 不要製造「假成功」
+
+本專案多次出現「函式什麼都沒做卻回報成功」而讓問題難以診斷的情況，
+新增程式碼時請避免重蹈：
+
+- `set_block_attributes` 找不到屬性區塊時**拋例外**，不可回傳 `True`
+- Odoo API 失敗（尤其 401/403）要明確指出是 **token** 問題，不可含糊帶過
+- 未實作的方法拋 `NotImplementedError`，不可回傳空結果
+- 錯誤訊息不可用 `print()` —— `--windowed` 打包後沒有主控台，訊息會消失；
+  一律用 `log.safe_log_insert()`
+- 輪詢路徑（COM 每 3 秒）不可寫日誌，否則會洗掉真正的訊息
 
 ## 文件
 
