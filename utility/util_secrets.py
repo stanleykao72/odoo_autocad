@@ -17,3 +17,26 @@ def mask_secret(value, keep=4):
     if len(text) <= keep:
         return "*" * len(text)
     return f"{text[:keep]}***(len={len(text)})"
+
+
+def mask_url_token(url):
+    """遮罩 URL query string 中的 token / password / api_key 等參數值。
+
+    Odoo 的 swagger url 形如
+        https://host/api/v1/...swagger.json?token=<uuid>&db=<name>
+    直接記錄整段 URL 等同把 API token 寫進日誌。
+
+    Args:
+        url: 原始 URL
+    Returns:
+        str — token 值被遮罩後的 URL
+    """
+    if not url:
+        return "(未設定)"
+    import re
+    return re.sub(
+        r"((?:token|password|passwd|pwd|api_key|apikey|secret)=)([^&#]*)",
+        lambda m: m.group(1) + mask_secret(m.group(2)),
+        str(url),
+        flags=re.IGNORECASE,
+    )

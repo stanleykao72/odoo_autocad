@@ -15,7 +15,12 @@ a = Analysis(
     # 不打包 config/ 與 db/：兩者都含 Odoo API token，
     # 且執行期實際讀的是 c:/odoo/config/*.yaml 與 %APPDATA%/OdooAutoCAD/database.db，
     # 打包進去的副本從未被讀取，只會讓憑證隨安裝包散佈。
-    datas=[('fonts', 'fonts'), ('icon', 'icon'), ('libs/autocad-mcp/lisp-code', 'lisp-code')],
+    #
+    # 不打包 fonts/：那三個 msjh*.ttc 是 C:\Windows\Fonts 系統字型的逐位元組複本
+    # （合計 48.7 MB，佔舊版 EXE 的 41.8%）。ui/ui_fonts.py 是用 tkfont.families()
+    # 依「名稱」解析系統已安裝字型，程式中沒有任何 AddFontResource 或讀取 fonts/
+    # 的路徑，因此打包進去的字型從未被載入。
+    datas=[('icon', 'icon'), ('libs/autocad-mcp/lisp-code', 'lisp-code')],
     hiddenimports=['customtkinter', 'win32com.client', 'win32com.gen_py', 'pywintypes', 'win32api', 'tkinter', 'tkinter.ttk', 'sqlalchemy', 'sqlalchemy.ext.declarative', 'sqlalchemy.orm', 'mcp', 'mcp.server.fastmcp', 'mcp.types', 'uvicorn', 'starlette', 'structlog', 'autocad_mcp', 'autocad_mcp.server', 'autocad_mcp.client', 'autocad_mcp.config', 'autocad_mcp.backends', 'autocad_mcp.backends.file_ipc', 'autocad_mcp.backends.ezdxf_backend', 'httpx', 'anyio', 'sniffio', 'httpx_sse', 'pydantic', 'pydantic_settings', 'sse_starlette'],
     hookspath=[],
     hooksconfig={},

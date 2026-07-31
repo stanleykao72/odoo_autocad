@@ -3,6 +3,8 @@
 import yaml
 import logging
 
+from utility.util_secrets import mask_url_token
+
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.INFO)
 
@@ -40,12 +42,12 @@ class LoadYamlConfig:
             with open(f"{token_cfg['server_file']}", 'r') as f:
                 server_config = yaml.load(f, Loader=yaml.FullLoader)
         
-            # print(server_config)
-            # _logger.info(f'server_config: {server_config}')
             server_cfg = server_config['server']
-            # print(f'server_cfg: {server_cfg}\n')
-            _logger.info(f'server_cfg: {server_cfg}')
-            # return server_cfg
+            # 不可直接記錄整個 server_cfg：url 的 query string 內含 API token。
+            _logger.info(
+                f"server_cfg: host={server_cfg.get('host')}, "
+                f"db_name={server_cfg.get('db_name')}, "
+                f"url={mask_url_token(server_cfg.get('url'))}")
         else:
             # prompt(acaduti, 'token.yaml設定中沒有 server_file。\n請檢查c:/odoo/config/token.yaml\n')
             return 'token.yaml設定中沒有 server_file。\n請檢查c:/odoo/config/token.yaml\n'
