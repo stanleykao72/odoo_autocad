@@ -128,3 +128,112 @@ class TestDisconnectedConstruction:
                    side_effect=requests.exceptions.ConnectionError()):
             with pytest.raises(requests.exceptions.ConnectionError):
                 UtilOdoo(CONN, log)
+
+
+class TestAuthVerifiedAtConnect:
+    """取得 swagger.json 成功 ≠ 可呼叫 API：user_token 必須另外驗證。
+
+    實際案例：server.yaml 的 url 自帶一組 query token（Odoo 對該端點不做認證），
+    而 API 呼叫用的是 token.yaml 的 user_token。後者失效時，舊版會顯示
+    「Odoo 已連接」，然後每次操作都 401，使用者只看到「取不到專案資料」。
+    """
+
+    def _client_raising_on_call(self, exc):
+        client = Mock()
+        (client.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel
+         .return_value.response.side_effect) = exc
+        return client
+
+    def _http(self, status):
+        err = requests.exceptions.HTTPError(f"HTTP {status}")
+        err.response = Mock(status_code=status)
+        return err
+
+    def test_invalid_user_token_is_not_reported_as_connected(self, log):
+        from utility.util_odoo import AuthenticationError
+        client = self._client_raising_on_call(self._http(401))
+        util = UtilOdoo(CONN, log, connect=False)
+        with patch("utility.util_odoo.SwaggerClient.from_url", return_value=client):
+            with pytest.raises(AuthenticationError):
+                util.connect_odoo(CONN)
+
+        assert util.connected_odoo() is False, "token 無效時不可宣稱已連接"
+        assert util.auth_failed is True
+        assert "token" in util.last_error.lower()
+        assert "401" in util.last_error
+
+    def test_auth_failure_message_names_token_not_project(self, log):
+        from utility.util_odoo import AuthenticationError
+        client = self._client_raising_on_call(self._http(403))
+        util = UtilOdoo(CONN, log, connect=False)
+        with patch("utility.util_odoo.SwaggerClient.from_url", return_value=client):
+            with pytest.raises(AuthenticationError):
+                util.connect_odoo(CONN)
+        assert "token" in util.last_error.lower()
+        assert "專案" not in util.last_error, "認證問題不可講成專案問題"
+
+    def test_successful_auth_sets_connected(self, log):
+        client = Mock()
+        (client.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel
+         .return_value.response.return_value.incoming_response.json
+         .return_value) = {}
+        util = UtilOdoo(CONN, log, connect=False)
+        with patch("utility.util_odoo.SwaggerClient.from_url", return_value=client):
+            util.connect_odoo(CONN)
+        assert util.connected_odoo() is True
+        assert util.auth_failed is False
+        assert util.last_error is None
+
+    def test_retry_clears_previous_auth_failure(self, log):
+        """更新 token 後重按「連接到 Odoo」，舊的失敗狀態要被清掉"""
+        from utility.util_odoo import AuthenticationError
+        util = UtilOdoo(CONN, log, connect=False)
+        bad = self._client_raising_on_call(self._http(401))
+        with patch("utility.util_odoo.SwaggerClient.from_url", return_value=bad):
+            with pytest.raises(AuthenticationError):
+                util.connect_odoo(CONN)
+        assert util.auth_failed is True
+
+        good = Mock()
+        (good.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel
+         .return_value.response.return_value.incoming_response.json
+         .return_value) = {}
+        with patch("utility.util_odoo.SwaggerClient.from_url", return_value=good):
+            util.connect_odoo(CONN)
+        assert util.auth_failed is False
+        assert util.last_error is None
+
+
+class TestApiCallErrorsAreClassified:
+    """API 呼叫階段（非連線階段）的 401 也要指名 token"""
+
+    def _util_with_call_raising(self, exc, log):
+        util = UtilOdoo(CONN, log, connect=False)
+        util.odoo = Mock()
+        util.requestOptions = {}
+        util.user_token = "t"
+        (util.odoo.job_working_plan_boq.callMethodForJobWorkingPlanBoqModel
+         .return_value.response.side_effect) = exc
+        return util
+
+    def _http(self, status):
+        err = requests.exceptions.HTTPError(f"HTTP {status}")
+        err.response = Mock(status_code=status)
+        return err
+
+    def test_get_project_401_names_token(self, log):
+        util = self._util_with_call_raising(self._http(401), log)
+        result = util.get_project("EPR03508")
+        assert result is None
+        assert util.auth_failed is True
+        assert "token" in util.last_error.lower()
+
+    def test_get_product_401_names_token(self, log):
+        util = self._util_with_call_raising(self._http(401), log)
+        assert util.get_product() is None
+        assert "token" in util.last_error.lower()
+
+    def test_call_without_connection_is_reported(self, log):
+        util = UtilOdoo(CONN, log, connect=False)
+        assert util.get_project("X") is None
+        assert "未連線" in _logged(log)

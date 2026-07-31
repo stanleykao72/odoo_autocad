@@ -104,10 +104,13 @@ class ModernFormMain(ctk.CTk):
         # 初始化工具類別
         # Odoo 連線失敗不可讓整個 GUI 開不起來 —— 失敗原因已由 UtilOdoo 寫入日誌，
         # 使用者可在畫面上按「🏢 連接到 Odoo」重試。
+        # 先建立未連線的實例再連線 —— 若連線失敗，同一個實例上會保留
+        # auth_failed / last_error，GUI 才能據實顯示原因（例如 token 失效）。
+        # 若改成失敗後 new 一個新實例，這些旗標會一併遺失。
+        self.odoo_util = UtilOdoo(self.odoo_connection, self.log_util, connect=False)
         try:
-            self.odoo_util = UtilOdoo(self.odoo_connection, self.log_util)
+            self.odoo_util.connect_odoo(self.odoo_connection)
         except Exception as e:
-            self.odoo_util = UtilOdoo(self.odoo_connection, self.log_util, connect=False)
             self.log_util.safe_log_insert(
                 f"⚠ Odoo 初始連線失敗（{type(e).__name__}），GUI 仍會開啟\n"
                 "  請依上方錯誤原因處理後，按「🏢 連接到 Odoo」重試\n"
@@ -740,6 +743,13 @@ class ModernFormMain(ctk.CTk):
                 fg_color="#2E7D32",  # 深綠色表示已連接
                 hover_color="#1B5E20"
             )
+        elif getattr(self, 'odoo_util', None) and getattr(self.odoo_util, 'auth_failed', False):
+            # token 失效必須明講，否則使用者會以為只是網路問題而一直重按
+            self.odoo_status_label.configure(text="🏢 Odoo: ❌ token 失效")
+            self.btn_connect_odoo.configure(
+                fg_color="#C62828",
+                hover_color="#8E0000"
+            )
         else:
             self.odoo_status_label.configure(text="🏢 Odoo: ❌ 未連接")
             self.btn_connect_odoo.configure(
@@ -859,7 +869,7 @@ class ModernFormMain(ctk.CTk):
     def get_parameters_from_odoo(self):
         """從Odoo獲取參數 - 使用改進的界面"""
         if not self.autocad_util.project_id:
-            self.show_error_message("錯誤", "請先連接 AutoCAD 並確保已獲取專案資料。")
+            self.show_error_message("錯誤", self._explain_missing_project())
             return
         
         # 使用改進的參數選擇表單
@@ -872,6 +882,37 @@ class ModernFormMain(ctk.CTk):
         )
         enhanced_form.get_parameters_from_odoo()
     
+    def _explain_missing_project(self):
+        """說明「取不到專案資料」的真正原因。
+
+        舊版一律回「請先連接 AutoCAD 並確保已獲取專案資料」，但最常見的情況
+        其實是 AutoCAD 連得好好的、pr_no 也讀到了，只是 Odoo 的 user_token
+        失效導致 get_project() 401 —— 這種訊息會把人引導到錯誤的方向。
+        """
+        # token 問題優先報：這是最常見的原因，且與「專案不存在」是完全不同的處置
+        if getattr(self.odoo_util, 'auth_failed', False):
+            return ("Odoo token 無效或已失效，因此無法查詢專案資料。\n\n"
+                    "請至 Odoo 重新產生 token，更新 c:/odoo/config/token.yaml 後，\n"
+                    "再按「連接到 Odoo」重新連線。\n\n"
+                    f"詳細訊息：{self.odoo_util.last_error}")
+
+        if not self.autocad_util.connected_autocad():
+            return "AutoCAD 尚未連接，請先按「連接到 AutoCAD」。"
+
+        pr_no = getattr(self.autocad_util, 'pr_no', None)
+        if not pr_no:
+            return ("圖面上讀不到請購單號 (pr_no)。\n"
+                    "請確認目前配置的屬性區塊含有 pr_no 標籤。")
+
+        if not self.odoo_util.connected_odoo():
+            reason = getattr(self.odoo_util, 'last_error', None)
+            return (f"已讀到請購單號 {pr_no}，但 Odoo 尚未連線。\n\n"
+                    + (f"原因：{reason}\n\n" if reason else "")
+                    + "請按「連接到 Odoo」後重試。")
+
+        return (f"已讀到請購單號 {pr_no}，但 Odoo 中查不到對應的專案。\n"
+                f"請確認 Odoo 是否存在名稱為 {pr_no} 的專案。")
+
     def push_to_boq(self):
         """推送到BOQ — 帶進度條的背景執行"""
         self._run_with_progress(
