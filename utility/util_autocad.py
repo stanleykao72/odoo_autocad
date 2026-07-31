@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import tkinter as tk
 from win32com import client
+from win32com.client import VARIANT
 import pythoncom
 import re
 import time
@@ -1069,72 +1070,104 @@ class UtilAutoCAD(AutoCADBackendInterface):
             self.log.safe_log_insert(f"創建圖面時發生錯誤: {str(e)}\n")
             raise e
     
-    def draw_line(self, start_point, end_point, layer="0"):
-        """在 AutoCAD 中繪製直線"""
+    @staticmethod
+    def _to_point(coords):
+        """把座標序列轉成 AutoCAD COM 需要的 VARIANT 陣列。
+
+        AutoCAD 的 AddLine / AddCircle / AddText 等要求 VT_ARRAY|VT_R8，
+        直接傳 Python list 會得到 E_INVALIDARG (0x80070057)（實測）。
+        不足 3 個值時補 0。
+        """
+        values = [float(v) for v in coords]
+        while len(values) < 3:
+            values.append(0.0)
+        return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, values[:3])
+
+    def _get_target_space(self, layout_name=None):
+        """取得繪製目標空間，回傳 (Block 物件, 空間名稱)。
+
+        預設用「目前作用中的配置」而非固定 ModelSpace —— 本專案的圖面內容
+        多半放在配置的圖紙空間，畫到 Model 等於看不見（實測）。
+        """
+        doc = self.doc or self.acad.ActiveDocument
+        if layout_name:
+            layout = doc.Layouts.Item(layout_name)
+        else:
+            layout = doc.ActiveLayout
+        return layout.Block, layout.Name
+
+    def draw_line(self, start_point, end_point, layer="0", layout_name=None):
+        """在 AutoCAD 中繪製直線
+
+        Args:
+            start_point / end_point: 座標（2 或 3 個數值）
+            layer: 圖層名稱
+            layout_name: 目標配置；None 表示目前作用中的配置
+        """
         try:
             if not self.acad or not self.doc:
                 raise Exception("AutoCAD 或文檔未連接")
-            
-            # 獲取模型空間
-            model_space = self.doc.ModelSpace
-            
-            # 確保圖層存在
+
+            space, space_name = self._get_target_space(layout_name)
             self._ensure_layer_exists(layer)
-            
-            # 創建直線
-            line = model_space.AddLine(start_point, end_point)
-            
-            # 設定圖層
+
+            line = space.AddLine(self._to_point(start_point),
+                                 self._to_point(end_point))
             line.Layer = layer
-            
-            # 獲取直線 ID
+
             line_id = f"AcDbLine:{line.Handle}" if hasattr(line, 'Handle') else "AcDbLine:Unknown"
-            
-            self.log.safe_log_insert(f"成功繪製直線: 起點{start_point} -> 終點{end_point}, 圖層: {layer}\n")
-            
+
+            self.log.safe_log_insert(
+                f"成功繪製直線: 起點{start_point} -> 終點{end_point}, "
+                f"圖層: {layer}, 空間: {space_name}\n")
+
             return {
                 "line_id": line_id,
                 "start_point": start_point,
                 "end_point": end_point,
                 "layer": layer,
+                "layout_name": space_name,
                 "success": True
             }
-            
+
         except Exception as e:
             self.log.safe_log_insert(f"繪製直線時發生錯誤: {str(e)}\n")
             raise e
     
-    def draw_circle(self, center_point, radius, layer="0"):
-        """在 AutoCAD 中繪製圓形"""
+    def draw_circle(self, center_point, radius, layer="0", layout_name=None):
+        """在 AutoCAD 中繪製圓形
+
+        Args:
+            center_point: 圓心座標（2 或 3 個數值）
+            radius: 半徑
+            layer: 圖層名稱
+            layout_name: 目標配置；None 表示目前作用中的配置
+        """
         try:
             if not self.acad or not self.doc:
                 raise Exception("AutoCAD 或文檔未連接")
-            
-            # 獲取模型空間
-            model_space = self.doc.ModelSpace
-            
-            # 確保圖層存在
+
+            space, space_name = self._get_target_space(layout_name)
             self._ensure_layer_exists(layer)
-            
-            # 創建圓形
-            circle = model_space.AddCircle(center_point, radius)
-            
-            # 設定圖層
+
+            circle = space.AddCircle(self._to_point(center_point), float(radius))
             circle.Layer = layer
-            
-            # 獲取圓形 ID
+
             circle_id = f"AcDbCircle:{circle.Handle}" if hasattr(circle, 'Handle') else "AcDbCircle:Unknown"
-            
-            self.log.safe_log_insert(f"成功繪製圓形: 圓心{center_point}, 半徑: {radius}, 圖層: {layer}\n")
-            
+
+            self.log.safe_log_insert(
+                f"成功繪製圓形: 圓心{center_point}, 半徑: {radius}, "
+                f"圖層: {layer}, 空間: {space_name}\n")
+
             return {
                 "circle_id": circle_id,
                 "center_point": center_point,
                 "radius": radius,
                 "layer": layer,
+                "layout_name": space_name,
                 "success": True
             }
-            
+
         except Exception as e:
             self.log.safe_log_insert(f"繪製圓形時發生錯誤: {str(e)}\n")
             raise e
@@ -1315,21 +1348,26 @@ class UtilAutoCAD(AutoCADBackendInterface):
             self.log.safe_log_insert(f"處理圖層時發生錯誤: {str(e)}\n")
             # 不拋出異常，因為這不是致命錯誤
 
-    def create_text(self, position, text_content, height, rotation, layer, style, alignment):
-        """在 AutoCAD 中創建文字"""
+    def create_text(self, position, text_content, height, rotation, layer, style,
+                    alignment, layout_name=None):
+        """在 AutoCAD 中創建文字
+
+        Args:
+            layout_name: 目標配置；None 表示目前作用中的配置
+        """
         try:
             # 確保 AutoCAD 連接
             if not self.acad or not self.doc:
                 raise Exception("AutoCAD 連接未建立")
-            
+
             # 確保圖層存在
             self._ensure_layer_exists(layer)
-            
-            # 獲取模型空間
-            model_space = self.doc.ModelSpace
-            
+
+            space, _space_name = self._get_target_space(layout_name)
+
             # 創建文字物件
-            text_obj = model_space.AddText(text_content, position, height)
+            text_obj = space.AddText(text_content, self._to_point(position),
+                                     float(height))
             
             # 設定屬性
             text_obj.Layer = layer
@@ -1402,18 +1440,21 @@ class UtilAutoCAD(AutoCADBackendInterface):
             raise e
 
     def add_dimension(self, dimension_type, definition_points, text_position, 
-                     text_override, dim_style, layer, angle):
-        """在 AutoCAD 中添加尺寸標註"""
+                     text_override, dim_style, layer, angle, layout_name=None):
+        """在 AutoCAD 中添加尺寸標註
+
+        Args:
+            layout_name: 目標配置；None 表示目前作用中的配置
+        """
         try:
             # 確保 AutoCAD 連接
             if not self.acad or not self.doc:
                 raise Exception("AutoCAD 連接未建立")
-            
+
             # 確保圖層存在
             self._ensure_layer_exists(layer)
-            
-            # 獲取模型空間
-            model_space = self.doc.ModelSpace
+
+            space, _space_name = self._get_target_space(layout_name)
             
             # 根據尺寸類型創建相應的尺寸
             if dimension_type == "linear":
@@ -1430,7 +1471,8 @@ class UtilAutoCAD(AutoCADBackendInterface):
                     mid_y = (point1[1] + point2[1]) / 2 + 10  # 向上偏移10單位
                     text_position = [mid_x, mid_y, 0]
                 
-                dim_obj = model_space.AddDimAligned(point1, point2, text_position)
+                dim_obj = space.AddDimAligned(self._to_point(point1), self._to_point(point2),
+                                              self._to_point(text_position))
                 measured_value = abs(point2[0] - point1[0]) if abs(point2[0] - point1[0]) > abs(point2[1] - point1[1]) else abs(point2[1] - point1[1])
                 
             elif dimension_type == "angular":
@@ -1446,7 +1488,8 @@ class UtilAutoCAD(AutoCADBackendInterface):
                     # 計算角度中點作為文字位置
                     text_position = [center[0] + 20, center[1] + 20, 0]
                 
-                dim_obj = model_space.AddDimAngular(center, point1, point2, text_position)
+                dim_obj = space.AddDimAngular(self._to_point(center), self._to_point(point1),
+                                              self._to_point(point2), self._to_point(text_position))
                 # 計算角度
                 import math
                 angle1 = math.atan2(point1[1] - center[1], point1[0] - center[0])
@@ -1466,7 +1509,9 @@ class UtilAutoCAD(AutoCADBackendInterface):
                     text_position = [(center[0] + point_on_circle[0]) / 2, 
                                    (center[1] + point_on_circle[1]) / 2, 0]
                 
-                dim_obj = model_space.AddDimRadial(center, point_on_circle, text_position)
+                dim_obj = space.AddDimRadial(self._to_point(center),
+                                             self._to_point(point_on_circle),
+                                             self._to_point(text_position))
                 # 計算半徑
                 measured_value = ((point_on_circle[0] - center[0])**2 + 
                                 (point_on_circle[1] - center[1])**2)**0.5
@@ -1483,7 +1528,8 @@ class UtilAutoCAD(AutoCADBackendInterface):
                     text_position = [(point1[0] + point2[0]) / 2, 
                                    (point1[1] + point2[1]) / 2, 0]
                 
-                dim_obj = model_space.AddDimDiametric(point1, point2, text_position)
+                dim_obj = space.AddDimDiametric(self._to_point(point1), self._to_point(point2),
+                                                self._to_point(text_position))
                 measured_value = ((point2[0] - point1[0])**2 + 
                                 (point2[1] - point1[1])**2)**0.5
                 

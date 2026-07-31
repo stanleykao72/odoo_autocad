@@ -491,8 +491,15 @@ class UtilAutoCADIPC(AutoCADBackendInterface):
 
     # === Drawing Operations (via autocad-mcp built-in commands) ===
 
-    def draw_line(self, start_point, end_point, layer="0"):
-        """Draw a line via IPC"""
+    def _warn_layout_unsupported(self, layout_name):
+        """IPC 的繪圖指令一律畫在 AutoCAD 目前的空間，無法指定配置"""
+        if layout_name:
+            self._log(f"[IPC] 繪圖不支援指定配置 ({layout_name})，"
+                      "將畫在 AutoCAD 目前的空間\n")
+
+    def draw_line(self, start_point, end_point, layer="0", layout_name=None):
+        """Draw a line via IPC（畫在 AutoCAD 目前的空間）"""
+        self._warn_layout_unsupported(layout_name)
         try:
             result = self._run_async(self._dispatch("create-line", {
                 "x1": start_point[0], "y1": start_point[1],
@@ -503,8 +510,9 @@ class UtilAutoCADIPC(AutoCADBackendInterface):
         except Exception:
             return False
 
-    def draw_circle(self, center_point, radius, layer="0"):
-        """Draw a circle via IPC"""
+    def draw_circle(self, center_point, radius, layer="0", layout_name=None):
+        """Draw a circle via IPC（畫在 AutoCAD 目前的空間）"""
+        self._warn_layout_unsupported(layout_name)
         try:
             result = self._run_async(self._dispatch("create-circle", {
                 "cx": center_point[0], "cy": center_point[1],

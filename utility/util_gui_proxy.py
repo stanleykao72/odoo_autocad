@@ -308,15 +308,16 @@ def setup_gui_proxy_handlers(autocad_util, logger):
             log_message(f"[GUI Proxy] 獲取AutoCAD狀態失敗: {e}")
             return {"success": False, "error": f"狀態獲取失敗: {str(e)}", "connected": False}
     
-    def handle_draw_line(start_point: list, end_point: list, layer: str = None) -> Dict[str, Any]:
-        """在AutoCAD中繪製直線"""
+    def handle_draw_line(start_point: list, end_point: list, layer: str = "0",
+                         layout_name: str = None) -> Dict[str, Any]:
+        """在AutoCAD中繪製直線（預設畫在目前作用中的配置）"""
         try:
             log_message(f"[GUI Proxy] 繪製直線從 {start_point} 到 {end_point}")
-            
+
             if not autocad_util.connected_autocad():
                 return {"success": False, "error": "AutoCAD 未連接"}
-            
-            result = autocad_util.draw_line(start_point, end_point, layer)
+
+            result = autocad_util.draw_line(start_point, end_point, layer, layout_name)
             
             if result:
                 return {"success": True, "message": "直線繪製成功", "object_created": True}
@@ -327,15 +328,16 @@ def setup_gui_proxy_handlers(autocad_util, logger):
             log_message(f"[GUI Proxy] 繪製直線失敗: {e}")
             return {"success": False, "error": f"繪製失敗: {str(e)}"}
     
-    def handle_draw_circle(center_point: list, radius: float, layer: str = None) -> Dict[str, Any]:
-        """在AutoCAD中繪製圓形"""
+    def handle_draw_circle(center_point: list, radius: float, layer: str = "0",
+                           layout_name: str = None) -> Dict[str, Any]:
+        """在AutoCAD中繪製圓形（預設畫在目前作用中的配置）"""
         try:
             log_message(f"[GUI Proxy] 繪製圓形，中心: {center_point}, 半徑: {radius}")
-            
+
             if not autocad_util.connected_autocad():
                 return {"success": False, "error": "AutoCAD 未連接"}
-            
-            result = autocad_util.draw_circle(center_point, radius, layer)
+
+            result = autocad_util.draw_circle(center_point, radius, layer, layout_name)
             
             if result:
                 return {"success": True, "message": "圓形繪製成功", "object_created": True}

@@ -88,13 +88,13 @@ class AutoCADBackendInterface(ABC):
     # === 繪圖操作 ===
 
     @abstractmethod
-    def draw_line(self, start_point, end_point, layer="0"):
-        """繪製直線"""
+    def draw_line(self, start_point, end_point, layer="0", layout_name=None):
+        """繪製直線。layout_name=None 表示目前作用中的配置（非 Model）"""
         ...
 
     @abstractmethod
-    def draw_circle(self, center_point, radius, layer="0"):
-        """繪製圓形"""
+    def draw_circle(self, center_point, radius, layer="0", layout_name=None):
+        """繪製圓形。layout_name=None 表示目前作用中的配置（非 Model）"""
         ...
 
     @abstractmethod

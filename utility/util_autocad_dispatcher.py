@@ -233,11 +233,11 @@ class UtilAutoCADDispatcher:
 
     # === Drawing Operations ===
 
-    def draw_line(self, start_point, end_point, layer="0"):
-        return self._invoke('draw_line', start_point, end_point, layer)
+    def draw_line(self, start_point, end_point, layer="0", layout_name=None):
+        return self._invoke('draw_line', start_point, end_point, layer, layout_name)
 
-    def draw_circle(self, center_point, radius, layer="0"):
-        return self._invoke('draw_circle', center_point, radius, layer)
+    def draw_circle(self, center_point, radius, layer="0", layout_name=None):
+        return self._invoke('draw_circle', center_point, radius, layer, layout_name)
 
     def set_layer(self, layer_name, color=7, create_if_not_exist=True):
         return self._invoke('set_layer', layer_name, color, create_if_not_exist)
