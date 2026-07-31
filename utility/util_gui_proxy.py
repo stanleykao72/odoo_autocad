@@ -549,3 +549,39 @@ def setup_gui_proxy_handlers(autocad_util, logger):
     
     log_message("[GUI Proxy] 處理器設置完成")
     return proxy
+
+
+def setup_backend_proxy(dispatcher, logger=None):
+    """註冊通用的 call_backend 處理器，讓任意後端方法能在 GUI 主線程執行。
+
+    COM 物件是 STA 封送的：在主線程建立、從背景線程呼叫會得到
+    RPC_E_WRONG_THREAD (0x8001010E)。MCP server 跑在背景線程，因此
+    COM 模式下所有碰圖面的呼叫都必須繞回主線程。
+
+    比逐一註冊 handler 更通用 —— 新增後端方法時不需要再改這裡。
+
+    Args:
+        dispatcher: UtilAutoCADDispatcher
+        logger: 具備 info() 或 safe_log_insert() 的日誌工具
+    Returns:
+        GUIProxy
+    """
+    proxy = get_gui_proxy()
+
+    def call_backend(method, args=(), kwargs=None):
+        """在 GUI 主線程呼叫 dispatcher 後端的指定方法"""
+        target = getattr(dispatcher.active_backend, method, None)
+        if target is None or not callable(target):
+            return {"success": False, "error": f"後端沒有方法: {method}"}
+        # 一律包一層，避免後端本身回傳 dict 時與代理協定混淆
+        return {"success": True, "result": target(*args, **(kwargs or {}))}
+
+    proxy.register_handler("call_backend", call_backend)
+
+    if logger is not None:
+        msg = "[GUI Proxy] call_backend 處理器已註冊（COM 跨線程呼叫）"
+        if hasattr(logger, 'info'):
+            logger.info(msg)
+        else:
+            logger.safe_log_insert(msg + "\n")
+    return proxy

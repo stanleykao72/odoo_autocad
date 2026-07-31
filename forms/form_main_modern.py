@@ -17,7 +17,8 @@ from utility.util_push_to_boq import UtilPushToBoq
 from utility.util_transfer_boq_to_pr import UtilTransferBoqToPr
 from utility.util_log import UtilLog
 from utility.util_mcp_manager import MCPManager
-from utility.util_gui_proxy import setup_gui_proxy_handlers, get_gui_proxy
+from utility.util_gui_proxy import (setup_gui_proxy_handlers, setup_backend_proxy,
+                                    get_gui_proxy)
 from forms.form_autocad_param import FormAutoCADParam
 from forms.form_autocad_param_enhanced import EnhancedFormAutoCADParam
 from ui.ui_theme import UITheme, theme
@@ -136,10 +137,17 @@ class ModernFormMain(ctk.CTk):
         self.mcp_manager.set_status_callback(self.on_mcp_status_update)
 
         # GUI代理系統：僅 COM 模式需要（解決COM線程問題）
+        #
+        # COM 物件是 STA 封送的，MCP server 跑在背景線程，直接呼叫會得到
+        # RPC_E_WRONG_THREAD 且被內部 try/except 吞成空結果。註冊代理後，
+        # dispatcher 會把非主線程的呼叫自動繞回這裡執行。
+        self._gui_thread_id = threading.get_ident()
         if self.autocad_mode == "com":
             self.gui_proxy = setup_gui_proxy_handlers(
                 self.autocad_dispatcher.active_backend, self.log_util
             )
+            setup_backend_proxy(self.autocad_dispatcher, self.log_util)
+            self.autocad_dispatcher.set_gui_proxy(self.gui_proxy, self._gui_thread_id)
             self.log_util.safe_log_insert("[GUI] GUI代理系統已初始化 (COM模式)\n")
             self.start_gui_proxy_processing()
         else:
@@ -450,11 +458,13 @@ class ModernFormMain(ctk.CTk):
         self.autocad_dispatcher.switch_mode(new_mode)
 
         # COM 模式需要 GUI Proxy，IPC 不需要
+        # （dispatcher 的 _needs_proxy() 也會檢查模式，IPC 下不會走代理）
         if new_mode == "com" and self.gui_proxy is None:
-            from utility.util_gui_proxy import setup_gui_proxy_handlers
             self.gui_proxy = setup_gui_proxy_handlers(
                 self.autocad_dispatcher.active_backend, self.log_util
             )
+            setup_backend_proxy(self.autocad_dispatcher, self.log_util)
+            self.autocad_dispatcher.set_gui_proxy(self.gui_proxy, self._gui_thread_id)
             self.start_gui_proxy_processing()
             self.log_util.safe_log_insert("[GUI] COM 模式 — GUI代理系統已啟動\n")
         elif new_mode == "ipc" and self.gui_proxy is not None:

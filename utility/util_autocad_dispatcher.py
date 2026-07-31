@@ -7,6 +7,7 @@ AutoCAD Dispatcher — COM / IPC 雙模式統一介面
 """
 
 import logging
+import threading
 
 _logger = logging.getLogger(__name__)
 
@@ -26,7 +27,53 @@ class UtilAutoCADDispatcher:
         # Version selection: COM progid or IPC target HWND
         self._com_progid = "AutoCAD.Application"
         self._ipc_target_hwnd = None
+        # COM 跨線程支援（見 _invoke）
+        self._gui_proxy = None
+        self._gui_thread_id = None
+        self._proxy_timeout = 120.0
         self._init_backend(mode)
+
+    # === COM 跨線程路由 ===
+
+    def set_gui_proxy(self, proxy, gui_thread_id, timeout=None):
+        """註冊 GUI 代理，讓 COM 模式下的跨線程呼叫能繞回 GUI 主線程。
+
+        COM 物件是 STA 封送的：在 GUI 主線程建立、從背景線程（例如 MCP
+        server 的 uvicorn thread）呼叫，會得到 RPC_E_WRONG_THREAD
+        (0x8001010E)。而 UtilAutoCAD 內部多處 try/except 會把它吞掉並回傳
+        空結果 —— 表現成「圖面沒有資料」，極難診斷。
+
+        註冊後，COM 模式下非主線程的呼叫會自動改走代理；主線程與 IPC 模式
+        則維持直接呼叫（IPC 走檔案與視窗訊息，沒有線程限制）。
+        """
+        self._gui_proxy = proxy
+        self._gui_thread_id = gui_thread_id
+        if timeout is not None:
+            self._proxy_timeout = timeout
+        self._log(f"[Dispatcher] GUI 代理已註冊（主線程 id={gui_thread_id}）\n")
+
+    def _needs_proxy(self):
+        """是否需要把呼叫繞回 GUI 主線程"""
+        return (self._mode == self.MODE_COM
+                and self._gui_proxy is not None
+                and self._gui_thread_id is not None
+                and threading.get_ident() != self._gui_thread_id)
+
+    def _invoke(self, method, *args, **kwargs):
+        """呼叫後端方法；必要時透過 GUI 代理在主線程執行"""
+        if not self._needs_proxy():
+            return getattr(self._active, method)(*args, **kwargs)
+
+        response = self._gui_proxy.execute_in_gui(
+            "call_backend", timeout=self._proxy_timeout,
+            method=method, args=args, kwargs=kwargs)
+
+        if response.get("success"):
+            return response.get("result")
+
+        error = response.get("error", "GUI 代理執行失敗")
+        self._log(f"[Dispatcher] {method} 經 GUI 代理失敗: {error}\n")
+        raise RuntimeError(f"{method}: {error}")
 
     def set_autocad_version(self, progid=None, target_hwnd=None):
         """Set target AutoCAD version for next connection.
@@ -136,6 +183,8 @@ class UtilAutoCADDispatcher:
     # === Connection ===
 
     def connected_autocad(self):
+        # COM 端只檢查 self.acad / self.doc 是否為 None，不實際呼叫 COM，
+        # 從任何線程判斷都安全；不繞代理可避免 MCP 狀態查詢卡在代理往返上。
         return self._active.connected_autocad()
 
     def connect_autocad(self, main_body=None):
@@ -146,55 +195,58 @@ class UtilAutoCADDispatcher:
             self._process_pr_no_ipc()
 
     # === Layout Management ===
+    #
+    # 以下方法都會碰到 AutoCAD 的資料，一律經 _invoke —— COM 模式下由背景
+    # 線程呼叫時會自動繞回 GUI 主線程（見 set_gui_proxy）。
 
     def get_active_layout(self):
-        return self._active.get_active_layout()
+        return self._invoke('get_active_layout')
 
     def get_doc_layouts(self):
-        return self._active.get_doc_layouts()
+        return self._invoke('get_doc_layouts')
 
     # === Odoo Operations ===
 
     def get_layouts_values(self):
-        return self._active.get_layouts_values()
+        return self._invoke('get_layouts_values')
 
     def get_single_layout_values(self, layout_name):
-        return self._active.get_single_layout_values(layout_name)
+        return self._invoke('get_single_layout_values', layout_name)
 
     def set_layouts_tables_id(self, boq_list):
-        return self._active.set_layouts_tables_id(boq_list)
+        return self._invoke('set_layouts_tables_id', boq_list)
 
     def get_layouts_header_id_to_pr(self):
-        return self._active.get_layouts_header_id_to_pr()
+        return self._invoke('get_layouts_header_id_to_pr')
 
     def get_block_attributes(self):
-        return self._active.get_block_attributes()
+        return self._invoke('get_block_attributes')
 
     def set_block_attributes(self, attrs, layout_name=None):
-        return self._active.set_block_attributes(attrs, layout_name)
+        return self._invoke('set_block_attributes', attrs, layout_name)
 
     def clear_table_id(self, layout=None):
-        return self._active.clear_table_id(layout)
+        return self._invoke('clear_table_id', layout)
 
     def clear_all_tables_id(self):
-        return self._active.clear_all_tables_id()
+        return self._invoke('clear_all_tables_id')
 
     # === Drawing Operations ===
 
     def draw_line(self, start_point, end_point, layer="0"):
-        return self._active.draw_line(start_point, end_point, layer)
+        return self._invoke('draw_line', start_point, end_point, layer)
 
     def draw_circle(self, center_point, radius, layer="0"):
-        return self._active.draw_circle(center_point, radius, layer)
+        return self._invoke('draw_circle', center_point, radius, layer)
 
     def set_layer(self, layer_name, color=7, create_if_not_exist=True):
-        return self._active.set_layer(layer_name, color, create_if_not_exist)
+        return self._invoke('set_layer', layer_name, color, create_if_not_exist)
 
     def list_layers(self, filter_type="all", sort_by="name", include_details=True):
-        return self._active.list_layers(filter_type, sort_by, include_details)
+        return self._invoke('list_layers', filter_type, sort_by, include_details)
 
     def scan_elements(self, element_type="all", **kwargs):
-        return self._active.scan_elements(element_type, **kwargs)
+        return self._invoke('scan_elements', element_type, **kwargs)
 
     # === Layout change detection & refresh ===
 
