@@ -525,8 +525,9 @@ class UtilAutoCAD(AutoCADBackendInterface):
             for table in block_list:
                 rows = table.Rows
                 for i in range(rows):
+                    # i == 1 是欄位標題列（"DETAIL ID"），不可清除
                     if i != 1:
-                        self.set_table_value(table, i, 8, "")
+                        self.set_table_value(table, i, self.DETAIL_ID_COL, "")
         except Exception as e:
             self.log.safe_log_insert(f"清除表格 ID 時發生錯誤: {str(e)}\n")
 
@@ -610,28 +611,44 @@ class UtilAutoCAD(AutoCADBackendInterface):
             self.log.safe_log_insert(f"獲取表格塊時發生錯誤: {str(e)}\n")
             return block_list
 
+    # BOQ 表格的欄位對照（固定 9 欄，c0~c8）
+    BOQ_COLUMNS = ['position', 'product_no', 'width', 'height', 'len',
+                   'thickness', 'qty', 'desc', 'detail_id']
+    BOQ_COL_COUNT = len(BOQ_COLUMNS)          # 9
+    HEADER_ID_LABEL_COL = 7                   # (0,7) = "HEADER_ID" 標籤
+    HEADER_ID_VALUE_COL = 8                   # (0,8) = header_id 值
+    DETAIL_ID_COL = 8                         # 資料列的 detail_id 欄
+
+    # 合計列不進 Odoo：以第一欄的文字判斷
+    TOTAL_ROW_LABELS = {'合計', '總計', '小計', 'total'}
+
+    def _is_total_row(self, table, row):
+        """判斷是否為合計列（不列入 BOQ 明細）"""
+        try:
+            first = table.GetCellValue(row, 0)
+        except Exception:
+            return False
+        if not first:
+            return False
+        return str(first).strip().lower() in self.TOTAL_ROW_LABELS
+
     def chk_legal_table(self, table):
         """
-        檢查給定的塊是否為合法表格。
+        檢查給定的塊是否為合法的 BOQ 表格。
+
+        規則：欄數 >= 9 且 (0,7) 為 "HEADER_ID"。
+
+        欄數改為「至少」9 而非「剛好」9 —— 新版表格在 DETAIL ID 右側還有
+        欄位，且數量不固定（實測 Columns=12）。舊版寫死 cols == 9，會讓整張
+        表格判定為不合法而完全不被讀取。右側多出來的欄位一律忽略。
         """
         try:
-            # table.GetCellValue(row_index, column_index)
-            # rows = table.Rows
             cols = table.Columns
-            # self.log.safe_log_insert(f"Rows: {rows}, Columns: {cols}\n")
+            if cols < self.BOQ_COL_COUNT:
+                return "N"
 
-            if cols == 9:
-                header_label = table.GetCellValue(0, 7)
-                # self.log.safe_log_insert(f"header_label: {header_label}\n")
-
-                if header_label == "HEADER_ID":
-                    return_str = "Y"
-                else:
-                    return_str = "N"
-            else:
-                return_str = "N"
-
-            return return_str
+            header_label = table.GetCellValue(0, self.HEADER_ID_LABEL_COL)
+            return "Y" if header_label == "HEADER_ID" else "N"
 
         except Exception as e:
             self.log.safe_log_insert(f"檢查合法表格時發生錯誤: {str(e)}\n")
@@ -837,15 +854,18 @@ class UtilAutoCAD(AutoCADBackendInterface):
                     table_count = 0
                     for table in block_list:
                         # set header_id
-                        self.set_table_value(table, 0, 8, header_id)
+                        self.set_table_value(table, 0, self.HEADER_ID_VALUE_COL, header_id)
                         table_count += 1
                         rows = table.Rows
                         for i in range(rows):
                             if i > 1:
+                                # 合計列不寫 detail_id（該列不進 Odoo）
+                                if self._is_total_row(table, i):
+                                    continue
                                 product_no = table.GetCellValue(i, 1)
                                 product_no = self.LM_UnFormat(product_no, True)
                                 detail_id = self.get_detail_id_index(detail_list, product_no)
-                                self.set_table_value(table, i, 8, detail_id)
+                                self.set_table_value(table, i, self.DETAIL_ID_COL, detail_id)
                     self.log.safe_log_insert(f"設置表格 ID 完成: {layout_name}\n")
                 else:
                     self.log.safe_log_insert(f"未找到佈局: {layout_name}\n")
@@ -858,14 +878,19 @@ class UtilAutoCAD(AutoCADBackendInterface):
         header_id = None
         for table in table_list:
             rows = table.Rows
-            cols = table.Columns
-            col_name_list = ['position', 'product_no', 'width', 'height', 'len', 'thickness', 'qty', 'desc', 'detail_id']
+            col_name_list = self.BOQ_COLUMNS
             for i in range(rows):
                 if i == 0:
-                    header_id = table.GetCellValue(i, 8)
+                    header_id = table.GetCellValue(i, self.HEADER_ID_VALUE_COL)
                 if i > 1:
+                    # 合計列不進 Odoo
+                    if self._is_total_row(table, i):
+                        self.log.safe_log_insert(f"跳過合計列: 第 {i + 1} 行\n")
+                        continue
+
                     dectail_dict = {}
-                    for j in range(cols):
+                    # 只讀 c0~c8：DETAIL ID 右側的欄位一律忽略（欄數不固定）
+                    for j in range(self.BOQ_COL_COUNT):
                         cell_value = table.GetCellValue(i, j)
                         cell_value = self.LM_UnFormat(cell_value, True)
                         dectail_dict[col_name_list[j]] = cell_value
