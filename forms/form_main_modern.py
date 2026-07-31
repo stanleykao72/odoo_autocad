@@ -102,7 +102,16 @@ class ModernFormMain(ctk.CTk):
         # 注意：log_util 已經在 create_ui() -> setup_log_util() 中創建
 
         # 初始化工具類別
-        self.odoo_util = UtilOdoo(self.odoo_connection, self.log_util)
+        # Odoo 連線失敗不可讓整個 GUI 開不起來 —— 失敗原因已由 UtilOdoo 寫入日誌，
+        # 使用者可在畫面上按「🏢 連接到 Odoo」重試。
+        try:
+            self.odoo_util = UtilOdoo(self.odoo_connection, self.log_util)
+        except Exception as e:
+            self.odoo_util = UtilOdoo(self.odoo_connection, self.log_util, connect=False)
+            self.log_util.safe_log_insert(
+                f"⚠ Odoo 初始連線失敗（{type(e).__name__}），GUI 仍會開啟\n"
+                "  請依上方錯誤原因處理後，按「🏢 連接到 Odoo」重試\n"
+            )
 
         # 使用 Dispatcher 統一 COM/IPC 介面
         self.autocad_dispatcher = UtilAutoCADDispatcher(

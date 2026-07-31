@@ -1,6 +1,16 @@
 # Complete build and package process script v5.0 (PowerShell version)
 # One-click build from source code to installer
 
+# 非互動環境（CI／自動化）中 Read-Host 會直接丟錯，若寫在 catch 區塊裡會讓
+# 後面的 exit 1 永遠執行不到 —— 腳本就會「印了 [ERROR] 卻繼續往下跑」，
+# 拿上一次殘留的舊 EXE 去簽章與打包。這裡統一用可安全略過的版本。
+function Stop-Build {
+    param([string]$Message)
+    Write-Host "[ERROR] $Message" -ForegroundColor Red
+    try { Read-Host "Press Enter to exit..." } catch { }
+    exit 1
+}
+
 Write-Host "[BUILD] Odoo-AutoCAD Integration System v6.0 - Complete Build Process" -ForegroundColor Green
 Write-Host "===============================================" -ForegroundColor Green
 Write-Host ""
@@ -13,9 +23,7 @@ try {
     $pythonVersion = python --version 2>&1
     Write-Host "[SUCCESS] Python: $pythonVersion" -ForegroundColor Yellow
 } catch {
-    Write-Host "[ERROR] Python not installed or not in PATH" -ForegroundColor Red
-    Read-Host "Press Enter to exit..."
-    exit 1
+    Stop-Build "Python not installed or not in PATH"
 }
 
 # Check PyInstaller
@@ -23,17 +31,13 @@ try {
     $pyinstallerVersion = pyinstaller --version 2>&1
     Write-Host "[SUCCESS] PyInstaller: $pyinstallerVersion" -ForegroundColor Yellow
 } catch {
-    Write-Host "[ERROR] PyInstaller not installed, please run: pip install pyinstaller" -ForegroundColor Red
-    Read-Host "Press Enter to exit..."
-    exit 1
+    Stop-Build "PyInstaller not installed, please run: pip install pyinstaller"
 }
 
 # Check Inno Setup
 $innoPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 if (-not (Test-Path $innoPath)) {
-    Write-Host "[ERROR] Inno Setup 6 not installed, please install Inno Setup first" -ForegroundColor Red
-    Read-Host "Press Enter to exit..."
-    exit 1
+    Stop-Build "Inno Setup 6 not installed, please install Inno Setup first"
 } else {
     Write-Host "[SUCCESS] Inno Setup 6 installed" -ForegroundColor Yellow
 }
@@ -53,6 +57,17 @@ Write-Host ""
 
 # Step 1: Build EXE
 Write-Host "[BUILD] Step 1/3: Building executable..." -ForegroundColor Cyan
+$exePath = "output\odoo-autocad-integration.exe"
+
+# 先刪除殘留的 EXE：否則建置失敗時，後續步驟會拿上一次的舊二進位檔
+# 去簽章並打包，產出看似成功、內容卻是舊版的安裝包。
+if (Test-Path $exePath) {
+    Remove-Item $exePath -Force -ErrorAction SilentlyContinue
+    if (Test-Path $exePath) {
+        Stop-Build "無法刪除殘留的 $exePath（檔案可能正在使用中），請關閉該程式後重試"
+    }
+}
+
 try {
     # 打包設定全部在 odoo-autocad-integration.spec，此處不重複 CLI 參數
     & python -m PyInstaller --clean --noconfirm --distpath "output" "odoo-autocad-integration.spec"
@@ -66,9 +81,12 @@ try {
         throw "PyInstaller returned error code: $LASTEXITCODE"
     }
 } catch {
-    Write-Host "[ERROR] EXE build failed: $_" -ForegroundColor Red
-    Read-Host "Press Enter to exit..."
-    exit 1
+    Stop-Build "EXE build failed: $_"
+}
+
+# 確認 EXE 真的產生了，才允許進入簽章／打包
+if (-not (Test-Path $exePath)) {
+    Stop-Build "PyInstaller 回報成功，但找不到 $exePath"
 }
 Write-Host ""
 
@@ -111,9 +129,7 @@ try {
         throw "Inno Setup returned error code: $LASTEXITCODE"
     }
 } catch {
-    Write-Host "[ERROR] Installer build failed: $_" -ForegroundColor Red
-    Read-Host "Press Enter to exit..."
-    exit 1
+    Stop-Build "Installer build failed: $_"
 }
 Write-Host ""
 
@@ -123,7 +139,6 @@ Write-Host "==========================================" -ForegroundColor Green
 Write-Host "[INFO] Output file locations:" -ForegroundColor Cyan
 
 # EXE file information
-$exePath = "output\odoo-autocad-integration.exe"
 if (Test-Path $exePath) {
     $exeInfo = Get-Item $exePath
     Write-Host "   EXE: $exePath" -ForegroundColor White

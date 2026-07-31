@@ -11,7 +11,7 @@ from bravado.requests_client import RequestsClient
 from bravado.client import SwaggerClient
 from swagger_spec_validator.common import SwaggerValidationError
 
-from utility.util_secrets import mask_secret
+from utility.util_secrets import mask_secret, mask_url_token
 
 # _logger = logging.getLogger(__name__)
 # _logger.setLevel(logging.INFO)
@@ -27,15 +27,22 @@ from utility.util_secrets import mask_secret
 
 
 class UtilOdoo:
-    def __init__(self, odoo_connection, log_util):
-        # self.odoo = odoo
-        # self.requestOptions = requestOptions
-        # self.user_token = token
+    def __init__(self, odoo_connection, log_util, connect=True):
+        """
+        Args:
+            odoo_connection: dict(host, db_name, url, token)
+            log_util: 具備 safe_log_insert() 的日誌工具
+            connect: True 時立即連線，失敗會拋出例外（fail fast）。
+                     False 時只建立未連線的實例，供 GUI 在連線失敗後
+                     仍能開啟並讓使用者手動重試。
+        """
         self.odoo = None
         self.requestOptions = None
         self.user_token = None
         self.log = log_util
-        self.connect_odoo(odoo_connection)
+        self.odoo_connection = odoo_connection
+        if connect:
+            self.connect_odoo(odoo_connection)
 
     def connected_odoo(self):
         if self.odoo:
@@ -56,7 +63,8 @@ class UtilOdoo:
         token = odoo_connection['token']
         self.log.safe_log_insert(f"host: {host}\n")
         self.log.safe_log_insert(f"db_name: {db_name}\n")
-        self.log.safe_log_insert(f"url: {url}\n")
+        # url 的 query string 內含 API token，需遮罩後才可寫入日誌
+        self.log.safe_log_insert(f"url: {mask_url_token(url)}\n")
         # 不記錄 token 明文（日誌會落地到 logs/*.log）
         self.log.safe_log_insert(f"token: {mask_secret(token)}\n")
 
@@ -78,18 +86,53 @@ class UtilOdoo:
             self.user_token = token
             return odoo, requestOptions, token
         except requests.exceptions.ConnectionError:
-            self.log.safe_log_insert(f"無法與 Odoo 連線，通常多試幾次會成功\n")
+            self.log.safe_log_insert("❌ 無法連線到 Odoo 伺服器，請檢查網路或稍後再試\n")
             raise
-        except (
-            simplejson.errors.JSONDecodeError,
-            yaml.YAMLError,
-            HTTPError,
-            ):
-            self.log.safe_log_insert(f"無效的 Swagger 文件。請檢查確保 Swagger 文件可以在 {url} 找到。\n")
+        except requests.exceptions.Timeout:
+            self.log.safe_log_insert("❌ 連線 Odoo 逾時，請稍後再試\n")
             raise
         except SwaggerValidationError:
-            self.log.safe_log_insert(f'無效的 Swagger 格式。\n')
+            self.log.safe_log_insert("❌ Swagger 格式無效\n")
             raise
+        except (simplejson.errors.JSONDecodeError, yaml.YAMLError, HTTPError) as e:
+            self.log.safe_log_insert(self._describe_connect_error(e, url))
+            raise
+        except Exception as e:
+            self.log.safe_log_insert(self._describe_connect_error(e, url))
+            raise
+
+    # HTTP 狀態碼 → 使用者看得懂的原因
+    _HTTP_REASONS = {
+        400: "❌ Odoo 拒絕請求 (400)，請確認 url 的 db 參數是否正確",
+        401: "❌ Odoo 認證失敗 (401) — token 不正確或已失效，請更新 config/token.yaml",
+        403: "❌ Odoo 拒絕存取 (403) — token 不正確、已失效或權限不足",
+        404: "❌ 找不到 Swagger 文件 (404)，請確認 url 是否正確",
+        500: "❌ Odoo 伺服器內部錯誤 (500)",
+    }
+
+    @staticmethod
+    def _extract_status_code(exc):
+        """從各種例外形態取出 HTTP 狀態碼（bravado / requests 形態不同）"""
+        status = getattr(exc, 'status_code', None)
+        if status is None:
+            status = getattr(getattr(exc, 'response', None), 'status_code', None)
+        return status
+
+    def _describe_connect_error(self, exc, url):
+        """把連線例外轉成明確的失敗原因，特別點名 token 問題。"""
+        status = self._extract_status_code(exc)
+
+        if status in self._HTTP_REASONS:
+            return f"{self._HTTP_REASONS[status]}\n"
+        if status is not None:
+            return f"❌ Odoo 回應 HTTP {status}，連線失敗\n"
+
+        # 沒有狀態碼：多半是伺服器回了 HTML 登入頁／錯誤頁，導致 JSON 解析失敗。
+        # 這在 token 錯誤時很常見（Odoo 會導向登入頁而非回 401）。
+        if isinstance(exc, simplejson.errors.JSONDecodeError):
+            return ("❌ Odoo 回應不是有效的 JSON — 常見原因是 token 不正確或已失效"
+                    f"（伺服器改回傳登入頁）。請確認 config/token.yaml 與 url 的 token 參數\n")
+        return f"❌ 連線 Odoo 失敗: {type(exc).__name__}: {exc}\n"
 
     def import2boq(self, layout_dict):
 

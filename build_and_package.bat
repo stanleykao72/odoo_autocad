@@ -45,10 +45,23 @@ echo.
 REM Step 1: Build EXE
 echo [BUILD] Step 1/3: Building executable...
 echo [LOG] Starting PyInstaller...
+REM Remove any stale EXE first: otherwise a failed build would leave the previous
+REM binary in place and the later steps would sign and package that old file.
+if exist "output\odoo-autocad-integration.exe" del /f /q "output\odoo-autocad-integration.exe"
+if exist "output\odoo-autocad-integration.exe" (
+    echo [ERROR] Cannot delete stale output\odoo-autocad-integration.exe - is it running?
+    pause
+    exit /b 1
+)
 REM All packaging settings live in odoo-autocad-integration.spec
 python -m PyInstaller --clean --noconfirm --distpath "output" "odoo-autocad-integration.spec"
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] EXE build failed!
+    pause
+    exit /b 1
+)
+if not exist "output\odoo-autocad-integration.exe" (
+    echo [ERROR] PyInstaller reported success but output\odoo-autocad-integration.exe is missing
     pause
     exit /b 1
 )
