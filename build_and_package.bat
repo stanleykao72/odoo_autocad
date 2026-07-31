@@ -63,19 +63,33 @@ echo [SUCCESS] EXE build completed
 echo.
 
 REM Step 2: Code signing (if certificate exists)
+REM
+REM Notes on the block below - do NOT move these comments inside the parentheses:
+REM   * A REM line containing quote characters inside a parenthesised block
+REM     breaks cmd's parsing of the whole if/else chain.
+REM   * Use "if errorlevel 1" rather than "if %ERRORLEVEL% EQU 0": the latter is
+REM     expanded when the block is parsed, so it always sees a stale value and
+REM     would report signing success even when signtool failed.
+REM   * The PFX password comes from the CODESIGN_PASSWORD environment variable.
+REM     Never hardcode it here - this file is tracked in git.
 echo [BUILD] Step 2/3: Code signing...
 echo [LOG] Checking certificate file...
-if exist "certs\codesign.pfx" (
+if not exist "certs\codesign.pfx" (
+    echo [INFO] Certificate file certs\codesign.pfx not found, skipping signing
+) else if "%CODESIGN_PASSWORD%"=="" (
+    REM Never hardcode the password here - this file is tracked in git.
+    echo [WARNING] CODESIGN_PASSWORD not set, skipping signing
+    echo [INFO] This session only:  set CODESIGN_PASSWORD=your_pfx_password
+    echo [INFO] Permanent:          setx CODESIGN_PASSWORD "your_pfx_password"
+) else (
     echo [LOG] Certificate file found, starting signing...
     echo [INFO] Signing output\odoo-autocad-integration.exe...
-    "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe" sign /f "certs\codesign.pfx" /p "YourSecurePassword123!" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 "output\odoo-autocad-integration.exe"
-    if %ERRORLEVEL% EQU 0 (
-        echo [SUCCESS] Code signing completed
-    ) else (
+    "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe" sign /f "certs\codesign.pfx" /p "%CODESIGN_PASSWORD%" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 "output\odoo-autocad-integration.exe"
+    if errorlevel 1 (
         echo [WARNING] Code signing failed, but continuing build
+    ) else (
+        echo [SUCCESS] Code signing completed
     )
-) else (
-    echo [INFO] Certificate file certs\codesign.pfx not found, skipping signing
 )
 echo [LOG] Signing step completed
 echo.

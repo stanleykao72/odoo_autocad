@@ -7,10 +7,21 @@ Files created:
 - deploy-ca.bat: Deployment script
 - inno-setup-config.txt: Inno Setup configuration
 
+PFX password:
+  The .pfx password is NEVER stored in this repository. Supply it via the
+  CODESIGN_PASSWORD environment variable before building:
+
+    cmd :  set CODESIGN_PASSWORD=<pfx password>
+    ps  :  $env:CODESIGN_PASSWORD = '<pfx password>'
+    permanent (either shell):  setx CODESIGN_PASSWORD "<pfx password>"
+
+  build_and_package.bat / .ps1 skip signing (with a warning) when it is unset.
+
 Usage:
 1. Run deploy-ca.bat as administrator
-2. Use inno-setup-config.txt in your .iss file
-3. Test: signtool sign /f "codesign.pfx" /p "YourSecurePassword123!" /fd sha256 "test.exe"
+2. Set CODESIGN_PASSWORD (see above)
+3. Use inno-setup-config.txt in your .iss file
+4. Test: signtool sign /f "codesign.pfx" /p "%CODESIGN_PASSWORD%" /fd sha256 "test.exe"
 
 Certificate Thumbprints:
 - Root CA: 462E6CCBC6FCB849853DCB64C062521A03ACBE53

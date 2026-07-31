@@ -61,9 +61,9 @@ VersionInfoCopyright=Copyright (C) 2025 承暉精品股份有限公司
 ; 方法5: 簡化版本 (使用舊格式時間戳記)
 ; SignTool=signtool sign /f "C:\certs\company.pfx" /p "your_password" /t "http://timestamp.digicert.com" $f
 
-; SignTool="C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe" sign /f "C:\certs\codesign.pfx" /p "YourSecurePassword123!" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
+; SignTool="C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe" sign /f "C:\certs\codesign.pfx" /p "%CODESIGN_PASSWORD%" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
 ; 設定 signtool="C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe" $p
-; SignTool=signtool sign /f "C:\odoo\autocad_source\certs\codesign.pfx" /p "YourSecurePassword123!" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
+; SignTool=signtool sign /f "C:\odoo\autocad_source\certs\codesign.pfx" /p "%CODESIGN_PASSWORD%" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 $f
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

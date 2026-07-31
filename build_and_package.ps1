@@ -77,10 +77,17 @@ Write-Host "[BUILD] Step 2/3: Code signing..." -ForegroundColor Cyan
 $certPath = "certs\codesign.pfx"
 $signtoolPath = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe"
 
-if (Test-Path $certPath) {
+if (-not (Test-Path $certPath)) {
+    Write-Host "[INFO] Certificate file $certPath not found, skipping signing" -ForegroundColor Gray
+} elseif (-not $env:CODESIGN_PASSWORD) {
+    # 密碼絕不寫死在腳本裡 — 本檔在 git 中
+    Write-Host "[WARNING] CODESIGN_PASSWORD not set, skipping signing" -ForegroundColor Yellow
+    Write-Host "          設定方式（僅本次工作階段）: `$env:CODESIGN_PASSWORD = '<pfx 密碼>'" -ForegroundColor Gray
+    Write-Host "          永久設定: setx CODESIGN_PASSWORD ""<pfx 密碼>""" -ForegroundColor Gray
+} else {
     Write-Host "[INFO] Signing output\odoo-autocad-integration.exe..." -ForegroundColor Yellow
     try {
-        & $signtoolPath sign /f $certPath /p "YourSecurePassword123!" /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 "output\odoo-autocad-integration.exe"
+        & $signtoolPath sign /f $certPath /p $env:CODESIGN_PASSWORD /fd sha256 /tr "http://timestamp.digicert.com" /td sha256 "output\odoo-autocad-integration.exe"
         if ($LASTEXITCODE -eq 0) {
             Write-Host "[SUCCESS] Code signing completed" -ForegroundColor Green
         } else {
@@ -89,8 +96,6 @@ if (Test-Path $certPath) {
     } catch {
         Write-Host "[WARNING] Signing process error: $_" -ForegroundColor Yellow
     }
-} else {
-    Write-Host "[INFO] Certificate file $certPath not found, skipping signing" -ForegroundColor Gray
 }
 Write-Host ""
 
