@@ -263,7 +263,8 @@ class UtilAutoCAD(AutoCADBackendInterface):
             return layout_name
 
         except Exception as e:
-            print(f"Error getting active layout: {str(e)}")
+            # 不可用 print：--windowed 打包後沒有主控台，訊息會直接消失
+            self.log.safe_log_insert(f"取得目前配置時發生錯誤: {str(e)}\n")
             return None
 
     def get_block_text(self, block):
@@ -372,11 +373,9 @@ class UtilAutoCAD(AutoCADBackendInterface):
         """
         try:
             tag_upper = tag.upper()
-            print(f"tag_upper: {tag_upper}")
             attributes = block.GetAttributes()
             for att in attributes:
                 att_tag_upper = att.TagString.upper()
-                print(f"att_tag_upper: {att_tag_upper}")
                 if att_tag_upper == tag_upper:
                     old_value = att.TextString
                     att.TextString = val
@@ -529,8 +528,8 @@ class UtilAutoCAD(AutoCADBackendInterface):
             return s
 
         except Exception as e:
-            # 可根據需求處理異常，例如記錄日誌
-            print(f"處理時發生錯誤: {e} -- {s}")
+            # 不可用 print：--windowed 打包後沒有主控台，訊息會直接消失
+            self.log.safe_log_insert(f"格式化文字時發生錯誤: {e} -- {s}\n")
             return False
 
     def get_layout_table_block(self, blocks):
