@@ -54,8 +54,8 @@ Write-Host ""
 # Step 1: Build EXE
 Write-Host "[BUILD] Step 1/3: Building executable..." -ForegroundColor Cyan
 try {
-    # Direct PyInstaller build, no dependency on build_windows.ps1
-    & python -m PyInstaller --onefile --windowed --name "odoo-autocad-integration" --icon "icon/odoo_autocad.ico" --add-data "fonts;fonts" --add-data "icon;icon" --add-data "libs/autocad-mcp/lisp-code;lisp-code" --paths "libs/autocad-mcp/src" --hidden-import "customtkinter" --hidden-import "win32com.client" --hidden-import "win32com.gen_py" --hidden-import "pywintypes" --hidden-import "win32api" --hidden-import "tkinter" --hidden-import "tkinter.ttk" --hidden-import "sqlalchemy" --hidden-import "sqlalchemy.ext.declarative" --hidden-import "sqlalchemy.orm" --hidden-import "mcp" --hidden-import "mcp.server.fastmcp" --hidden-import "mcp.types" --hidden-import "uvicorn" --hidden-import "starlette" --hidden-import "structlog" --hidden-import "autocad_mcp" --hidden-import "autocad_mcp.server" --hidden-import "autocad_mcp.client" --hidden-import "autocad_mcp.config" --hidden-import "autocad_mcp.backends" --hidden-import "autocad_mcp.backends.file_ipc" --hidden-import "autocad_mcp.backends.ezdxf_backend" --hidden-import "httpx" --hidden-import "anyio" --hidden-import "sniffio" --hidden-import "httpx_sse" --hidden-import "pydantic" --hidden-import "pydantic_settings" --hidden-import "sse_starlette" --exclude-module "pytest" --exclude-module "unittest" --exclude-module "doctest" --exclude-module "pdb" --exclude-module "matplotlib" --exclude-module "numpy" --exclude-module "pandas" --clean --noconfirm --distpath "output" odoo.py
+    # 打包設定全部在 odoo-autocad-integration.spec，此處不重複 CLI 參數
+    & python -m PyInstaller --clean --noconfirm --distpath "output" "odoo-autocad-integration.spec"
     if ($LASTEXITCODE -eq 0) {
         # Copy additional files to output directory
         Copy-Item "doc\ANTIVIRUS_SOLUTION.md" "output\" -ErrorAction SilentlyContinue
