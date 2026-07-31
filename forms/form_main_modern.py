@@ -1089,17 +1089,12 @@ class ModernFormMain(ctk.CTk):
         port = self.mcp_manager.port
         endpoint = "/mcp" if self.mcp_manager.transport == "streamable-http" else "/sse"
         url = f"http://localhost:{port}{endpoint}"
-        # Python executable path for stdio mode
-        python_exe = sys.executable.replace("\\", "/")
-        server_script = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "mcp_server_autocad.py"
-        ).replace("\\", "/")
+
         log = self.log_util.safe_log_insert
         log("─" * 60 + "\n")
         log(f"📋 MCP 連線設定 (共 13 個工具, port {port})\n")
         log("─" * 60 + "\n")
-        log("方式一：Streamable HTTP（推薦，GUI 已自動啟動）\n")
+        log("Streamable HTTP（GUI 已自動啟動）\n")
         log(f"  URL: {url}\n\n")
         log("【Claude Code .mcp.json】\n")
         log('  {\n')
@@ -1110,32 +1105,11 @@ class ModernFormMain(ctk.CTk):
         log('      }\n')
         log('    }\n')
         log('  }\n\n')
-        log("【Gemini CLI ~/.gemini/settings.json】\n")
+        log("【Antigravity 2.0 ~/.gemini/antigravity/mcp_config.json】\n")
         log('  {\n')
         log('    "mcpServers": {\n')
         log('      "autocad-odoo": {\n')
-        log(f'        "type": "http",\n'
-            f'      "url": "{url}"\n')
-        log('      }\n')
-        log('    }\n')
-        log('  }\n\n')
-        log("─" * 40 + "\n")
-        log("方式二：stdio（不需 GUI，獨立執行）\n\n")
-        log("【Claude Code .mcp.json】\n")
-        log('  {\n')
-        log('    "mcpServers": {\n')
-        log('      "autocad-odoo": {\n')
-        log(f'        "command": "{python_exe}",\n')
-        log(f'        "args": ["{server_script}"]\n')
-        log('      }\n')
-        log('    }\n')
-        log('  }\n\n')
-        log("【Gemini CLI ~/.gemini/settings.json】\n")
-        log('  {\n')
-        log('    "mcpServers": {\n')
-        log('      "autocad-odoo": {\n')
-        log(f'        "command": "{python_exe}",\n')
-        log(f'        "args": ["{server_script}"]\n')
+        log(f'        "serverUrl": "{url}"\n')
         log('      }\n')
         log('    }\n')
         log('  }\n')
@@ -1212,18 +1186,13 @@ AutoCAD 模式: {self.autocad_mode.upper()}
         transport = self.mcp_manager.transport
         endpoint = "/mcp" if transport == "streamable-http" else "/sse"
         url = f"http://localhost:{port}{endpoint}"
-        python_exe = sys.executable.replace("\\", "/")
-        server_script = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "mcp_server_autocad.py"
-        ).replace("\\", "/")
 
         config_text = (
             f"MCP Server: {url}  |  Transport: {transport}  |  "
             f"AutoCAD: {self.autocad_mode.upper()}  |  工具數: 13\n"
             f"{'─' * 70}\n"
             f"\n"
-            f"方式一：Streamable HTTP（推薦，GUI 已自動啟動）\n"
+            f"Streamable HTTP（GUI 已自動啟動）\n"
             f"\n"
             f"【Claude Code】專案目錄建立 .mcp.json:\n"
             f'{{\n'
@@ -1235,26 +1204,11 @@ AutoCAD 模式: {self.autocad_mode.upper()}
             f'  }}\n'
             f'}}\n'
             f"\n"
-            f"【Gemini CLI】~/.gemini/settings.json:\n"
+            f"【Antigravity 2.0】~/.gemini/antigravity/mcp_config.json:\n"
             f'{{\n'
             f'  "mcpServers": {{\n'
             f'    "autocad-odoo": {{\n'
-            f'      "type": "http",\n'
-            f'      "url": "{url}"\n'
-            f'    }}\n'
-            f'  }}\n'
-            f'}}\n'
-            f"\n"
-            f"{'─' * 70}\n"
-            f"\n"
-            f"方式二：stdio（不需 GUI，AI 工具自動啟動）\n"
-            f"\n"
-            f"【Claude Code / Gemini CLI】.mcp.json 或 settings.json:\n"
-            f'{{\n'
-            f'  "mcpServers": {{\n'
-            f'    "autocad-odoo": {{\n'
-            f'      "command": "{python_exe}",\n'
-            f'      "args": ["{server_script}"]\n'
+            f'      "serverUrl": "{url}"\n'
             f'    }}\n'
             f'  }}\n'
             f'}}\n'

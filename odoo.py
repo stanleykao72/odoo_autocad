@@ -8,8 +8,6 @@ import yaml
 import json
 import base64
 import argparse
-import signal
-import time
 from requests.exceptions import HTTPError
 from pathlib import Path
 from sqlalchemy import create_engine
@@ -178,11 +176,9 @@ def connect_to_odoo(odoo_conn):
 
         basic_string = f'{db_name}:{token}'
         basic_token = string_to_base64(basic_string)
-        print(f'basic_token:{basic_token}\n')
         headers = {
             'Authorization': f'Basic {basic_token}'
         }
-        print(f'headers:{headers}\n')
 
         requestOptions = {
             # === bravado config ===
@@ -213,65 +209,6 @@ def connect_to_odoo(odoo_conn):
         # print('Invalid swagger format.\n')
         _logger.info(f'Invalid swagger format.')
         return
-
-
-def start_mcp_server_only(args):
-    """啟動純MCP伺服器模式 (無GUI)"""
-    try:
-        from ai_assistant.mcp_server_manager import MCPServerManager
-        from utility.util_log import UtilLog
-        from utility.util_autocad import UtilAutoCAD
-        from utility.util_odoo import UtilOdoo
-        
-        _logger.info("啟動MCP伺服器模式...")
-        
-        # 建立資料庫連接
-        odoo_connection = sqlite_create_table()
-        if not odoo_connection:
-            _logger.error("無法建立Odoo連接配置")
-            return 1
-        
-        # 建立工具實例 (不需要GUI組件)
-        log_util = UtilLog(None)  # None因為沒有GUI
-        odoo_util = UtilOdoo(odoo_connection, log_util)
-        autocad_util = UtilAutoCAD(odoo_util, log_util)
-        
-        # 建立MCP伺服器管理器
-        server_manager = MCPServerManager(
-            autocad_util=autocad_util,
-            odoo_util=odoo_util,
-            log_util=log_util,
-            tcp_port=args.mcp_port,
-            pipe_name=args.mcp_pipe
-        )
-        
-        # 設置信號處理程序以正常關閉
-        def signal_handler(signum, frame):
-            _logger.info("收到停止信號，正在關閉MCP伺服器...")
-            server_manager.stop_all_servers()
-            sys.exit(0)
-        
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-        
-        # 啟動伺服器
-        server_manager.start_all_servers()
-        _logger.info(f"MCP伺服器已啟動 - TCP:{args.mcp_port}, Pipe:{args.mcp_pipe}")
-        
-        # 保持運行
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            _logger.info("收到鍵盤中斷，正在關閉...")
-        finally:
-            server_manager.stop_all_servers()
-        
-        return 0
-        
-    except Exception as e:
-        _logger.error(f"MCP伺服器啟動失敗: {e}")
-        return 1
 
 
 def start_mcp_autocad_server(args):
@@ -315,19 +252,12 @@ def main():
 範例用法:
   python odoo.py                           # 啟動GUI模式
   python odoo.py --enable-mcp              # 啟動GUI並自動啟動MCP伺服器
-  python odoo.py --mcp-server               # 純MCP伺服器模式 (無GUI)
-  python odoo.py --mcp-server --mcp-port 8001  # 自訂端口的MCP伺服器
+  python odoo.py --mcp-autocad             # 純MCP伺服器模式 (stdio, 無GUI)
+  python odoo.py --autocad-mode ipc        # 使用 IPC 模式 (AutoCAD LT 2024+)
         """
     )
-    
+
     # MCP 伺服器相關參數
-    parser.add_argument('--mcp-server', action='store_true',
-                       help='啟動純MCP伺服器模式 (無GUI)')
-    parser.add_argument('--mcp-port', type=int, default=8000,
-                       help='MCP TCP伺服器端口 (預設: 8000)')
-    parser.add_argument('--mcp-pipe', type=str, 
-                       default=r'\\.\pipe\odoo_autocad_mcp',
-                       help='MCP Named Pipe名稱')
     parser.add_argument('--enable-mcp', action='store_true',
                        help='在GUI模式下啟用MCP伺服器')
     parser.add_argument('--autocad-mode', choices=['com', 'ipc'], default='com',
@@ -340,9 +270,6 @@ def main():
     if args.mcp_autocad:
         # MCP AutoCAD 模式 (stdio, uses mcp_server_autocad.py)
         return start_mcp_autocad_server(args)
-    elif args.mcp_server:
-        # 純MCP伺服器模式
-        return start_mcp_server_only(args)
     else:
         # GUI模式
         start_gui_application(

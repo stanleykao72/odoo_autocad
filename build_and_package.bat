@@ -35,6 +35,10 @@ if not exist "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" (
 )
 echo [LOG] Inno Setup check passed
 
+REM Read version from version.py
+for /f "tokens=2 delims== " %%A in ('findstr "APP_VERSION" version.py') do set APP_VERSION=%%~A
+if "%APP_VERSION%"=="" set APP_VERSION=6.0
+echo [INFO] App version: %APP_VERSION%
 echo [SUCCESS] Build environment check completed
 echo.
 
@@ -42,7 +46,7 @@ REM Step 1: Build EXE
 echo [BUILD] Step 1/3: Building executable...
 echo [LOG] Starting PyInstaller...
 REM Direct PyInstaller build, no dependency on build_windows.bat
-python -m PyInstaller --onefile --windowed --name "odoo-autocad-integration" --icon "icon/odoo_autocad.ico" --add-data "config;config" --add-data "fonts;fonts" --add-data "icon;icon" --add-data "db;db" --add-data "libs/autocad-mcp/lisp-code;lisp-code" --paths "libs/autocad-mcp/src" --hidden-import "customtkinter" --hidden-import "win32com.client" --hidden-import "win32com.gen_py" --hidden-import "pywintypes" --hidden-import "win32api" --hidden-import "tkinter" --hidden-import "tkinter.ttk" --hidden-import "sqlalchemy" --hidden-import "sqlalchemy.ext.declarative" --hidden-import "sqlalchemy.orm" --hidden-import "mcp" --hidden-import "mcp.server.fastmcp" --hidden-import "mcp.types" --hidden-import "uvicorn" --hidden-import "starlette" --hidden-import "structlog" --hidden-import "autocad_mcp" --hidden-import "autocad_mcp.server" --hidden-import "autocad_mcp.client" --hidden-import "autocad_mcp.config" --hidden-import "autocad_mcp.backends" --hidden-import "autocad_mcp.backends.file_ipc" --hidden-import "autocad_mcp.backends.ezdxf_backend" --hidden-import "httpx" --hidden-import "anyio" --hidden-import "sniffio" --hidden-import "httpx_sse" --hidden-import "pydantic" --hidden-import "pydantic_settings" --hidden-import "sse_starlette" --exclude-module "pytest" --exclude-module "unittest" --exclude-module "doctest" --exclude-module "pdb" --exclude-module "matplotlib" --exclude-module "numpy" --exclude-module "pandas" --clean --noconfirm --distpath "output" odoo.py
+python -m PyInstaller --onefile --windowed --name "odoo-autocad-integration" --icon "icon/odoo_autocad.ico" --add-data "fonts;fonts" --add-data "icon;icon" --add-data "libs/autocad-mcp/lisp-code;lisp-code" --paths "libs/autocad-mcp/src" --hidden-import "customtkinter" --hidden-import "win32com.client" --hidden-import "win32com.gen_py" --hidden-import "pywintypes" --hidden-import "win32api" --hidden-import "tkinter" --hidden-import "tkinter.ttk" --hidden-import "sqlalchemy" --hidden-import "sqlalchemy.ext.declarative" --hidden-import "sqlalchemy.orm" --hidden-import "mcp" --hidden-import "mcp.server.fastmcp" --hidden-import "mcp.types" --hidden-import "uvicorn" --hidden-import "starlette" --hidden-import "structlog" --hidden-import "autocad_mcp" --hidden-import "autocad_mcp.server" --hidden-import "autocad_mcp.client" --hidden-import "autocad_mcp.config" --hidden-import "autocad_mcp.backends" --hidden-import "autocad_mcp.backends.file_ipc" --hidden-import "autocad_mcp.backends.ezdxf_backend" --hidden-import "httpx" --hidden-import "anyio" --hidden-import "sniffio" --hidden-import "httpx_sse" --hidden-import "pydantic" --hidden-import "pydantic_settings" --hidden-import "sse_starlette" --exclude-module "pytest" --exclude-module "unittest" --exclude-module "doctest" --exclude-module "pdb" --exclude-module "matplotlib" --exclude-module "numpy" --exclude-module "pandas" --clean --noconfirm --distpath "output" odoo.py
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] EXE build failed!
     pause
@@ -80,7 +84,8 @@ REM Step 3: Create installer package
 echo [BUILD] Step 3/3: Creating Inno Setup installer...
 echo [LOG] Starting Inno Setup...
 REM Use unsigned version to avoid certificate password issues
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer\odoo-autocad-setup.iss"
+REM Pass version from version.py via /D define
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=%APP_VERSION% "installer\odoo-autocad-setup.iss"
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Installer build failed!
     pause
@@ -95,15 +100,15 @@ echo [SUCCESS] Build completed!
 echo ==========================================
 echo [INFO] Output file locations:
 echo    EXE: output\odoo-autocad-integration.exe
-if exist "installer\odoo-autocad-integration-6.0-setup.exe" (
-    echo    Installer: installer\odoo-autocad-integration-6.0-setup.exe
+if exist "installer\odoo-autocad-integration-%APP_VERSION%-setup.exe" (
+    echo    Installer: installer\odoo-autocad-integration-%APP_VERSION%-setup.exe
 )
 echo.
 
 REM Display file sizes
 for %%I in (output\odoo-autocad-integration.exe) do echo [INFO] EXE size: %%~zI bytes
-if exist "installer\odoo-autocad-integration-6.0-setup.exe" (
-    for %%I in (installer\odoo-autocad-integration-6.0-setup.exe) do echo [INFO] Installer size: %%~zI bytes
+if exist "installer\odoo-autocad-integration-%APP_VERSION%-setup.exe" (
+    for %%I in (installer\odoo-autocad-integration-%APP_VERSION%-setup.exe) do echo [INFO] Installer size: %%~zI bytes
 )
 echo.
 

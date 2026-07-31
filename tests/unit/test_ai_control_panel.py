@@ -1,202 +1,164 @@
 # -*- coding: utf-8 -*-
 """
-Unit tests for AI Control Panel
-Following TDD principles: Red → Green → Refactor
+Unit tests for the MCP control panel in ModernFormMain.
 
-These tests define the expected behavior of the AI control panel
-before implementation (Red phase).
+註：舊版本測的是 TCP Socket + Named Pipe 那套 MCPServerManager
+（toggle_mcp_server / update_mcp_status_display / start_all_servers），
+該架構已由 utility/util_mcp_manager.py 的 MCPManager 取代，
+UI 也改為 toggle_sse_server + on_mcp_status_update。
+本檔已改寫為對照現行實作。
 """
+from unittest.mock import Mock, patch
+
 import pytest
-import customtkinter as ctk
-from unittest.mock import Mock, patch, MagicMock
+
+from forms.form_main_modern import ModernFormMain
 
 
-class TestAIControlPanelMethods:
-    """Test AI Control Panel method existence and basic functionality"""
-    
-    def test_create_ai_control_panel_method_exists(self):
-        """Test that create_ai_control_banner method exists (updated to banner design)"""
-        from forms.form_main_modern import ModernFormMain
-        
-        # Check if the method exists
-        assert hasattr(ModernFormMain, 'create_ai_control_banner'), \
-            "create_ai_control_banner method should exist"
-        
-        # Check if it's callable
-        assert callable(getattr(ModernFormMain, 'create_ai_control_banner')), \
-            "create_ai_control_banner should be callable"
-    
-    def test_initialize_mcp_server_manager_method_exists(self):
-        """Test that initialize_mcp_server_manager method exists"""
-        from forms.form_main_modern import ModernFormMain
-        
-        # Check if the method exists
-        assert hasattr(ModernFormMain, 'initialize_mcp_server_manager'), \
-            "initialize_mcp_server_manager method should exist"
-        
-        # Check if it's callable
-        assert callable(getattr(ModernFormMain, 'initialize_mcp_server_manager')), \
-            "initialize_mcp_server_manager should be callable"
-    
-    def test_toggle_mcp_server_method_exists(self):
-        """Test that toggle_mcp_server method exists"""
-        from forms.form_main_modern import ModernFormMain
-        
-        # Check if the method exists
-        assert hasattr(ModernFormMain, 'toggle_mcp_server'), \
-            "toggle_mcp_server method should exist"
-        
-        # Check if it's callable
-        assert callable(getattr(ModernFormMain, 'toggle_mcp_server')), \
-            "toggle_mcp_server should be callable"
-    
-    def test_update_mcp_status_display_method_exists(self):
-        """Test that update_mcp_status_display method exists"""
-        from forms.form_main_modern import ModernFormMain
-        
-        # Check if the method exists
-        assert hasattr(ModernFormMain, 'update_mcp_status_display'), \
-            "update_mcp_status_display method should exist"
-        
-        # Check if it's callable
-        assert callable(getattr(ModernFormMain, 'update_mcp_status_display')), \
-            "update_mcp_status_display should be callable"
-    
+class TestMCPControlPanelMethods:
+    """介面方法存在性"""
+
+    @pytest.mark.parametrize("name", [
+        "create_ai_control_banner",
+        "create_sse_status_indicator",
+        "create_sse_control_panel",
+        "initialize_mcp_server_manager",
+        "toggle_sse_server",
+        "auto_start_mcp_server",
+        "on_mcp_status_update",
+        "show_sse_status",
+        "test_sse_connection",
+    ])
+    def test_method_exists_and_callable(self, name):
+        assert hasattr(ModernFormMain, name), f"{name} 應存在"
+        assert callable(getattr(ModernFormMain, name)), f"{name} 應可呼叫"
+
+    def test_removed_legacy_methods_are_gone(self):
+        """舊的 TCP/Pipe 控制方法已隨架構移除，不應復活"""
+        for name in ("toggle_mcp_server", "update_mcp_status_display"):
+            assert not hasattr(ModernFormMain, name), \
+                f"{name} 屬於已移除的 TCP/Pipe 架構"
+
+    def test_backward_compatible_alias_kept(self):
+        """auto_start_sse_server 是 auto_start_mcp_server 的相容別名"""
+        assert ModernFormMain.auto_start_sse_server is ModernFormMain.auto_start_mcp_server
 
 
-class TestAIControlPanelLogic:
-    """Test AI Control Panel business logic with mocked dependencies"""
-    
-    def test_initialize_mcp_server_manager_creates_instance(self):
-        """Test that initialize_mcp_server_manager creates MCP server manager instance"""
-        from forms.form_main_modern import ModernFormMain
-        
-        # Create a mock form instance
-        form = Mock(spec=ModernFormMain)
-        form.mcp_server_manager = None
-        form.autocad_util = Mock()
-        form.odoo_util = Mock()
-        form.log_util = Mock()
-        
-        # Bind the real method to our mock
-        form.initialize_mcp_server_manager = ModernFormMain.initialize_mcp_server_manager.__get__(form)
-        
-        # Mock MCPServerManager import
-        with patch('forms.form_main_modern.MCPServerManager') as mock_mcp_class:
-            mock_instance = Mock()
-            mock_mcp_class.return_value = mock_instance
-            
-            # Call the method
-            form.initialize_mcp_server_manager()
-            
-            # Verify MCPServerManager was created with correct dependencies
-            mock_mcp_class.assert_called_once_with(
-                autocad_util=form.autocad_util,
-                odoo_util=form.odoo_util,
-                log_util=form.log_util
-            )
-            
-            # Verify the instance was assigned
-            assert form.mcp_server_manager == mock_instance
-    
-    def test_toggle_mcp_server_starts_when_stopped(self):
-        """Test that toggle_mcp_server starts MCP server when stopped"""
-        from forms.form_main_modern import ModernFormMain
-        
-        # Create a mock form instance
-        form = Mock(spec=ModernFormMain)
-        form.mcp_server_manager = Mock()
-        form.mcp_server_manager.is_running.return_value = False
-        form.log_util = Mock()
-        
-        # Mock the initialize and update methods
-        form.initialize_mcp_server_manager = Mock()
-        form.update_mcp_status_display = Mock()
-        
-        # Bind the real method to our mock
-        form.toggle_mcp_server = ModernFormMain.toggle_mcp_server.__get__(form)
-        
-        # Call the method
-        form.toggle_mcp_server()
-        
-        # Verify server was started
-        form.mcp_server_manager.start_all_servers.assert_called_once()
-        form.update_mcp_status_display.assert_called_once()
-    
-    def test_toggle_mcp_server_stops_when_running(self):
-        """Test that toggle_mcp_server stops MCP server when running"""
-        from forms.form_main_modern import ModernFormMain
-        
-        # Create a mock form instance
-        form = Mock(spec=ModernFormMain)
-        form.mcp_server_manager = Mock()
-        form.mcp_server_manager.is_running.return_value = True
-        form.log_util = Mock()
-        
-        # Mock the update method
-        form.update_mcp_status_display = Mock()
-        
-        # Bind the real method to our mock
-        form.toggle_mcp_server = ModernFormMain.toggle_mcp_server.__get__(form)
-        
-        # Call the method
-        form.toggle_mcp_server()
-        
-        # Verify server was stopped
-        form.mcp_server_manager.stop_all_servers.assert_called_once()
-        form.update_mcp_status_display.assert_called_once()
-    
-    def test_update_mcp_status_display_shows_running_state(self):
-        """Test that update_mcp_status_display correctly shows running state"""
-        from forms.form_main_modern import ModernFormMain
-        
-        # Create a mock form instance
-        form = Mock(spec=ModernFormMain)
-        form.mcp_server_manager = Mock()
-        form.mcp_server_manager.is_running.return_value = True
-        form.mcp_server_manager.get_tcp_port.return_value = 8000
-        form.mcp_server_manager.get_pipe_name.return_value = r'\\.\pipe\odoo_autocad_mcp'
-        
-        # Mock UI components
-        form.mcp_status_label = Mock()
-        form.mcp_toggle_button = Mock()
-        form.tcp_info_label = Mock()
-        form.pipe_info_label = None
-        
-        # Bind the real method to our mock
-        form.update_mcp_status_display = ModernFormMain.update_mcp_status_display.__get__(form)
-        
-        # Call the method
-        form.update_mcp_status_display()
-        
-        # Verify UI updates for running state (icon-only design)
-        form.mcp_status_label.configure.assert_called_with(text="🟢")
-        form.mcp_toggle_button.configure.assert_called_with(text="⏹️")
-        form.tcp_info_label.configure.assert_called_with(text="AI: :8000")
-    
-    def test_update_mcp_status_display_shows_stopped_state(self):
-        """Test that update_mcp_status_display correctly shows stopped state"""
-        from forms.form_main_modern import ModernFormMain
-        
-        # Create a mock form instance  
-        form = Mock(spec=ModernFormMain)
-        form.mcp_server_manager = Mock()
-        form.mcp_server_manager.is_running.return_value = False
-        
-        # Mock UI components
-        form.mcp_status_label = Mock()
-        form.mcp_toggle_button = Mock()
-        form.tcp_info_label = Mock()
-        form.pipe_info_label = None
-        
-        # Bind the real method to our mock
-        form.update_mcp_status_display = ModernFormMain.update_mcp_status_display.__get__(form)
-        
-        # Call the method
-        form.update_mcp_status_display()
-        
-        # Verify UI updates for stopped state (icon-only design)
-        form.mcp_status_label.configure.assert_called_with(text="🔴")
-        form.mcp_toggle_button.configure.assert_called_with(text="🚀")
-        form.tcp_info_label.configure.assert_called_with(text="")
-    
+def _form_stub():
+    """建立不啟動 Tk 的 ModernFormMain 替身"""
+    form = Mock(spec=ModernFormMain)
+    form.mcp_manager = Mock()
+    form.log_util = Mock()
+    form.autocad_mode = "com"
+    return form
+
+
+class TestToggleSSEServer:
+    def test_starts_when_stopped(self):
+        form = _form_stub()
+        form.mcp_manager.is_running = False
+        form.toggle_sse_server = ModernFormMain.toggle_sse_server.__get__(form)
+
+        form.toggle_sse_server()
+
+        form.mcp_manager.start_server.assert_called_once()
+        form.mcp_manager.stop_server.assert_not_called()
+
+    def test_stops_when_running(self):
+        form = _form_stub()
+        form.mcp_manager.is_running = True
+        form.toggle_sse_server = ModernFormMain.toggle_sse_server.__get__(form)
+
+        form.toggle_sse_server()
+
+        form.mcp_manager.stop_server.assert_called_once()
+        form.mcp_manager.start_server.assert_not_called()
+
+    def test_error_is_reported_not_raised(self):
+        form = _form_stub()
+        form.mcp_manager.is_running = False
+        form.mcp_manager.start_server.side_effect = OSError("port in use")
+        form.toggle_sse_server = ModernFormMain.toggle_sse_server.__get__(form)
+
+        with patch("forms.form_main_modern.messagebox") as mb:
+            form.toggle_sse_server()  # 不可往外拋
+            mb.showerror.assert_called_once()
+        form.log_util.safe_log_insert.assert_called()
+
+
+class TestAutoStartMCPServer:
+    def test_calls_start_server(self):
+        form = _form_stub()
+        form.mcp_manager.port = 8084
+        form.auto_start_mcp_server = ModernFormMain.auto_start_mcp_server.__get__(form)
+
+        form.auto_start_mcp_server()
+
+        form.mcp_manager.start_server.assert_called_once()
+
+    def test_failure_is_swallowed_and_logged(self):
+        form = _form_stub()
+        form.mcp_manager.port = 8084
+        form.mcp_manager.start_server.side_effect = RuntimeError("boom")
+        form.auto_start_mcp_server = ModernFormMain.auto_start_mcp_server.__get__(form)
+
+        form.auto_start_mcp_server()  # 啟動失敗不可讓 GUI 無法開啟
+
+        logged = " ".join(str(c) for c in form.log_util.safe_log_insert.call_args_list)
+        assert "Auto-start failed" in logged
+
+
+class TestMCPStatusCallback:
+    def test_status_update_is_marshalled_to_ui_thread(self):
+        """on_mcp_status_update 由背景 thread 呼叫，必須透過 after() 回主線程"""
+        form = _form_stub()
+        form.on_mcp_status_update = ModernFormMain.on_mcp_status_update.__get__(form)
+
+        form.on_mcp_status_update(True, "running")
+
+        form.after.assert_called_once()
+        assert form.after.call_args[0][0] == 0
+
+    def test_running_state_updates_indicators(self):
+        form = _form_stub()
+        form.mcp_manager.port = 8084
+        form.sse_status_label = Mock()
+        form.sse_toggle_button = Mock()
+        form.sse_info_label = Mock()
+        form._log_mcp_connection_guide = Mock()
+        # after(0, fn) → 直接執行 fn，模擬主線程
+        form.after = Mock(side_effect=lambda delay, fn: fn())
+        form.on_mcp_status_update = ModernFormMain.on_mcp_status_update.__get__(form)
+
+        form.on_mcp_status_update(True, "running")
+
+        form.sse_status_label.configure.assert_called_with(text="🟢")
+        form.sse_toggle_button.configure.assert_called_with(text="⏹️")
+        form.sse_info_label.configure.assert_called_with(text="MCP: :8084")
+        form._log_mcp_connection_guide.assert_called_once()
+
+    def test_stopped_state_updates_indicators(self):
+        form = _form_stub()
+        form.sse_status_label = Mock()
+        form.sse_toggle_button = Mock()
+        form.sse_info_label = Mock()
+        form._log_mcp_connection_guide = Mock()
+        form.after = Mock(side_effect=lambda delay, fn: fn())
+        form.on_mcp_status_update = ModernFormMain.on_mcp_status_update.__get__(form)
+
+        form.on_mcp_status_update(False, "stopped")
+
+        form.sse_status_label.configure.assert_called_with(text="🔴")
+        form.sse_toggle_button.configure.assert_called_with(text="🌊")
+        form.sse_info_label.configure.assert_called_with(text="")
+        form._log_mcp_connection_guide.assert_not_called()
+
+    def test_legacy_callback_signature_still_works(self):
+        """on_mcp_sse_status_update(message, is_running) 為舊簽章的相容包裝"""
+        form = _form_stub()
+        form.on_mcp_status_update = Mock()
+        form.on_mcp_sse_status_update = ModernFormMain.on_mcp_sse_status_update.__get__(form)
+
+        form.on_mcp_sse_status_update("hello", True)
+
+        form.on_mcp_status_update.assert_called_once_with(True, "hello")

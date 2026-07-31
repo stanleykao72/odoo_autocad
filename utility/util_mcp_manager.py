@@ -92,7 +92,8 @@ class MCPManager:
 
                 config = uvicorn.Config(
                     starlette_app,
-                    host="0.0.0.0",
+                    # 僅綁定本機 — MCP 工具無認證機制，不可暴露到區網
+                    host="127.0.0.1",
                     port=self.port,
                     log_level="warning",
                     log_config=None,

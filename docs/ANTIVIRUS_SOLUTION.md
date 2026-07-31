@@ -37,8 +37,8 @@ pyinstaller --onefile \
            --windowed \
            --name "odoo-autocad-integration" \
            --icon "icon/odoo_autocad.ico" \
-           --add-data "config;config" \
            --add-data "fonts;fonts" \
+           --add-data "icon;icon" \
            --hidden-import "customtkinter" \
            --hidden-import "win32com.client" \
            --exclude-module "pytest" \

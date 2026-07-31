@@ -26,11 +26,9 @@ class LoadYamlConfig:
         with open(self.token_yaml_file, 'r') as stream:
             token_config = yaml.load(stream, Loader=yaml.FullLoader)
 
-        # print(f'token_config:{token_config}\n')
-        _logger.info(f'token_config:{token_config}')
         token_cfg = token_config['user']
-        # print(f'token_cfg:{token_cfg}\n')
-        _logger.info(f'token_cfg:{token_cfg}')
+        # 不記錄 token 明文：只列出有哪些設定鍵
+        _logger.info(f'token_cfg keys: {sorted(token_cfg.keys())}')
 
         if 'token' in token_cfg:
             pass

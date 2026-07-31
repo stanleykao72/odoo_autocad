@@ -11,6 +11,8 @@ from bravado.requests_client import RequestsClient
 from bravado.client import SwaggerClient
 from swagger_spec_validator.common import SwaggerValidationError
 
+from utility.util_secrets import mask_secret
+
 # _logger = logging.getLogger(__name__)
 # _logger.setLevel(logging.INFO)
 
@@ -55,7 +57,8 @@ class UtilOdoo:
         self.log.safe_log_insert(f"host: {host}\n")
         self.log.safe_log_insert(f"db_name: {db_name}\n")
         self.log.safe_log_insert(f"url: {url}\n")
-        self.log.safe_log_insert(f"token: {token}\n")
+        # 不記錄 token 明文（日誌會落地到 logs/*.log）
+        self.log.safe_log_insert(f"token: {mask_secret(token)}\n")
 
         http_client = RequestsClient()
         http_client.set_basic_auth(host, db_name, token)

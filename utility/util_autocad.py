@@ -270,6 +270,7 @@ class UtilAutoCAD(AutoCADBackendInterface):
         :return: 塊對象或 None
         """
         try:
+            return_block = None
             blocks = layout.Block
             for block in blocks:
                 if block.ObjectName == "AcDbBlockReference":
@@ -760,6 +761,7 @@ class UtilAutoCAD(AutoCADBackendInterface):
 
     def get_table_data(self, table_list):
         detail_list = []
+        header_id = None
         for table in table_list:
             rows = table.Rows
             cols = table.Columns
@@ -799,6 +801,8 @@ class UtilAutoCAD(AutoCADBackendInterface):
                 self.log.safe_log_insert("無佈局可供處理。\n")
                 return header_dict
             for layout_name in layout_names:
+                # 每個 layout 都重置，避免沿用上一個 layout 的結果
+                header_id, detail_list = None, []
                 try:
                     layout = self.get_layout_from_name(layout_name)
                     if not layout:
@@ -815,7 +819,7 @@ class UtilAutoCAD(AutoCADBackendInterface):
                             self.log.safe_log_insert(f"無塊可供處理: {layout_name}\n")
                             continue
 
-                    if detail_list:
+                    if detail_list and header_id is not None:
                         header_id_list.append(header_id)
 
                 except Exception as e:

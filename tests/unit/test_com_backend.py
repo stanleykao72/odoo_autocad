@@ -16,18 +16,19 @@ import sys
 from unittest.mock import MagicMock, Mock, patch, PropertyMock
 
 
-# Mock win32com before importing
+# Patch the COM handles that util_autocad already bound at import time.
+#
+# 早期版本只在 sys.modules 尚無 'pythoncom' 時才注入 MagicMock，因此單獨執行
+# 本檔會通過、整套執行時（其他測試已先 import 真正的 pythoncom）卻失敗。
+# 這裡改為直接 patch util_autocad 模組內的名稱，與 import 順序無關。
 @pytest.fixture(autouse=True)
-def mock_win32com_modules():
-    mods = {}
-    for name in ('win32com', 'win32com.client', 'pythoncom'):
-        if name not in sys.modules:
-            mods[name] = MagicMock()
-            sys.modules[name] = mods[name]
-    yield
-    for name, mod in mods.items():
-        if sys.modules.get(name) is mod:
-            del sys.modules[name]
+def mock_com_handles():
+    import utility.util_autocad as ua
+    with patch.object(ua, 'pythoncom', MagicMock()) as mock_pythoncom, \
+            patch.object(ua, 'client', MagicMock()) as mock_client:
+        # com_error 必須是可被 except 捕捉的真實例外類別
+        mock_pythoncom.com_error = type('com_error', (Exception,), {})
+        yield mock_pythoncom, mock_client
 
 
 def _make_mock_layout(name, blocks=None, has_block=True):
@@ -279,6 +280,76 @@ class TestCOMGetLayoutsHeaderIdToPr:
         assert isinstance(result["all"], list)
         assert "H001" in result["all"]
 
+    def test_layout_without_block_does_not_reuse_previous_header_id(self, com_backend):
+        """迴歸測試：沒有 Block 的 layout 不可沿用上一個 layout 的 header_id。
+
+        舊版 header_id / detail_list 在迴圈外殘留，導致同一個 header_id
+        被重複收集（或第一個 layout 就沒 Block 時 UnboundLocalError）。
+        """
+        with_block = _make_mock_layout("Layout1")
+        without_block = _make_mock_layout("Layout2", has_block=True)
+        without_block.Block = None  # 沒有可處理的 Block
+
+        mock_doc = MagicMock()
+        l1 = MagicMock(); l1.Name = "Layout1"
+        l2 = MagicMock(); l2.Name = "Layout2"
+        mock_doc.Layouts = [l1, l2]
+        com_backend.doc = mock_doc
+
+        com_backend.get_layout_from_name = MagicMock(
+            side_effect=lambda n: with_block if n == "Layout1" else without_block)
+        com_backend.get_layout_table_block = MagicMock(return_value=[MagicMock()])
+        com_backend.get_table_data = MagicMock(return_value=("H001", [{"product_no": "A"}]))
+
+        result = com_backend.get_layouts_header_id_to_pr()
+        # 只有 Layout1 有資料 — H001 不可出現兩次
+        assert result["all"] == ["H001"]
+
+    def test_first_layout_without_block_does_not_raise(self, com_backend):
+        """第一個 layout 就沒有 Block 時不可 UnboundLocalError"""
+        no_block = _make_mock_layout("Layout1")
+        no_block.Block = None
+
+        mock_doc = MagicMock()
+        l1 = MagicMock(); l1.Name = "Layout1"
+        mock_doc.Layouts = [l1]
+        com_backend.doc = mock_doc
+        com_backend.get_layout_from_name = MagicMock(return_value=no_block)
+
+        result = com_backend.get_layouts_header_id_to_pr()
+        assert result == {"all": []}
+
+
+class TestCOMGetTableData:
+    def test_empty_table_list_returns_none_header(self, com_backend):
+        """迴歸測試：table_list 為空時 header_id 未定義會 UnboundLocalError"""
+        header_id, detail_list = com_backend.get_table_data([])
+        assert header_id is None
+        assert detail_list == []
+
+
+class TestCOMGetAttributeBlock:
+    def test_returns_none_when_no_matching_block(self, com_backend):
+        """迴歸測試：找不到屬性塊時 return_block 未初始化會 UnboundLocalError，
+        導致真正的原因被外層 except 吞掉並記錄成誤導的錯誤訊息。"""
+        other = _make_mock_block_ref("other", [_make_mock_attribute("foo", "bar")])
+        layout = _make_mock_layout("Layout1", blocks=[other])
+
+        result = com_backend.get_attribute_block(layout)
+        assert result is None
+        # 必須是「未找到屬性塊」而不是例外訊息
+        logged = " ".join(str(c) for c in com_backend.log.safe_log_insert.call_args_list)
+        assert "未找到屬性塊" in logged
+        assert "UnboundLocalError" not in logged
+
+    def test_returns_block_when_matching_tag_present(self, com_backend):
+        target = _make_mock_block_ref("title", [
+            _make_mock_attribute("project_name", "P1")])
+        layout = _make_mock_layout("Layout1", blocks=[target])
+
+        result = com_backend.get_attribute_block(layout)
+        assert result is target
+
 
 class TestCOMClearTableId:
     def test_accepts_string_layout_name(self, com_backend):
@@ -416,9 +487,6 @@ class TestCOMProcessPrNo:
         mock_doc.FullName = "C:\\test.dwg"
         com_backend.acad = MagicMock()
         com_backend.doc = mock_doc
-
-        import pythoncom
-        pythoncom.CoInitialize = MagicMock()
 
         main_body = MagicMock()
         com_backend.connect_autocad(main_body)

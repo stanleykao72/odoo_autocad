@@ -5,7 +5,10 @@ a = Analysis(
     ['odoo.py'],
     pathex=['libs/autocad-mcp/src'],
     binaries=[],
-    datas=[('config', 'config'), ('fonts', 'fonts'), ('icon', 'icon'), ('db', 'db'), ('libs/autocad-mcp/lisp-code', 'lisp-code')],
+    # 不打包 config/ 與 db/：兩者都含 Odoo API token，
+    # 且執行期實際讀的是 c:/odoo/config/*.yaml 與 %APPDATA%/OdooAutoCAD/database.db，
+    # 打包進去的副本從未被讀取，只會讓憑證隨安裝包散佈。
+    datas=[('fonts', 'fonts'), ('icon', 'icon'), ('libs/autocad-mcp/lisp-code', 'lisp-code')],
     hiddenimports=['customtkinter', 'win32com.client', 'win32com.gen_py', 'pywintypes', 'win32api', 'tkinter', 'tkinter.ttk', 'sqlalchemy', 'sqlalchemy.ext.declarative', 'sqlalchemy.orm', 'mcp', 'mcp.server.fastmcp', 'mcp.types', 'uvicorn', 'starlette', 'structlog', 'autocad_mcp', 'autocad_mcp.server', 'autocad_mcp.client', 'autocad_mcp.config', 'autocad_mcp.backends', 'autocad_mcp.backends.file_ipc', 'autocad_mcp.backends.ezdxf_backend', 'httpx', 'anyio', 'sniffio', 'httpx_sse', 'pydantic', 'pydantic_settings', 'sse_starlette'],
     hookspath=[],
     hooksconfig={},

@@ -38,7 +38,6 @@ logs/
 .coverage
 htmlcov/
 .tox/
-pytest.ini
 .testmondata
 
 # Build outputs
@@ -75,9 +74,10 @@ db/*.sqlite
 db/*.sqlite3
 
 # Configuration files with sensitive data
-config/*_prod*.yaml
-config/*token*.yaml
-config/server_*prod*.yaml
+# server*.yaml 的 url 內含 API token、token*.yaml 內含使用者 token，
+# 因此一律不追蹤實際設定檔，只保留 *.yaml.example 範本。
+config/*.yaml
+!config/*.yaml.example
 
 # Temporary files
 *.tmp

@@ -149,19 +149,21 @@ def odoo_create_pr() -> Dict[str, Any]:
 
 
 @mcp.tool()
-def odoo_get_setup(project_id: int = 0) -> Dict[str, Any]:
-    """Get setup/configuration values from Odoo (products, specs, etc.)
+def odoo_get_setup(setup_name: str) -> Dict[str, Any]:
+    """Get setup/configuration values from Odoo by setup name.
 
     Args:
-        project_id: Odoo project ID
+        setup_name: Odoo setup record name (e.g. "product_category")
     """
-    logger.info(f"odoo_get_setup called, project_id={project_id}")
+    logger.info(f"odoo_get_setup called, setup_name={setup_name}")
     try:
         odoo = _get_odoo_util()
         if odoo is None:
             return {"success": False, "error": "Odoo not connected"}
 
-        setup = odoo.get_setup(project_id)
+        setup = odoo.get_setup(setup_name)
+        if isinstance(setup, str):
+            return {"success": False, "error": setup}
         return {"success": True, "setup": setup}
     except Exception as e:
         logger.error(f"odoo_get_setup error: {e}")
@@ -169,16 +171,30 @@ def odoo_get_setup(project_id: int = 0) -> Dict[str, Any]:
 
 
 @mcp.tool()
-def odoo_get_colors() -> Dict[str, Any]:
-    """Get available color options from Odoo."""
-    logger.info("odoo_get_colors called")
+def odoo_get_colors(project_id: int = 0) -> Dict[str, Any]:
+    """Get available color options for a project from Odoo.
+
+    Args:
+        project_id: Odoo project ID (0 = use the project currently loaded
+                    from the AutoCAD drawing)
+    """
+    logger.info(f"odoo_get_colors called, project_id={project_id}")
     try:
         odoo = _get_odoo_util()
         if odoo is None:
             return {"success": False, "error": "Odoo not connected"}
 
-        colors = odoo.get_color()
-        return {"success": True, "colors": colors}
+        if not project_id:
+            project_id = getattr(_autocad_dispatcher, 'project_id', None) \
+                if _autocad_dispatcher is not None else None
+        if not project_id:
+            return {"success": False,
+                    "error": "No project_id given and none available from the drawing"}
+
+        colors = odoo.get_color(project_id)
+        if isinstance(colors, str):
+            return {"success": False, "error": colors}
+        return {"success": True, "project_id": project_id, "colors": colors}
     except Exception as e:
         logger.error(f"odoo_get_colors error: {e}")
         return {"success": False, "error": str(e)}
@@ -242,8 +258,10 @@ def main():
     if args.transport == "stdio":
         mcp.run(transport="stdio")
     elif args.transport == "streamable-http":
-        mcp.run(transport="streamable-http",
-                streamable_http_params={"port": args.port})
+        # FastMCP.run() 只接受 (transport, mount_path)；host/port 由 settings 提供
+        mcp.settings.host = "127.0.0.1"
+        mcp.settings.port = args.port
+        mcp.run(transport="streamable-http")
 
 
 if __name__ == "__main__":

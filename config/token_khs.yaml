@@ -1,4 +1,0 @@
-user:
-  token: ''
-  # server_file: 'C:/odoo/odoo_autocad/config/server_prod_khs.yaml'
-  server_file: 'C:/odoo/odoo_autocad/config/server_khs.yaml'

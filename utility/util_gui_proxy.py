@@ -14,78 +14,81 @@ import logging
 
 class GUIProxy:
     """GUI代理執行器 - 處理跨線程COM操作"""
-    
-    def __init__(self, logger=None):
+
+    # 預設等待 GUI 主線程回覆的秒數
+    DEFAULT_TIMEOUT = 10.0
+
+    def __init__(self, logger=None, timeout: float = None):
         self.logger = logger or logging.getLogger(__name__)
-        
-        # 請求和響應隊列
+
+        # 請求隊列；每個請求自帶一個回覆 queue，避免共用 cache 造成洩漏
         self.request_queue = queue.Queue()
-        self.response_cache = {}
         self.request_id_counter = 0
         self.lock = threading.Lock()
-        
+        self.timeout = timeout if timeout is not None else self.DEFAULT_TIMEOUT
+
         # GUI處理器函數註冊
         self.handlers = {}
-        
+
         # 狀態
         self.is_running = False
-        
+
     def register_handler(self, action_name: str, handler_func: Callable):
         """註冊GUI處理器函數"""
         self.handlers[action_name] = handler_func
         if hasattr(self.logger, 'info'):
             self.logger.info(f"[GUI Proxy] 註冊處理器: {action_name}")
         
-    def execute_in_gui(self, action: str, **kwargs) -> Dict[str, Any]:
+    def execute_in_gui(self, action: str, timeout: float = None, **kwargs) -> Dict[str, Any]:
         """
         在GUI線程中執行操作
-        
+
         Args:
             action: 要執行的操作名稱
+            timeout: 等待秒數（None 使用 self.timeout）
             **kwargs: 操作參數
-            
+
         Returns:
             Dict[str, Any]: 操作結果
         """
         with self.lock:
             self.request_id_counter += 1
             request_id = f"req_{self.request_id_counter}"
-        
-        # 創建請求
+
+        # 每個請求自帶回覆 queue：超時後 queue 隨請求一起被回收，
+        # 不會像共用 cache 那樣留下無人取走的響應而持續累積記憶體。
+        reply_queue = queue.Queue(maxsize=1)
         request = {
             "id": request_id,
             "action": action,
             "params": kwargs,
-            "timestamp": time.time()
+            "timestamp": time.time(),
+            "reply_queue": reply_queue,
         }
-        
+
         if hasattr(self.logger, 'info'):
             self.logger.info(f"[GUI Proxy] 發送請求: {action} (ID: {request_id})")
-        
+
         # 發送到GUI線程
         self.request_queue.put(request)
-        
-        # 等待響應 (最多10秒)
-        timeout = 10.0
-        start_time = time.time()
-        
-        while time.time() - start_time < timeout:
-            if request_id in self.response_cache:
-                response = self.response_cache.pop(request_id)
-                if hasattr(self.logger, 'info'):
-                    self.logger.info(f"[GUI Proxy] 收到響應: {request_id}")
-                return response
-            time.sleep(0.1)
-        
-        # 超時
-        if hasattr(self.logger, 'error'):
-            self.logger.error(f"[GUI Proxy] 請求超時: {request_id}")
-        return {
-            "success": False,
-            "error": f"GUI代理執行超時 (操作: {action})",
-            "timeout": True
-        }
-        
+
+        # 阻塞等待回覆（不再忙等輪詢）
+        wait = self.timeout if timeout is None else timeout
+        try:
+            response = reply_queue.get(timeout=wait)
+            if hasattr(self.logger, 'info'):
+                self.logger.info(f"[GUI Proxy] 收到響應: {request_id}")
+            return response
+        except queue.Empty:
+            if hasattr(self.logger, 'error'):
+                self.logger.error(f"[GUI Proxy] 請求超時: {request_id}")
+            return {
+                "success": False,
+                "error": f"GUI代理執行超時 (操作: {action})",
+                "timeout": True
+            }
+
+
     def process_requests(self):
         """
         處理請求隊列 (在GUI主線程中調用)
@@ -134,9 +137,16 @@ class GUIProxy:
                                 "exception_type": type(e).__name__
                             }
                     
-                    # 保存響應
-                    self.response_cache[request_id] = response
-                    
+                    # 回傳響應；若呼叫端已超時離開，put_nowait 會滿而被丟棄
+                    reply_queue = request.get("reply_queue")
+                    if reply_queue is not None:
+                        try:
+                            reply_queue.put_nowait(response)
+                        except queue.Full:
+                            if hasattr(self.logger, 'warning'):
+                                self.logger.warning(
+                                    f"[GUI Proxy] 呼叫端已離開，丟棄響應: {request_id}")
+
                 except queue.Empty:
                     break
                 except Exception as e:

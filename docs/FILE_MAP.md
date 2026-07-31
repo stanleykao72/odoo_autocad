@@ -6,10 +6,10 @@ Complete listing of all source files and their roles.
 
 ```
 odoo.py                        Entry point (CLI + GUI launcher)
-mcp_server_autocad.py          MCP server (5 Odoo tools, FastMCP)
-mcp_server_fastmcp.py          [deprecated] Legacy SSE MCP server
+mcp_server_autocad.py          MCP server (13 tools: 8 autocad-mcp + 5 Odoo)
 CLAUDE.md                      Project instructions for Claude Code
 version.py                     Single source of truth for APP_VERSION
+pytest.ini                     Test config (live AutoCAD tests deselected by default)
 ```
 
 ## forms/ — GUI
@@ -31,14 +31,16 @@ util_push_to_boq.py            BOQ push workflow orchestrator
 util_transfer_boq_to_pr.py     PR generation workflow orchestrator
 util_gui_proxy.py              Thread-safe COM execution (queue-based)
 util_mcp_manager.py            MCP server lifecycle manager (in-process)
-util_mcp_sse_manager.py        [deprecated] Legacy SSE server manager
-util_mcp_sse_server.py         [deprecated] Legacy SSE server wrapper
 util_log.py                    GUI + console logger
 util_load_yaml_config.py       YAML configuration loader
-util_get_product_config.py     Product/setup config fetcher (legacy)
-util_com_server.py             COM server registration for AutoCAD ribbon
-util_nlp_processor.py          Natural language processor (legacy)
+util_secrets.py                Secret masking for log output
 popup_selector.py              Popup selection dialog
+```
+
+## utility/ — ABC contract
+
+```
+autocad_backend_interface.py   ABC: 17 abstract methods both backends implement
 ```
 
 ## models/ — Data
@@ -57,10 +59,13 @@ enhanced_widgets.py            Enhanced Tkinter widgets (legacy)
 
 ## config/ — Configuration
 
+實際設定檔含 API token，**不進 git**（見 `.gitignore`），repo 只提供範本：
+
 ```
-server.yaml                    Odoo connection (host, db, url)
-server_prod.yaml               Production variant
-token.yaml                     API token
+server.yaml.example            Odoo connection template (host, db, url)
+token.yaml.example             API token template
+server.yaml / server_*.yaml    [not tracked] actual connection settings
+token.yaml / token_*.yaml      [not tracked] actual API tokens
 ```
 
 ## autolisp/ — AutoCAD Side
@@ -105,12 +110,17 @@ README-DEVELOPMENT.md          Development environment setup
 UI_IMPROVEMENT_PLAN.md         UI modernization plan
 ```
 
-## Deprecated Files
+## Removed Files
 
-Files kept for backward compatibility but no longer imported by main code:
+已刪除的檔案（可由 git 歷史取回）：
 
 ```
-mcp_server_fastmcp.py          → replaced by mcp_server_autocad.py
+mcp_server_fastmcp.py           → replaced by mcp_server_autocad.py
 utility/util_mcp_sse_manager.py → replaced by util_mcp_manager.py
 utility/util_mcp_sse_server.py  → replaced by mcp_server_autocad.py
+ai_assistant/                   → TCP Socket + Named Pipe MCP，由 FastMCP 取代
+forms/form_main.py              → 舊版 GUI，由 form_main_modern.py 取代
+utility/util_com_server.py      → legacy COM server（呼叫者 autolisp/legacy/call_python.lsp）
+utility/util_nlp_processor.py   → 未使用
+utility/util_get_product_config.py → 未使用
 ```

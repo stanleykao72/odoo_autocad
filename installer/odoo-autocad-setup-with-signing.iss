@@ -2,7 +2,10 @@
 ; 包含程式碼簽章配置的 Inno Setup 腳本
 
 #define MyAppName "Odoo and AutoCAD Integration"
-#define MyAppVersion "5.0"
+; MyAppVersion 由建置腳本透過 /D 傳入，預設 "6.0"
+#ifndef MyAppVersion
+  #define MyAppVersion "6.0"
+#endif
 #define MyAppPublisher "承暉精品股份有限公司"
 #define MyAppURL "https://odoo-esmith.odoo.com/"
 #define MyAppExeName "odoo-autocad-integration.exe"
@@ -26,7 +29,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 ChangesAssociations=yes
 DisableProgramGroupPage=yes
 OutputDir=C:\odoo\autocad_source\installer
-OutputBaseFilename=odoo-autocad-integration-5.0-setup
+OutputBaseFilename=odoo-autocad-integration-{#MyAppVersion}-setup
 SetupIconFile=C:\odoo\autocad_source\icon\odoo_autocad.ico
 Compression=lzma
 SolidCompression=yes

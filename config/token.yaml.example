@@ -1,0 +1,5 @@
+# 複製此檔為 config/token.yaml（或 c:/odoo/config/token.yaml）後填入實際值。
+# token.yaml 已列入 .gitignore，請勿提交。
+user:
+  token: YOUR_ODOO_API_TOKEN_HERE
+  server_file: c:/odoo/config/server.yaml
