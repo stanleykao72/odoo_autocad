@@ -931,47 +931,6 @@ class UtilAutoCAD(AutoCADBackendInterface):
         for widget in main_body.winfo_children():
             widget.destroy()
     
-    def scan_entities(self):
-        """掃描AutoCAD圖面中的所有實體"""
-        entities = []
-        try:
-            if not self.acad or not self.doc:
-                self.log.safe_log_insert("AutoCAD未連接，無法掃描實體\n")
-                return entities
-            
-            # 掃描模型空間中的所有實體
-            model_space = self.doc.ModelSpace
-            for entity in model_space:
-                entity_info = {
-                    'type': entity.ObjectName,
-                    'layer': getattr(entity, 'Layer', 'Unknown'),
-                    'handle': str(entity.Handle) if hasattr(entity, 'Handle') else 'Unknown'
-                }
-                
-                # 根據實體類型添加特定屬性
-                if hasattr(entity, 'StartPoint') and hasattr(entity, 'EndPoint'):
-                    # 線段類實體
-                    entity_info['start_point'] = list(entity.StartPoint)
-                    entity_info['end_point'] = list(entity.EndPoint)
-                elif hasattr(entity, 'Center') and hasattr(entity, 'Radius'):
-                    # 圓形類實體
-                    entity_info['center'] = list(entity.Center)
-                    entity_info['radius'] = entity.Radius
-                elif hasattr(entity, 'TextString'):
-                    # 文字類實體
-                    entity_info['text'] = entity.TextString
-                    if hasattr(entity, 'InsertionPoint'):
-                        entity_info['position'] = list(entity.InsertionPoint)
-                
-                entities.append(entity_info)
-            
-            self.log.safe_log_insert(f"掃描完成，找到 {len(entities)} 個實體\n")
-            return entities
-            
-        except Exception as e:
-            self.log.safe_log_insert(f"掃描實體時發生錯誤: {str(e)}\n")
-            return entities
-    
     def get_layouts(self):
         """獲取所有佈局資訊"""
         layouts = []
