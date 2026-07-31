@@ -147,3 +147,62 @@ class TestWriteBackSkipsTotalRow:
         written_rows = [c.args[1] for c in backend.set_table_value.call_args_list]
         assert 4 not in written_rows, "合計列（r4）不可寫入 detail_id"
         assert 2 in written_rows, "資料列（r2）應寫入"
+
+
+class TestHeaderIdColumnIsScanned:
+    """HEADER_ID 位置改為掃描第 0 列，不再寫死欄索引。
+
+    第 0 列的標題（如「加工細節」）是跨欄合併的，合併範圍一調整
+    HEADER_ID 就會落到不同欄；寫死 (0,7) 會因版面微調而失效。
+    """
+
+    def _grid_with_header_at(self, col, total_cols=12):
+        row0 = [''] * total_cols
+        row0[0] = '加工細節'
+        row0[col] = 'HEADER_ID'
+        row0[col + 1] = 'H777'
+        rest = _real_grid()[1:]
+        return [row0] + [r + [''] * (total_cols - len(r)) for r in rest]
+
+    @pytest.mark.parametrize("col", [5, 7, 9])
+    def test_detects_header_id_at_any_column(self, backend, col):
+        table = _table(self._grid_with_header_at(col))
+        assert backend.chk_legal_table(table) == "Y"
+        header_id, _ = backend.get_table_data([table])
+        assert header_id == 'H777', f"HEADER_ID 在 c{col} 時應讀到右一格的值"
+
+    def test_case_and_whitespace_tolerant(self, backend):
+        grid = _real_grid()
+        grid[0][7] = '  header_id  '
+        table = _table(grid)
+        assert backend.chk_legal_table(table) == "Y"
+        header_id, _ = backend.get_table_data([table])
+        assert header_id == 'H999'
+
+    def test_rejected_when_label_is_last_column(self, backend):
+        """標籤在最後一欄 —— 右邊沒有存值的格子"""
+        grid = _real_grid()
+        grid[0][7] = ''
+        for r in grid:
+            while len(r) > 12:
+                r.pop()
+        grid[0][11] = 'HEADER_ID'
+        assert backend.chk_legal_table(_table(grid)) == "N"
+
+    def test_write_back_uses_scanned_column(self, backend):
+        table = _table(self._grid_with_header_at(9))
+        backend.set_table_value = MagicMock()
+        layout = MagicMock()
+        layout.Block = [table]
+        backend.get_layout_from_name = MagicMock(return_value=layout)
+        backend.get_layout_table_block = MagicMock(return_value=[table])
+
+        backend.set_layouts_tables_id([{
+            'layout_name': '01', 'header_id': 'NEW',
+            'detail': [{'product_no': 'E169-209', 'detail_id': 'D1'}],
+        }])
+
+        header_writes = [c.args for c in backend.set_table_value.call_args_list
+                         if c.args[1] == 0]
+        assert header_writes, "應寫入 header_id"
+        assert header_writes[0][2] == 10, "HEADER_ID 在 c9 時，值應寫到 c10"

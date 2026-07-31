@@ -615,9 +615,8 @@ class UtilAutoCAD(AutoCADBackendInterface):
     BOQ_COLUMNS = ['position', 'product_no', 'width', 'height', 'len',
                    'thickness', 'qty', 'desc', 'detail_id']
     BOQ_COL_COUNT = len(BOQ_COLUMNS)          # 9
-    HEADER_ID_LABEL_COL = 7                   # (0,7) = "HEADER_ID" 標籤
-    HEADER_ID_VALUE_COL = 8                   # (0,8) = header_id 值
     DETAIL_ID_COL = 8                         # 資料列的 detail_id 欄
+    HEADER_ID_LABEL = "HEADER_ID"             # 第 0 列的標籤文字，值在其右一格
 
     # 合計列不進 Odoo：以第一欄的文字判斷
     TOTAL_ROW_LABELS = {'合計', '總計', '小計', 'total'}
@@ -632,23 +631,49 @@ class UtilAutoCAD(AutoCADBackendInterface):
             return False
         return str(first).strip().lower() in self.TOTAL_ROW_LABELS
 
+    def _find_header_id_value_col(self, table):
+        """在第 0 列掃描 "HEADER_ID" 標籤，回傳存放其值的欄索引（標籤右一格）。
+
+        不寫死欄位位置 —— 第 0 列的標題（如「加工細節」）是跨欄合併的，
+        合併範圍一調整，HEADER_ID 就會落在不同欄。掃描才不會因版面微調失效。
+
+        Returns:
+            int 欄索引，或 None（找不到標籤／標籤右邊沒有欄位）
+        """
+        try:
+            cols = table.Columns
+        except Exception:
+            return None
+
+        for c in range(cols):
+            try:
+                value = table.GetCellValue(0, c)
+            except Exception:
+                continue
+            if value and str(value).strip().upper() == self.HEADER_ID_LABEL:
+                value_col = c + 1
+                if value_col < cols:
+                    return value_col
+                self.log.safe_log_insert(
+                    f"表格第 0 列的 {self.HEADER_ID_LABEL} 位於最後一欄 (c{c})，"
+                    "右邊沒有存放值的格子\n")
+                return None
+        return None
+
     def chk_legal_table(self, table):
         """
         檢查給定的塊是否為合法的 BOQ 表格。
 
-        規則：欄數 >= 9 且 (0,7) 為 "HEADER_ID"。
+        規則：欄數 >= 9，且第 0 列有 "HEADER_ID" 標籤（其右一格存放值）。
 
-        欄數改為「至少」9 而非「剛好」9 —— 新版表格在 DETAIL ID 右側還有
-        欄位，且數量不固定（實測 Columns=12）。舊版寫死 cols == 9，會讓整張
-        表格判定為不合法而完全不被讀取。右側多出來的欄位一律忽略。
+        欄數為「至少」9 而非「剛好」9 —— 新版表格在 DETAIL ID 右側還有欄位，
+        且數量不固定（實測 Columns=12）。舊版寫死 cols == 9，會讓整張表格
+        判定為不合法而完全不被讀取。右側多出來的欄位一律忽略。
         """
         try:
-            cols = table.Columns
-            if cols < self.BOQ_COL_COUNT:
+            if table.Columns < self.BOQ_COL_COUNT:
                 return "N"
-
-            header_label = table.GetCellValue(0, self.HEADER_ID_LABEL_COL)
-            return "Y" if header_label == "HEADER_ID" else "N"
+            return "Y" if self._find_header_id_value_col(table) is not None else "N"
 
         except Exception as e:
             self.log.safe_log_insert(f"檢查合法表格時發生錯誤: {str(e)}\n")
@@ -853,8 +878,14 @@ class UtilAutoCAD(AutoCADBackendInterface):
                     block_list = self.get_layout_table_block(layout.Block)
                     table_count = 0
                     for table in block_list:
-                        # set header_id
-                        self.set_table_value(table, 0, self.HEADER_ID_VALUE_COL, header_id)
+                        # set header_id（欄位由第 0 列掃描 HEADER_ID 標籤決定）
+                        value_col = self._find_header_id_value_col(table)
+                        if value_col is not None:
+                            self.set_table_value(table, 0, value_col, header_id)
+                        else:
+                            self.log.safe_log_insert(
+                                f"表格中找不到 {self.HEADER_ID_LABEL} 標籤，"
+                                "略過 header_id 寫入\n")
                         table_count += 1
                         rows = table.Rows
                         for i in range(rows):
@@ -881,7 +912,9 @@ class UtilAutoCAD(AutoCADBackendInterface):
             col_name_list = self.BOQ_COLUMNS
             for i in range(rows):
                 if i == 0:
-                    header_id = table.GetCellValue(i, self.HEADER_ID_VALUE_COL)
+                    value_col = self._find_header_id_value_col(table)
+                    header_id = (table.GetCellValue(0, value_col)
+                                 if value_col is not None else None)
                 if i > 1:
                     # 合計列不進 Odoo
                     if self._is_total_row(table, i):
