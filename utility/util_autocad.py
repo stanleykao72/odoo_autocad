@@ -388,39 +388,6 @@ class UtilAutoCAD(AutoCADBackendInterface):
             self.log.safe_log_insert(f"設置屬性值時發生錯誤: {str(e)}\n")
             return None
 
-    def _set_attributes_in_model(self, attrs, requested_layout):
-        """在 Model 空間的屬性區塊寫入（配置本身沒有屬性區塊時的退路）。
-
-        Returns:
-            bool — 是否確實寫入了至少一個欄位
-        """
-        try:
-            model = self.acad.ActiveDocument.Layouts.Item("Model").Block
-        except Exception:
-            return False
-
-        for block in model:
-            if block.ObjectName != "AcDbBlockReference" or not block.HasAttributes:
-                continue
-            tags = {att.TagString.upper(): att for att in block.GetAttributes()}
-            if not any(t in tags for t in ['PR_NO', 'PROJECT_NAME', 'JOB_WORKING_PLAN_NAME']):
-                continue
-            written = 0
-            for tag, val in attrs.items():
-                tag_upper = tag.upper()
-                if tag_upper in tags:
-                    old = tags[tag_upper].TextString
-                    tags[tag_upper].TextString = str(val)
-                    written += 1
-                    self.log.safe_log_insert(
-                        f"設置屬性 '{tag}' 從 '{old}' 為 '{val}'\n")
-            if written:
-                self.log.safe_log_insert(
-                    f"（配置 {requested_layout} 內無屬性區塊，已寫入 Model 空間的區塊 "
-                    f"{block.Name}）\n")
-                return True
-        return False
-
     def set_block_attributes(self, attrs, layout_name=None):
         """Write multiple attributes to the attribute block in AutoCAD (COM mode).
 
@@ -464,13 +431,15 @@ class UtilAutoCAD(AutoCADBackendInterface):
             except Exception as e:
                 self.log.safe_log_insert(f"寫入屬性失敗 ({layout_name}): {e}\n")
                 raise
-            # 配置中找不到屬性區塊 —— 常見情況是標題欄位的屬性區塊放在 Model
-            # 空間，配置只是透過視埠看到它。此時退回 Model 空間寫入。
-            # （每個配置各有標題欄的圖面不會走到這裡，行為不受影響。）
-            if layout_name != "Model" and self._set_attributes_in_model(attrs, layout_name):
-                return True
-            # 不可回傳 True，否則呼叫端會誤判為成功
-            raise RuntimeError(f"配置 {layout_name} 及 Model 中都找不到屬性區塊")
+            # 配置中找不到屬性區塊 —— 必須據實報錯，不可回傳 True，
+            # 否則呼叫端（參數表單）會誤判為成功。
+            #
+            # 刻意不退回 Model 空間：屬性必須寫在使用者指定的那個配置裡，
+            # 寫到 Model 會讓所有配置共用同一份值，不是預期行為。
+            raise RuntimeError(
+                f"配置 {layout_name} 中找不到屬性區塊 —— "
+                f"請確認該配置的圖紙空間內有含屬性的標題欄區塊"
+                f"（若標題欄放在 Model 空間，配置只會透過視埠看到它，無法寫入）")
         else:
             # Write to all layouts
             for layout in doc.Layouts:
