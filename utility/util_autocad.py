@@ -121,6 +121,7 @@ class UtilAutoCAD(AutoCADBackendInterface):
             retry_delay = 1  # 秒
             self.doc = None
             self.acad = None
+            all_rejected = True  # 是否每一次都是 RPC_E_CALL_REJECTED
             for attempt in range(retry_count):
                 try:
                     idisp = raw.QueryInterface(pythoncom.IID_IDispatch)
@@ -136,20 +137,27 @@ class UtilAutoCAD(AutoCADBackendInterface):
                     hr = e.args[0] if e.args else None
                     if hr == RPC_E_CALL_REJECTED:
                         self.log.safe_log_insert(
-                            f"AutoCAD 忙碌中，重試... ({attempt + 1}/{retry_count})\n")
+                            f"AutoCAD 拒絕 COM 呼叫，重試... ({attempt + 1}/{retry_count})\n")
                     else:
+                        all_rejected = False
                         self.log.safe_log_insert(
                             f"COM 錯誤: {e} ({attempt + 1}/{retry_count})\n")
                     time.sleep(retry_delay)
                 except (AttributeError, Exception) as e:
+                    all_rejected = False
                     self.log.safe_log_insert(
                         f"等待 AutoCAD 就緒... ({attempt + 1}/{retry_count}) [{type(e).__name__}]\n")
                     time.sleep(retry_delay)
             else:
-                self.log.safe_log_insert(
-                    "無法獲取 ActiveDocument，請確認 AutoCAD 已開啟且有文件。\n")
+                if all_rejected:
+                    self._log_com_rejected_help()
+                else:
+                    self.log.safe_log_insert(
+                        "❌ 無法獲取 ActiveDocument，請確認 AutoCAD 已開啟且有文件。\n")
                 self.doc = None
                 self.acad = None
+                # 原因已在上面說明，不再重複輸出後面那句籠統訊息
+                return
 
             if self.acad and self.doc:
                 # 獲取檔案名稱及路徑
@@ -169,6 +177,29 @@ class UtilAutoCAD(AutoCADBackendInterface):
                 
         except Exception as e:
             main_body.after(1000, lambda e=e: self.log.safe_log_insert(f"連接 AutoCAD 時發生錯誤: {str(e)}\n"))
+
+    def _log_com_rejected_help(self):
+        """AutoCAD 持續以 RPC_E_CALL_REJECTED 拒絕所有 COM 呼叫時的說明。
+
+        這種情況下 AutoCAD 是開著的、也有文件，舊訊息「請確認 AutoCAD 已開啟
+        且有文件」會把人導向錯誤方向。實測確認：此時連 VBScript 等完全獨立的
+        COM 客戶端也同樣被拒，代表是 AutoCAD 該實例的狀態問題，而非本程式；
+        另開一個乾淨的 AutoCAD 實例則 COM 完全正常。
+        """
+        self.log.safe_log_insert(
+            "❌ AutoCAD 持續拒絕 COM 呼叫 (RPC_E_CALL_REJECTED)\n")
+        self.log.safe_log_insert(
+            "   AutoCAD 已開啟且有文件，但它拒絕所有自動化呼叫 —— "
+            "這是該 AutoCAD 實例的狀態問題，與本程式無關。\n")
+        self.log.safe_log_insert("   建議依序嘗試：\n")
+        self.log.safe_log_insert(
+            "     1. 在 AutoCAD 中按 ESC，關閉所有對話框，確認命令列為 "
+            "\"指令:\" 待命狀態\n")
+        self.log.safe_log_insert(
+            "     2. 重新啟動 AutoCAD（先直接開啟 AutoCAD，再開圖檔，"
+            "不要用雙擊圖檔的方式啟動）\n")
+        self.log.safe_log_insert(
+            "     3. 若仍無法連線，改用 IPC 模式（左側「模式」切換為 IPC）\n")
 
     def process_pr_no(self, layout_name):
         """
